@@ -20,6 +20,26 @@
                 }
             } catch (e) {}
 
+            /* 反馈页 / 评论区已经并进主页面（?view=feedback / ?view=comments），
+               原来 project_subpage/blog/ 下的那两个文件也挪进 /archive/ 归档了。
+               旧链接打到这两个路径时直接送去新地址，
+               老参数 article / title 顺手改名成 fa+ft（反馈）、ca+ct（评论）。 */
+            try {
+                var legacy = window.location.pathname.match(/\/project_subpage\/blog\/(feedback|comments)\.html$/i);
+                if (legacy) {
+                    var view = legacy[1].toLowerCase();
+                    var old = new URLSearchParams(window.location.search);
+                    var next = new URLSearchParams();
+                    next.set('view', view);
+                    var legacyArticle = old.get('article');
+                    var legacyTitle = old.get('title');
+                    if (legacyArticle) next.set(view === 'feedback' ? 'fa' : 'ca', legacyArticle);
+                    if (legacyTitle) next.set(view === 'feedback' ? 'ft' : 'ct', legacyTitle);
+                    window.location.replace('/index.html?' + next.toString());
+                    return;
+                }
+            } catch (e) {}
+
             try {
                 var t = localStorage.getItem('annie-theme');
                 var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;

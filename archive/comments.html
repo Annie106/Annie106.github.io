@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Annie · 文章评论</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="stylesheet" href="../css/style.css">
+<meta name="robots" content="noindex">
+<!-- 这个文件现在是「跳转桩」：
+     评论区已经搬进博客主页面，地址是 index.html?view=comments
+     （和「问题反馈」「本周折腾」同一套站内视图）。
+     留在这里是为了两件事：
+       1. 以前分享出去 / 被收藏的 comments.html?article=3&title=… 不会 404；
+       2. 旧入口跟过来也能落到新地址。
+     参数要顺手改名：老地址用 article / title，新地址用 ca / ct
+     （?article= 在新主页面的含义是「打开这篇文章」，不能混用）。 -->
+<script>
+  (function () {
+    try {
+      var saved = localStorage.getItem('annie-theme');
+      var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.setAttribute(
+        'data-theme',
+        saved === 'light' || saved === 'dark' ? saved : (dark ? 'dark' : 'light')
+      );
+    } catch (e) {}
+  })();
+</script>
+<style>
+  html, body { overflow-x: hidden; }
+  .redirect-note {
+    max-width: 420px;
+    margin: 0 auto;
+    padding: 120px 24px 96px;
+    text-align: center;
+    font-size: 0.9375rem;
+    line-height: 1.9;
+    color: var(--color-text-secondary);
+  }
+  .redirect-note a {
+    color: var(--color-text-primary);
+  }
+</style>
+</head>
+<body>
+
+<div class="main-container">
+  <p class="redirect-note">
+    正在打开评论区…
+    <br><a href="../index.html?view=comments" id="redirectFallback">如果没有自动跳转，点这里</a>
+  </p>
+</div>
+
+<script>
+  (function () {
+    var link = document.getElementById('redirectFallback');
+    var target;
+    try {
+      var params = new URLSearchParams(window.location.search);
+      target = new URL('../index.html', window.location.href);
+      target.searchParams.set('view', 'comments');
+      var articleId = params.get('article');
+      var articleTitle = params.get('title');
+      if (articleId) target.searchParams.set('ca', articleId);
+      if (articleTitle) target.searchParams.set('ct', articleTitle);
+      // 兜底链接也带上同样的参数，脚本被拦掉时手动点也能定位到那篇文章
+      link.href = target.href;
+      // replace 而不是 assign：跳转桩不留在历史记录里
+      window.location.replace(target.href);
+    } catch (e) {
+      window.location.replace('../index.html?view=comments');
+    }
+  })();
+</script>
+
+</body>
+</html>

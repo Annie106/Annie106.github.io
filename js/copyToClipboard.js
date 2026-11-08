@@ -3,7 +3,7 @@
     // 不再弹浏览器原生的 alert 对话框。
     //
     // 样式在 css/style.css 的「顶部轻提示」一节，和「链接已复制」
-    // 那个提示完全一致：白底卡片、绿色链接图标、顶部居中、3.2 秒后淡出。
+    // 那个提示完全一致：白底卡片、绿色勾图标、导航下方居中、3.6 秒后淡出。
     //
     // 有些页面（比如按指南改出来的子页面）没有 #siteToast 节点，
     // 这里按需创建一个，保证 copyToClipboard() 在哪儿都能用。
@@ -22,7 +22,7 @@
         toast.hidden = true;
 
         var icon = document.createElement('i');
-        icon.className = 'ri-link';
+        icon.className = 'ri-checkbox-circle-line';
         icon.setAttribute('aria-hidden', 'true');
 
         var text = document.createElement('span');
@@ -41,9 +41,20 @@
 
         text.textContent = message;
         toast.classList.toggle('is-error', !!isError);
+        // 图标要跟着结果换：成功是勾，失败是感叹号
+        //（只靠 .is-error 改颜色的话，失败还挂着一个勾，语义是反的）
+        var icon = toast.querySelector('i');
+        if (icon) {
+            icon.className = isError ? 'ri-error-warning-line' : 'ri-checkbox-circle-line';
+        }
 
         clearTimeout(copyToastTimer);
         clearTimeout(copyToastCleanupTimer);
+
+        // 上一条还在屏幕上（比如点了微信紧接着点 QQ）：
+        // 只换文案会硬切，这里把入场动画重头播一遍。
+        // 判断必须放在 hidden = false 之前，否则永远是 false。
+        var replaying = !toast.hidden && toast.classList.contains('visible');
 
         // 先让元素变成 display:flex，并强制一次样式重算，
         // 否则 display:none → flex 和 opacity:0 → 1 会被合并进同一次
@@ -52,13 +63,22 @@
         void toast.offsetHeight;
         toast.classList.add('visible');
 
+        if (replaying) {
+            // 摘类 → 强制重排 → 加回来，@keyframes 才会跳回 0% 重播
+            toast.classList.remove('is-replaying');
+            void toast.offsetWidth;
+            toast.classList.add('is-replaying');
+        }
+
         copyToastTimer = setTimeout(function () {
             toast.classList.remove('visible');
+            // 动画类是 fill: both，留着会把 opacity 钉在 1、收不起来
+            toast.classList.remove('is-replaying');
             // 等淡出过渡走完再真正隐藏，否则会被 display:none 打断
             copyToastCleanupTimer = setTimeout(function () {
                 toast.hidden = true;
             }, 300);
-        }, 3200);
+        }, 3600);
     }
 
     function copyToClipboard(text, message) {

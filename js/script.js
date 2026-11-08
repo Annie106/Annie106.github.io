@@ -6,12 +6,13 @@
 
             // ==================== 统一管理文章卡片的二级菜单 ====================
             // 使用文章 id 对应菜单项；未配置的文章默认显示“评论”入口。
-            // type 可用 article（打开站内文章）、externalPage（打开文章的 externalPage）或 link（打开 url）。
-            // 菜单项支持三种类型：
-
-            // article：打开站内文章
-            // link：打开指定网址或 HTML 页面
-            // externalPage：打开该文章数据中的独立页面
+            // 菜单项支持这些类型：
+            //   article      打开站内文章
+            //   link         打开指定网址或 HTML 页面
+            //   externalPage 打开该文章数据中的独立页面
+            //   share        复制这篇文章的链接
+            //   comments     站内切到评论视图（?view=comments）
+            //   feedback     站内切到问题反馈视图（?view=feedback）
 
             const articleMenus = {
                 // 新增指南文章
@@ -55,6 +56,9 @@
             const movieSubmissionFrame = $('#movieSubmissionFrame');
             const movieSubmissionClose = $('#movieSubmissionClose');
             const viewArticle = $('#view-article');
+            const viewFeedback = $('#view-feedback');
+            const viewThanks = $('#view-thanks');
+            const viewComments = $('#view-comments');
             const postsListHome = $('#postsListHome');
             const postsListBlog = $('#postsListBlog');
             const tagFilterHome = $('#tagFilterHome');
@@ -126,6 +130,14 @@
             let embeddedFrameHeight = 0;
             let articleReturnView = 'home';
             let articleReturnScroll = 0;
+            /* 问题反馈视图要带的那篇文章。地址栏用 fa / ft 两个参数传，
+               不能复用 ?article= —— 那个参数的含义是「直接打开这篇文章」。 */
+            let feedbackContext = { id: '', title: '' };
+            /* 评论视图要带的那篇文章（ca / ct），同一个道理 */
+            let commentsContext = { id: '', title: '' };
+            let commentsEntryActive = false;
+            // 感谢页的倒计时句柄，切走视图时要清掉
+            let thanksCountdownTimer = null;
             // ==================== 搜索状态 ====================
             // 当前关键词始终以输入框的值为准，不另存一份，避免两边不一致。
             let searchOpen = false;
@@ -157,7 +169,10 @@
             let searchHistoryBackCallback = null;
             let articleHistoryEntryActive = false;
             let returningFromArticleButton = false;
-            const viewScrollPositions = { home: 0, blog: 0, movie: null, about: 0 };
+            const viewScrollPositions = {
+                home: 0, blog: 0, movie: null, about: 0,
+                archive: 0, tweaks: 0, feedback: 0, thanks: 0, comments: 0,
+            };
             /* 快速来回切换视图（首页 ⇄ 文章）时，每次切换都会让入场动画
                从 opacity:0 重新开始。间隔比 350ms 的动画还短的话，页面
                几乎一直停在半透明状态，看起来就是在「闪」。
@@ -234,7 +249,7 @@
             // 点击文章跳到独立 HTML 页面后，返回本站时恢复离开时所在的界面：
             // 视图（首页 / 文章列表 / 文章详情 / 电影 / 关于）、当前标签、滚动位置。
             const VIEW_STATE_KEY = 'annie-view-state';
-            const VALID_VIEWS = ['home', 'blog', 'archive', 'tweaks', 'movie', 'about', 'article'];
+            const VALID_VIEWS = ['home', 'blog', 'archive', 'tweaks', 'movie', 'about', 'article', 'feedback', 'thanks', 'comments'];
 
             function saveViewState() {
                 if (!VALID_VIEWS.includes(currentView)) return;
@@ -243,7 +258,8 @@
                 }
                 try {
                     sessionStorage.setItem(VIEW_STATE_KEY, JSON.stringify({
-                        view: currentView,
+                        // 感谢页是一次性的：下次进来还原到首页，别让人再看一遍倒计时
+                        view: currentView === 'thanks' ? 'home' : currentView,
                         articleId: currentArticleId,
                         tag: homeTag,
                         homeTag: homeTag,
@@ -252,6 +268,8 @@
                         scrollPositions: viewScrollPositions,
                         returnView: articleReturnView,
                         returnScroll: articleReturnScroll,
+                        feedbackArticle: feedbackContext.id,
+                        feedbackTitle: feedbackContext.title,
                     }));
                 } catch (e) {}
             }
@@ -281,6 +299,16 @@
             // 在别人的浏览器里也能直接打开对应文章（sessionStorage 只在本机有效）。
             const ARTICLE_PARAM = 'article';
             const VIEW_PARAM = 'view';
+            /* 反馈页的「针对哪篇文章」用单独的短参数名（fa = feedback article，
+               ft = feedback title）。之所以不直接用 article / title：
+               ?article=N 的含义是「打开第 N 篇文章」，init() 会先按它进文章视图，
+               两个语义撞在一起就没法区分「看文章」和「给这篇文章提意见」。 */
+            const FEEDBACK_ARTICLE_PARAM = 'fa';
+            const FEEDBACK_TITLE_PARAM = 'ft';
+            /* 评论视图同理，用 ca / ct（ca = comments article，ct = comments title），
+               也不能和 ?article= 混用 */
+            const COMMENTS_ARTICLE_PARAM = 'ca';
+            const COMMENTS_TITLE_PARAM = 'ct';
 
             function buildArticleUrl(id) {
                 const url = new URL(window.location.href);
@@ -311,10 +339,35 @@
                 } else {
                     url.searchParams.delete(ARTICLE_PARAM);
                 }
-                if (currentView === 'about' || currentView === 'archive' || currentView === 'tweaks') {
+                if (currentView === 'about' || currentView === 'archive' || currentView === 'tweaks'
+                    || currentView === 'feedback' || currentView === 'thanks'
+                    || currentView === 'comments') {
                     url.searchParams.set(VIEW_PARAM, currentView);
                 } else {
                     url.searchParams.delete(VIEW_PARAM);
+                }
+                /* 反馈页的文章上下文只在反馈视图里留在地址栏：
+                   离开时一并清掉，别让首页也拖着 ?fa=3&ft=… */
+                if (currentView === 'feedback' && feedbackContext.id) {
+                    url.searchParams.set(FEEDBACK_ARTICLE_PARAM, String(feedbackContext.id));
+                } else {
+                    url.searchParams.delete(FEEDBACK_ARTICLE_PARAM);
+                }
+                if (currentView === 'feedback' && feedbackContext.title) {
+                    url.searchParams.set(FEEDBACK_TITLE_PARAM, feedbackContext.title);
+                } else {
+                    url.searchParams.delete(FEEDBACK_TITLE_PARAM);
+                }
+                // 评论视图的 ca / ct 同理，切走就清掉
+                if (currentView === 'comments' && commentsContext.id) {
+                    url.searchParams.set(COMMENTS_ARTICLE_PARAM, String(commentsContext.id));
+                } else {
+                    url.searchParams.delete(COMMENTS_ARTICLE_PARAM);
+                }
+                if (currentView === 'comments' && commentsContext.title) {
+                    url.searchParams.set(COMMENTS_TITLE_PARAM, commentsContext.title);
+                } else {
+                    url.searchParams.delete(COMMENTS_TITLE_PARAM);
                 }
                 url.hash = '';
                 const next = url.pathname + url.search;
@@ -405,13 +458,29 @@
             // 顶部轻提示（复制成功等），样式复用 .site-toast
             let toastHideTimer = null;
             let toastCleanupTimer = null;
-            function showToast(message) {
+            // 留多久：原来 3.2s，提到 3.6s —— 提示改成从导航下方落下来之后，
+            // 用户的视线要先「找」到它，多给半秒才读得完一句话
+            const TOAST_DURATION = 3600;
+            function showToast(message, isError) {
                 const toast = document.getElementById('siteToast');
                 const text = document.getElementById('siteToastText');
                 if (!toast || !text) return;
                 text.textContent = message;
+                // 图标跟结果走：成功是勾、失败是感叹号。
+                // 只在 CSS 里给 .is-error 换色不够，图标本身也得换，
+                // 不然「复制失败」配一个勾会自相矛盾
+                const icon = toast.querySelector('i');
+                if (icon) {
+                    icon.className = isError ? 'ri-error-warning-line' : 'ri-checkbox-circle-line';
+                }
+                toast.classList.toggle('is-error', !!isError);
                 clearTimeout(toastHideTimer);
                 clearTimeout(toastCleanupTimer);
+
+                // 已经在屏幕上（上一条还没消失）：这时候只换文案是硬切，
+                // 得把入场动画重头播一遍，才算「又来了一条」。
+                // 判断要放在 hidden=false 之前，否则永远是 false。
+                const replaying = !toast.hidden && toast.classList.contains('visible');
 
                 // 关键：先让元素变成 display:flex，并强制一次样式重算，
                 // 把 opacity:0 变成"已经生效的起始状态"。
@@ -422,11 +491,20 @@
                 void toast.offsetHeight;
                 toast.classList.add('visible');
 
+                if (replaying) {
+                    // 先摘类再强制重排，动画才会真的从 0% 重播，而不是原地不动
+                    toast.classList.remove('is-replaying');
+                    void toast.offsetWidth;
+                    toast.classList.add('is-replaying');
+                }
+
                 toastHideTimer = setTimeout(() => {
                     toast.classList.remove('visible');
+                    // 连带动画类一起摘：animation-fill 是 both，留着会把 opacity 钉住
+                    toast.classList.remove('is-replaying');
                     // 等淡出过渡走完再真正隐藏，否则会被 display:none 打断
                     toastCleanupTimer = setTimeout(() => { toast.hidden = true; }, 300);
-                }, 3200);
+                }, TOAST_DURATION);
             }
 
             // 把链接写入剪贴板。优先 Clipboard API，失败则退回 execCommand。
@@ -464,7 +542,7 @@
                     // 失败时不再弹原生 prompt，统一用顶部轻提示告诉用户手动复制
                     showToast(ok
                         ? '链接已复制，打开连接可查看此文章'
-                        : '复制失败，可长按地址栏手动复制');
+                        : '复制失败，可长按地址栏手动复制', !ok);
                 });
             }
 
@@ -587,7 +665,7 @@
                 Promise.resolve(copyLink(url)).then(function (ok) {
                     openWechatShareGuide();
                     // 复制失败时不谎称「已复制」，浮层里还有「再次复制链接」可以补救
-                    if (!ok) showToast('链接复制失败，可长按地址栏手动复制');
+                    if (!ok) showToast('链接复制失败，可长按地址栏手动复制', true);
                 });
             }
 
@@ -631,6 +709,10 @@
                     articleReturnView = state.returnView;
                 }
                 if (typeof state.returnScroll === 'number') articleReturnScroll = state.returnScroll;
+                // 反馈页要还原「针对哪篇文章」的上下文，否则顶部那张卡片会空着
+                if (state.view === 'feedback') {
+                    applyFeedbackContext({ id: state.feedbackArticle, title: state.feedbackTitle });
+                }
 
                 const post = state.view === 'article'
                     ? blogPosts.find(p => p.id === state.articleId)
@@ -1422,11 +1504,12 @@
                     const likeCount = 7 + (p.id % 6);
                 // ================ 二级菜单默认选项 ================
                     // url 里可以用占位符：{id} 换成文章 id，{title} 换成文章标题。
-                    // 「问题反馈」带上这两个参数，反馈页就知道是针对哪篇文章提的意见。
+                    // 「问题反馈」和「查看评论」用 type: 'feedback' / 'comments'：
+                    // 都是站内切视图，不整页跳转。
                     const menuItems = articleMenus[p.id] || [
                         { label: '复制文章链接', type: 'share' },
-                        { label: '查看评论', type: 'link', url: 'project_subpage/blog/comments.html?article={id}&title={title}' },
-                        { label: '问题反馈', type: 'link', url: 'project_subpage/blog/feedback.html?article={id}&title={title}' },
+                        { label: '查看评论', type: 'comments' },
+                        { label: '问题反馈', type: 'feedback' },
                     ];
                     const menuLinks = menuItems.map(item => {
                         if (item.type === 'article') {
@@ -1435,6 +1518,14 @@
                         // 分享：直接复制这篇文章的链接（?article=id）
                         if (item.type === 'share') {
                             return `<button class="post-menu-item" type="button" role="menuitem" data-action="share"><i class="ri-link"></i>${escapeHtml(item.label)}</button>`;
+                        }
+                        // 反馈 / 评论：站内切视图。做成按钮而不是带 URL 的链接，
+                        // 否则整页重载，回来还得重新渲染一遍文章
+                        if (item.type === 'feedback') {
+                            return `<button class="post-menu-item" type="button" role="menuitem" data-action="feedback"><i class="ri-feedback-line"></i>${escapeHtml(item.label)}</button>`;
+                        }
+                        if (item.type === 'comments') {
+                            return `<button class="post-menu-item" type="button" role="menuitem" data-action="comments"><i class="ri-chat-3-line"></i>${escapeHtml(item.label)}</button>`;
                         }
                         let url = item.type === 'externalPage' ? p.externalPage : item.url;
                         if (!url) return '';
@@ -1530,6 +1621,28 @@
                         const post = blogPosts.find(item => item.id === parseInt(card.getAttribute('data-article-id'), 10));
                         // 菜单项写的是「复制链接」，就只复制，不弹系统分享面板
                         if (post) copyArticleLink(post);
+                    });
+                });
+                container.querySelectorAll('.post-menu [data-action="comments"]').forEach(button => {
+                    button.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const card = this.closest('.post-card');
+                        card.classList.remove('menu-open');
+                        card.querySelector('.options').setAttribute('aria-expanded', 'false');
+                        card.querySelector('.post-menu').hidden = true;
+                        const post = blogPosts.find(item => item.id === parseInt(card.getAttribute('data-article-id'), 10));
+                        openComments(post || null);
+                    });
+                });
+                container.querySelectorAll('.post-menu [data-action="feedback"]').forEach(button => {
+                    button.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const card = this.closest('.post-card');
+                        card.classList.remove('menu-open');
+                        card.querySelector('.options').setAttribute('aria-expanded', 'false');
+                        card.querySelector('.post-menu').hidden = true;
+                        const post = blogPosts.find(item => item.id === parseInt(card.getAttribute('data-article-id'), 10));
+                        openFeedback(post || null);
                     });
                 });
                 container.querySelectorAll('.post-menu a').forEach(link => {
@@ -2286,11 +2399,9 @@
                 articleMeta.hidden = isUnavailableArticle;
                 articleUnavailableNotice.hidden = !isUnavailableArticle;
                 articleShare.hidden = isUnavailableArticle;
-                // 底部「问题反馈」入口：把当前文章带给反馈页（地址格式和卡片「⋯」菜单一致）
+                // 底部「问题反馈」入口：把当前文章带给反馈页（地址格式见 buildFeedbackUrl）
                 if (articleFeedback) {
-                    articleFeedback.href = 'project_subpage/blog/feedback.html?article='
-                        + encodeURIComponent(post.id)
-                        + '&title=' + encodeURIComponent(post.title || '');
+                    articleFeedback.href = buildFeedbackUrl(post.id, post.title || '');
                 }
                 articleTitle.textContent = post.title;
                 /* 日期优先读「最近更新」：发布后改过的文章，主日期直接是 updated，
@@ -3389,7 +3500,10 @@
                     viewScrollPositions[previousView] = window.scrollY;
                 }
                 currentView = viewName;
-                [viewHome, viewBlog, viewArchive, viewTweaks, viewMovie, viewAbout, viewArticle].forEach(v => {
+                // 离开感谢页就把倒计时停掉，别再偷偷把用户送回首页
+                if (viewName !== 'thanks') stopThanksCountdown();
+                [viewHome, viewBlog, viewArchive, viewTweaks, viewMovie, viewAbout,
+                    viewArticle, viewFeedback, viewThanks, viewComments].forEach(v => {
                     v.style.display = 'none';
                     v.classList.remove('active-view');
                 });
@@ -3437,6 +3551,18 @@
                 } else if (viewName === 'about') {
                     viewAbout.style.display = 'block';
                     viewAbout.classList.add('active-view');
+                } else if (viewName === 'feedback') {
+                    viewFeedback.style.display = 'block';
+                    viewFeedback.classList.add('active-view');
+                } else if (viewName === 'comments') {
+                    viewComments.style.display = 'block';
+                    viewComments.classList.add('active-view');
+                    // 进来（或从历史里回到这里）就挂一次；同一篇文章会复用 iframe
+                    mountCommentsView();
+                } else if (viewName === 'thanks') {
+                    viewThanks.style.display = 'block';
+                    viewThanks.classList.add('active-view');
+                    startThanksCountdown();
                 } else if (viewName === 'article') {
                     viewArticle.style.display = 'block';
                     viewArticle.classList.add('active');
@@ -3450,9 +3576,14 @@
                     link.classList.remove('active');
                     link.removeAttribute('aria-current');
                 });
-                const navMap = { home: 'home', blog: 'blog', archive: 'archive', tweaks: 'home', movie: 'movie', about: 'about', article: 'blog' };
-                const activeNav = navMap[viewName] || 'home';
-                const navLink = document.querySelector(`.nav-links a[data-nav="${activeNav}"]`);
+                /* 反馈 / 感谢不属于导航里的任何一栏，映射成 null：
+                   否则站在反馈页上会看到「首页」是选中态，比没有高亮更误导。
+                   指示块那边找不到 .active 会自己收起，不用额外处理。 */
+                const navMap = { home: 'home', blog: 'blog', archive: 'archive', tweaks: 'home', movie: 'movie', about: 'about', article: 'blog', feedback: null, thanks: null, comments: null };
+                const activeNav = (viewName in navMap) ? navMap[viewName] : 'home';
+                const navLink = activeNav
+                    ? document.querySelector(`.nav-links a[data-nav="${activeNav}"]`)
+                    : null;
                 if (navLink) {
                     navLink.classList.add('active');
                     navLink.setAttribute('aria-current', 'page');
@@ -3464,13 +3595,583 @@
                 syncUrlWithView();
             }
 
+            // 回到首页（用户主动点「首页」入口时走这里，而不是直接 switchView）。
+            // 关键：把当前这条「模块」历史记录改写回首页，这样从首页再进别的模块、
+            // 按返回键时退回的是首页，而不是刚才浏览过的上一个模块。
+            function goHome() {
+                if (currentView === 'article') {
+                    articleHistoryEntryActive = false;
+                    returningFromArticleButton = false;
+                }
+                if (currentView !== 'home') {
+                    try {
+                        history.replaceState({ annieView: 'home' }, '', window.location.href);
+                    } catch (e) {}
+                }
+                switchView('home');
+            }
+
+            // ==================== 问题反馈 / 提交成功 ====================
+            /* 反馈页与感谢页现在都是站内视图（?view=feedback / ?view=thanks），
+               原来那两张独立 HTML 里的表单和样式已经搬进 index.html + style.css：
+               旧的 project_subpage/blog/feedback.html 已归档成 archive/feedback.html
+               的跳转桩（老链接由根目录 404.html 接住再送过来），
+               thanks.html 继续给电影投稿那个 iframe 面板用（它带 ?embedded=1）。 */
+            const feedbackForm = $('#feedbackForm');
+            const feedbackArticleCard = $('#feedbackArticleCard');
+            const feedbackArticleTitle = $('#feedbackArticleTitle');
+            const feedbackArticleIdInput = $('#feedbackArticleId');
+            const feedbackArticleTitleInput = $('#feedbackArticleTitleInput');
+            const feedbackTypeOther = $('#feedbackTypeOther');
+            const feedbackTypeOtherBox = $('#feedbackTypeOtherBox');
+            const feedbackTypeOtherText = $('#feedbackTypeOtherText');
+            const feedbackSubmit = $('#feedbackSubmit');
+            const feedbackSubmitHint = $('#feedbackSubmitHint');
+            const feedbackCancel = $('#feedbackCancel');
+            const feedbackContactBox = $('#feedbackContactBox');
+            const feedbackContactValue = $('#feedbackContactValue');
+            const feedbackContactValueLabel = $('#feedbackContactValueLabel');
+            const feedbackContactRadios = feedbackForm
+                ? feedbackForm.querySelectorAll('input[name="contact_allowed"]')
+                : [];
+            const feedbackContactTypeRadios = feedbackForm
+                ? feedbackForm.querySelectorAll('input[name="contact_type"]')
+                : [];
+            const thanksCountdown = $('#thanksCountdown');
+            // web3forms 的 redirect 只认绝对的 https 地址，这里按当前环境拼好
+            const FEEDBACK_THANKS_PATH = 'index.html?view=thanks';
+            //修改反馈可提交次数
+            const FEEDBACK_DAILY_LIMIT = 1;
+            const FEEDBACK_DAILY_COUNT_KEY = 'annie-feedback-daily-count';
+
+            function getLocalDateKey() {
+                const now = new Date();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                return now.getFullYear() + '-' + month + '-' + day;
+            }
+
+            function getFeedbackDailyCount() {
+                const saved = window.localStorage.getItem(FEEDBACK_DAILY_COUNT_KEY);
+                if (!saved) return 0;
+                const record = JSON.parse(saved);
+                if (!record || record.date !== getLocalDateKey()) return 0;
+                if (!Number.isInteger(record.count) || record.count < 0) {
+                    throw new Error('反馈提交次数记录无效');
+                }
+                return record.count;
+            }
+
+            function saveFeedbackDailyCount(count) {
+                window.localStorage.setItem(FEEDBACK_DAILY_COUNT_KEY, JSON.stringify({
+                    date: getLocalDateKey(),
+                    count: count,
+                }));
+            }
+
+            /* 把「这次反馈针对哪篇文章」写进表单的隐藏字段和顶部卡片。
+               没有文章（比如直接从地址栏打开反馈页）时整张卡片收起来。 */
+            function applyFeedbackContext(ctx) {
+                const id = ctx && ctx.id !== undefined && ctx.id !== null ? String(ctx.id) : '';
+                const title = ctx && ctx.title ? String(ctx.title) : '';
+                feedbackContext = { id: id, title: title };
+                if (feedbackArticleIdInput) feedbackArticleIdInput.value = id;
+                if (feedbackArticleTitleInput) feedbackArticleTitleInput.value = title;
+                if (feedbackArticleCard && feedbackArticleTitle) {
+                    feedbackArticleCard.hidden = !title;
+                    feedbackArticleTitle.textContent = title;
+                }
+            }
+
+            function readFeedbackContextFromUrl() {
+                try {
+                    const params = new URL(window.location.href).searchParams;
+                    return {
+                        id: params.get(FEEDBACK_ARTICLE_PARAM) || '',
+                        title: params.get(FEEDBACK_TITLE_PARAM) || '',
+                    };
+                } catch (e) {
+                    return { id: '', title: '' };
+                }
+            }
+
+            /* 反馈页自己的地址。留着它给「在新标签页打开」和右键复制用，
+               站内点击则走 openFeedback（不重新加载页面）。 */
+            function buildFeedbackUrl(id, title) {
+                const params = new URLSearchParams();
+                params.set(VIEW_PARAM, 'feedback');
+                if (id !== undefined && id !== null && id !== '') {
+                    params.set(FEEDBACK_ARTICLE_PARAM, String(id));
+                }
+                if (title) params.set(FEEDBACK_TITLE_PARAM, title);
+                return 'index.html?' + params.toString();
+            }
+
+            function openFeedback(post) {
+                applyFeedbackContext({
+                    id: post ? post.id : '',
+                    title: post ? post.title : '',
+                });
+                viewScrollPositions.feedback = 0;
+                /* 这里不用 navigateToView：它在「正在读文章」时会改写当前那条记录，
+                   返回键就直接离开文章了。反馈是从文章里点进去的二级页，
+                   要能原路退回那篇文章，所以一律新压一条记录。 */
+                rememberEntryScroll();
+                pushViewHistoryEntry('feedback', true);
+                switchView('feedback');
+                window.scrollTo({ top: 0, behavior: 'instant' });
+            }
+
+            /* ============================================================
+               一句话 checkValidity() 就能把所有必填校验做完：
+               浏览器会检查表单里所有带 required 的字段，
+               单选组只要组里有一个 required，整组都算必填。
+               ============================================================ */
+            function updateFeedbackSubmitState() {
+                if (!feedbackForm || !feedbackSubmit) return;
+                const ok = feedbackForm.checkValidity();
+                let count;
+                try {
+                    count = getFeedbackDailyCount();
+                } catch (error) {
+                    feedbackSubmit.disabled = true;
+                    if (feedbackSubmitHint) {
+                        feedbackSubmitHint.textContent = '无法读取每日反馈次数，请检查浏览器存储设置后重试';
+                    }
+                    return;
+                }
+                const remaining = Math.max(0, FEEDBACK_DAILY_LIMIT - count);
+                feedbackSubmit.disabled = !ok || remaining === 0;
+                if (feedbackSubmitHint) {
+                    if (remaining === 0) {
+                        feedbackSubmitHint.textContent = '今日反馈次数已达上限';
+                    } else {
+                        feedbackSubmitHint.textContent = ok
+                            ? '信息已填写完整，可以提交'
+                            : '请填写必填项后提交';
+                    }
+                }
+            }
+
+            function isFeedbackContactAllowed() {
+                if (!feedbackForm) return false;
+                const checked = feedbackForm.querySelector('input[name="contact_allowed"]:checked');
+                return !!checked && checked.value === '允许';
+            }
+
+            /* 只有在「允许联系」时才展开联系方式，并同步切换必填状态：
+               隐藏的输入框如果还挂着 required，表单永远提交不了。 */
+            function updateFeedbackContactField() {
+                if (!feedbackContactBox) return;
+                const allowed = isFeedbackContactAllowed();
+                feedbackContactBox.classList.toggle('visible', allowed);
+                if (allowed) {
+                    if (feedbackContactTypeRadios[0]) feedbackContactTypeRadios[0].required = true;
+                    return;
+                }
+                feedbackContactTypeRadios.forEach(function (radio) {
+                    radio.required = false;
+                    radio.checked = false;
+                });
+                if (feedbackContactValue) {
+                    feedbackContactValue.required = false;
+                    feedbackContactValue.disabled = true;
+                    feedbackContactValue.type = 'text';
+                    feedbackContactValue.placeholder = '请先选择联系方式类型';
+                    feedbackContactValue.value = '';
+                }
+                if (feedbackContactValueLabel) feedbackContactValueLabel.textContent = '你的联系方式';
+            }
+
+            // 感谢页倒计时：结束后回首页，返回键不会再把用户带回感谢页
+            function startThanksCountdown() {
+                stopThanksCountdown();
+                if (!thanksCountdown) return;
+                let secondsLeft = 3;
+                thanksCountdown.textContent = secondsLeft + ' 秒后自动返回首页';
+                thanksCountdownTimer = window.setInterval(function () {
+                    secondsLeft -= 1;
+                    if (secondsLeft > 0) {
+                        thanksCountdown.textContent = secondsLeft + ' 秒后自动返回首页';
+                        return;
+                    }
+                    stopThanksCountdown();
+                    // goHome() 会把当前这条历史记录改写成首页
+                    goHome();
+                    showToast('反馈已提交，谢谢！');
+                }, 1000);
+            }
+
+            function stopThanksCountdown() {
+                if (thanksCountdownTimer) {
+                    window.clearInterval(thanksCountdownTimer);
+                    thanksCountdownTimer = null;
+                }
+            }
+
+            if (feedbackForm) {
+                // 提交成功后的落点（绝对地址；file:// 预览时 web3forms 会拦跳转，干脆不带）
+                const redirectField = feedbackForm.querySelector('input[name="redirect"]');
+                if (redirectField) {
+                    if (/^https?:$/.test(window.location.protocol)) {
+                        redirectField.value = new URL(FEEDBACK_THANKS_PATH, window.location.href).href;
+                    } else {
+                        redirectField.remove();
+                    }
+                }
+
+                /* 选到「其他」时，把补充说明框显出来并设为必填；
+                   切走时清空，别把上一条说明残留在表单里 */
+                feedbackForm.querySelectorAll('input[name="type"]').forEach(function (radio) {
+                    radio.addEventListener('change', function () {
+                        if (!feedbackTypeOther || !feedbackTypeOtherBox || !feedbackTypeOtherText) return;
+                        if (feedbackTypeOther.checked) {
+                            feedbackTypeOtherBox.classList.add('visible');
+                            feedbackTypeOtherText.required = true;
+                            feedbackTypeOtherText.focus();
+                        } else {
+                            feedbackTypeOtherBox.classList.remove('visible');
+                            feedbackTypeOtherText.required = false;
+                            feedbackTypeOtherText.value = '';
+                        }
+                        updateFeedbackSubmitState();
+                    });
+                });
+
+                feedbackContactRadios.forEach(function (radio) {
+                    radio.addEventListener('change', function () {
+                        updateFeedbackContactField();
+                        updateFeedbackSubmitState();
+                    });
+                });
+
+                // 微信 / 邮箱 切换时改输入框类型、占位文案和字段名
+                feedbackContactTypeRadios.forEach(function (radio) {
+                    radio.addEventListener('change', function () {
+                        if (!feedbackContactValue) return;
+                        feedbackContactValue.disabled = false;
+                        feedbackContactValue.required = true;
+                        if (radio.value === '邮箱') {
+                            feedbackContactValue.type = 'email';
+                            feedbackContactValue.placeholder = '请输入你的邮箱地址';
+                            if (feedbackContactValueLabel) feedbackContactValueLabel.textContent = '你的邮箱地址';
+                        } else {
+                            feedbackContactValue.type = 'text';
+                            feedbackContactValue.placeholder = '请输入你的微信号';
+                            if (feedbackContactValueLabel) feedbackContactValueLabel.textContent = '你的微信号';
+                        }
+                        feedbackContactValue.value = '';
+                        updateFeedbackSubmitState();
+                    });
+                });
+
+                feedbackForm.addEventListener('input', updateFeedbackSubmitState);
+                feedbackForm.addEventListener('change', updateFeedbackSubmitState);
+
+                feedbackForm.addEventListener('submit', function (e) {
+                    if (!feedbackForm.checkValidity()) {
+                        e.preventDefault();
+                        updateFeedbackSubmitState();
+                        return;
+                    }
+                    let count;
+                    try {
+                        count = getFeedbackDailyCount();
+                        if (count >= FEEDBACK_DAILY_LIMIT) {
+                            e.preventDefault();
+                            updateFeedbackSubmitState();
+                            return;
+                        }
+                        saveFeedbackDailyCount(count + 1);
+                    } catch (error) {
+                        e.preventDefault();
+                        if (feedbackSubmitHint) {
+                            feedbackSubmitHint.textContent = '无法保存每日反馈次数，请检查浏览器存储设置后重试';
+                        }
+                        if (feedbackSubmit) feedbackSubmit.disabled = true;
+                        return;
+                    }
+                    if (feedbackSubmit) {
+                        feedbackSubmit.classList.add('loading');
+                        feedbackSubmit.disabled = true;
+                    }
+                    if (feedbackSubmitHint) {
+                        feedbackSubmitHint.textContent = '正在提交……';
+                    }
+                });
+
+                updateFeedbackContactField();
+                updateFeedbackSubmitState();
+            }
+
+            if (feedbackCancel) {
+                feedbackCancel.addEventListener('click', function () {
+                    goHome();
+                });
+            }
+
+            // ==================== 文章评论视图 ====================
+            /* 原来是独立页 project_subpage/blog/comments.html（已归档成 archive/comments.html
+               的跳转桩），现在也是站内视图
+               （?view=comments）。评论本身没变：同一套 giscus、同一个 term，
+               和文章正文下面那块是同一份数据；唯一的差别是 reactionsEnabled，
+               这里 1（独立入口保留表情回应），文章内是 0。
+
+               没有复用 renderArticleComments()：那套带着预热、滚动预加载、
+               同一 term 复用 iframe 等一堆针对「正文下方」位置做的优化；
+               这边是点了菜单就进来，进来挂一次就够，单独写一条更清楚。 */
+            const commentsViewWidget = $('#commentsViewWidget');
+            const commentsViewStage = $('#commentsViewStage');
+            const commentsViewTitle = $('#commentsViewTitle');
+            const commentsViewLead = $('#commentsViewLead');
+            const commentsViewBack = $('#commentsViewBack');
+            const commentsViewFeedback = $('#commentsViewFeedback');
+            /* 当前 iframe 对应的 term：同一篇文章来回切时直接复用，不重走一遍请求链 */
+            let commentsViewTerm = null;
+            let commentsViewObserver = null;
+            let commentsViewReadyTimer = null;
+            let commentsViewFailTimer = null;
+            let commentsViewParkTimer = null;
+            let articleGiscusParked = false;
+
+            /* ★ 这一条是评论区能不能显示的关键：
+               giscus 的 client.js 不支持「挂到指定容器」，它只挂到
+               document.querySelector('.giscus') —— 页面里第一个带这个类的元素。
+               文章页的 #articleComments 在 DOM 里排在 #view-comments 前面，
+               所以直接往评论视图里插脚本，iframe 会被塞进隐藏的文章视图，
+               页面上看着就是「评论一直加载不出来」（控制台还会跟着报
+               Discussion not found 之类的请求失败）。
+               做法：挂之前先把文章那个的类摘掉，让 .giscus 只命中评论视图这一个，
+               iframe 建出来之后再把类还回去（还回去不影响已经建好的 iframe）。 */
+            function parkArticleGiscus(parked) {
+                if (!articleComments) return;
+                if (parked === articleGiscusParked) return;
+                articleGiscusParked = parked;
+                articleComments.classList.toggle('giscus', !parked);
+            }
+
+            function restoreArticleGiscus() {
+                if (commentsViewParkTimer) {
+                    clearTimeout(commentsViewParkTimer);
+                    commentsViewParkTimer = null;
+                }
+                parkArticleGiscus(false);
+            }
+
+            function applyCommentsContext(ctx) {
+                const id = ctx && ctx.id !== undefined && ctx.id !== null ? String(ctx.id) : '';
+                const title = ctx && ctx.title ? String(ctx.title) : '';
+                commentsContext = { id: id, title: title };
+
+                if (commentsViewTitle) commentsViewTitle.textContent = title || '评论';
+                if (commentsViewLead) {
+                    commentsViewLead.textContent = title
+                        ? '这篇文章的留言都在下面。'
+                        : '缺少文章信息，请从文章卡片的「查看评论」入口打开。';
+                }
+                // 没有文章信息时把评论区整个收起来，只留底栏
+                if (commentsViewStage) commentsViewStage.hidden = !title;
+                if (commentsViewFeedback) commentsViewFeedback.href = buildFeedbackUrl(id, title);
+            }
+
+            function readCommentsContextFromUrl() {
+                try {
+                    const params = new URL(window.location.href).searchParams;
+                    return {
+                        id: params.get(COMMENTS_ARTICLE_PARAM) || '',
+                        title: params.get(COMMENTS_TITLE_PARAM) || '',
+                    };
+                } catch (e) {
+                    return { id: '', title: '' };
+                }
+            }
+
+            /* giscus 的 term 必须和文章页那边一字不差，否则就是另一个讨论串。
+               文章页用的是 `文章 ${post.id}：${post.title}`，这里照抄。 */
+            function commentsViewTermOf() {
+                return '文章 ' + commentsContext.id + '：' + commentsContext.title;
+            }
+
+            function clearCommentsViewLoading() {
+                if (commentsViewReadyTimer) {
+                    clearInterval(commentsViewReadyTimer);
+                    commentsViewReadyTimer = null;
+                }
+                if (commentsViewFailTimer) {
+                    clearTimeout(commentsViewFailTimer);
+                    commentsViewFailTimer = null;
+                }
+                if (commentsViewObserver) {
+                    commentsViewObserver.disconnect();
+                    commentsViewObserver = null;
+                }
+            }
+
+            function fadeCommentsViewSkeleton() {
+                const skeleton = commentsViewStage
+                    ? commentsViewStage.querySelector('.comments-skeleton')
+                    : null;
+                if (!skeleton) return;
+                skeleton.classList.add('is-hidden');
+                setTimeout(function () {
+                    if (skeleton.parentNode) skeleton.remove();
+                }, 260);
+            }
+
+            function showCommentsViewRetry() {
+                if (!commentsViewWidget) return;
+                clearCommentsViewLoading();
+                restoreArticleGiscus();
+                commentsViewWidget.replaceChildren();
+                const skeleton = commentsViewStage
+                    ? commentsViewStage.querySelector('.comments-skeleton')
+                    : null;
+                if (skeleton) skeleton.remove();
+
+                const box = document.createElement('div');
+                box.className = 'comments-retry';
+                const text = document.createElement('p');
+                text.className = 'comments-retry-text';
+                text.textContent = '评论加载失败，可能是网络问题。';
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'comments-retry-btn';
+                btn.textContent = '重新加载';
+                btn.addEventListener('click', function () {
+                    mountCommentsView(true);
+                });
+                box.append(text, btn);
+                commentsViewWidget.appendChild(box);
+            }
+
+            /* force = true 时不看缓存，重挂一遍（重试按钮用） */
+            function mountCommentsView(force) {
+                if (!commentsViewWidget || !commentsContext.id || !commentsContext.title) return;
+                const term = commentsViewTermOf();
+
+                // 同一篇文章的 iframe 还挂着：直接复用
+                if (!force && commentsViewTerm === term
+                    && commentsViewWidget.querySelector('iframe.giscus-frame')) {
+                    return;
+                }
+
+                clearCommentsViewLoading();
+                commentsViewTerm = null;
+                commentsViewWidget.replaceChildren();
+                const staleSkeleton = commentsViewStage
+                    ? commentsViewStage.querySelector('.comments-skeleton')
+                    : null;
+                if (staleSkeleton) staleSkeleton.remove();
+                if (commentsViewStage) commentsViewStage.appendChild(buildCommentsSkeleton());
+
+                const script = document.createElement('script');
+                script.src = 'https://giscus.app/client.js';
+                script.async = true;
+                script.crossOrigin = 'anonymous';
+                script.dataset.repo = 'Annie106/Annie106.github.io';
+                script.dataset.repoId = 'R_kgDOSTMWsg';
+                script.dataset.category = 'General';
+                script.dataset.categoryId = 'DIC_kwDOSTMWss4DKarQ';
+                script.dataset.mapping = 'specific';
+                script.dataset.term = term;
+                script.dataset.strict = '0';
+                // 独立入口保留表情回应；文章页那块是 0
+                script.dataset.reactionsEnabled = '1';
+                script.dataset.emitMetadata = '0';
+                script.dataset.inputPosition = 'bottom';
+                script.dataset.theme = document.documentElement.getAttribute('data-theme') === 'dark'
+                    ? 'dark'
+                    : 'light';
+                script.dataset.lang = 'zh-CN';
+                // 先让 .giscus 只命中评论视图这一个，再插脚本（见 parkArticleGiscus 的注释）
+                parkArticleGiscus(true);
+                commentsViewWidget.appendChild(script);
+                commentsViewTerm = term;
+
+                /* 脚本加载失败也要把类还回去，否则文章页的评论区以后都挂不上 giscus */
+                if (commentsViewParkTimer) clearTimeout(commentsViewParkTimer);
+                commentsViewParkTimer = setTimeout(function () {
+                    commentsViewParkTimer = null;
+                    parkArticleGiscus(false);
+                }, 2500);
+
+                /* 和文章页同一套就绪判定：iframe 出来之后高度连续 3 次
+                   （约 450ms）超过 200px 才算真渲染完。giscus 自己的
+                   「正在加载评论」也有 150px，用「高度稳定」当完成信号会误判 */
+                commentsViewObserver = new MutationObserver(function () {
+                    const frame = commentsViewWidget.querySelector('iframe.giscus-frame');
+                    if (!frame) return;
+                    commentsViewObserver.disconnect();
+                    commentsViewObserver = null;
+                    // iframe 已经落到评论视图里了，可以把文章那边还原
+                    restoreArticleGiscus();
+
+                    let lastHeight = -1;
+                    let stableTicks = 0;
+                    let ticks = 0;
+                    commentsViewReadyTimer = setInterval(function () {
+                        ticks += 1;
+                        const height = frame.getBoundingClientRect().height;
+                        if (height > 200 && Math.abs(height - lastHeight) < 2) {
+                            stableTicks += 1;
+                        } else {
+                            stableTicks = 0;
+                        }
+                        lastHeight = height;
+                        if (stableTicks >= 3 || ticks > 70) {
+                            clearInterval(commentsViewReadyTimer);
+                            commentsViewReadyTimer = null;
+                            fadeCommentsViewSkeleton();
+                        }
+                    }, 150);
+                });
+                commentsViewObserver.observe(commentsViewWidget, { childList: true });
+
+                // 兜底：12 秒还没撑起来就是失败了，给个重试入口
+                commentsViewFailTimer = setTimeout(function () {
+                    commentsViewFailTimer = null;
+                    const frame = commentsViewWidget.querySelector('iframe.giscus-frame');
+                    const height = frame ? frame.getBoundingClientRect().height : 0;
+                    if (height < 80) showCommentsViewRetry();
+                }, 12000);
+            }
+
+            function openComments(post) {
+                applyCommentsContext({
+                    id: post ? post.id : '',
+                    title: post ? post.title : '',
+                });
+                viewScrollPositions.comments = 0;
+                /* 和反馈页同理：不用 navigateToView（它在文章视图下会改写当前记录，
+                   返回键就直接离开文章了），这里一律新压一条记录 */
+                rememberEntryScroll();
+                commentsEntryActive = pushViewHistoryEntry('comments', true);
+                switchView('comments');
+                window.scrollTo({ top: 0, behavior: 'instant' });
+            }
+
+            /* 底栏的「返回」：从站内点进来就按浏览器后退走（回到列表或文章原位），
+               直接输网址打开的没有上一级可退，退回首页 */
+            function returnFromComments() {
+                if (commentsEntryActive) {
+                    commentsEntryActive = false;
+                    history.back();
+                    return;
+                }
+                goHome();
+            }
+
+            if (commentsViewBack) {
+                commentsViewBack.addEventListener('click', returnFromComments);
+            }
+
             // ==================== 事件绑定 ====================
             $$('.nav-links a').forEach(link => {
                 link.addEventListener('click', function(e) {
                     const nav = this.getAttribute('data-nav');
                     if (!nav) return;
                     e.preventDefault();
-                    if (nav === 'home') switchView('home');
+                    if (nav === 'home') goHome();
                     if (nav === 'blog') navigateToView('blog');
                     if (nav === 'archive') navigateToView('archive');
                     if (nav === 'movie') navigateToView('movie');
@@ -3480,7 +4181,7 @@
 
             homeLink.addEventListener('click', function(e) {
                 e.preventDefault();
-                switchView('home');
+                goHome();
             });
 
             // 文章列表页标题旁的「首页」按钮：回到首页并滚到顶部。
@@ -3492,7 +4193,7 @@
                 // 这个入口的语义就是「回首页顶部」：先把记下的位置清零，
                 // 否则 switchView 会先把你送回原来的位置、再滑到顶部，一上一下
                 viewScrollPositions.home = 0;
-                switchView('home');
+                goHome();
                 window.scrollTo({ top: 0, behavior: 'instant' });
             });
 
@@ -3533,6 +4234,18 @@
                 });
             }
 
+            /* 底部「问题反馈」：站内切到反馈视图，不跳页面。
+               按住 Ctrl / Cmd / Shift 或中键点击时交回浏览器（href 是同一页的带参地址），
+               想在新标签页开的人照样能开。 */
+            if (articleFeedback) {
+                articleFeedback.addEventListener('click', function(e) {
+                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                    e.preventDefault();
+                    const post = blogPosts.find(item => item.id === currentArticleId);
+                    openFeedback(post || null);
+                });
+            }
+
             // ==================== 微信分享引导浮层 ====================
             if (wechatShareGuide) {
                 if (wechatShareGuideClose) {
@@ -3549,7 +4262,7 @@
                         if (!post) return;
                         const url = buildArticleUrl(post.id);
                         Promise.resolve(copyLink(url)).then(function(ok) {
-                            showToast(ok ? '链接已复制，粘贴给好友即可' : '链接复制失败，可长按地址栏手动复制');
+                            showToast(ok ? '链接已复制，粘贴给好友即可' : '链接复制失败，可长按地址栏手动复制', !ok);
                         });
                     });
                 }
@@ -3762,10 +4475,14 @@
                     history.replaceState(history.state, '', clean.pathname + clean.search);
                 }
 
-                // 关于 / 归档页也可以通过 ?view=about / ?view=archive 直接打开，
+                // 关于 / 归档 / 折腾 / 反馈 / 提交成功 / 评论 也可以通过 ?view=xxx 直接打开，
                 // 不受本地界面记忆影响。
                 const urlView = new URL(window.location.href).searchParams.get(VIEW_PARAM);
-                if (urlView === 'about' || urlView === 'archive' || urlView === 'tweaks') {
+                if (urlView === 'about' || urlView === 'archive' || urlView === 'tweaks'
+                    || urlView === 'feedback' || urlView === 'thanks' || urlView === 'comments') {
+                    // 反馈 / 评论的文章信息跟着地址栏走，直接打开也能带上
+                    if (urlView === 'feedback') applyFeedbackContext(readFeedbackContextFromUrl());
+                    if (urlView === 'comments') applyCommentsContext(readCommentsContextFromUrl());
                     switchView(urlView);
                     playReturnEnterAnimation();
                     return;

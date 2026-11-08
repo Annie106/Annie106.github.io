@@ -3576,11 +3576,19 @@
             animation: audio-error-enter 0.25s ease-out;
         }
 
-        /* 顶部轻提示：反馈提交成功、链接已复制等共用同一套外观 */
+        /* 顶部轻提示：反馈提交成功、链接已复制等共用同一套外观。
+           原来是「浅灰底 + 淡描边 + 几乎看不见的投影」，压在白色页面上
+           跟背景糊成一片，扫一眼根本注意不到。这里不换语言、只提亮：
+             · 底色改纯白、描边收到 8% 黑，投影换成两层（贴地的 2px +
+               散开的 12px/32px）—— 卡片立马从页面上「浮」起来
+             · 文字权重 500，图标做成小圆片（成功绿、失败红），
+               整条提示靠这一小块颜色被一眼看到，正文仍然是黑白的
+             · 位置从 top:24（压在导航条上）挪到导航下方；入场改成
+               从上方落下 + 轻微放大，视线会被这一下动作带走 */
         .feedback-success-toast,
         .site-toast {
             position: fixed;
-            top: 24px;
+            top: calc(var(--header-h) + 14px);
             left: 50%;
             z-index: 1100;
             display: flex;
@@ -3588,18 +3596,30 @@
             gap: 10px;
             width: max-content;
             max-width: calc(100% - 32px);
-            padding: 14px 20px;
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-md);
-            background: var(--color-surface);
+            padding: 11px 18px 11px 13px;
+            border: 1px solid rgba(17, 17, 17, 0.08);
+            border-radius: 12px;
+            background: var(--color-bg);
             color: var(--color-text-primary);
-            box-shadow: var(--shadow-md);
+            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14),
+                        0 2px 6px rgba(15, 23, 42, 0.06);
             font-size: 0.9rem;
+            font-weight: 500;
             line-height: 1.5;
             opacity: 0;
-            transform: translate(-50%, -10px);
-            transition: opacity var(--transition-smooth), transform var(--transition-smooth);
+            transform: translate(-50%, -14px) scale(0.96);
+            transition: opacity 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+                        transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
             pointer-events: none;
+        }
+        /* 深色下底色和页面同色就看不见了，改用比页面亮一档的 surface；
+           投影也得换成更重的黑，不然「浮起来」的感觉会消失 */
+        [data-theme="dark"] .feedback-success-toast,
+        [data-theme="dark"] .site-toast {
+            background: var(--color-surface);
+            border-color: rgba(255, 255, 255, 0.10);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55),
+                        0 2px 6px rgba(0, 0, 0, 0.35);
         }
 
         .movie-submission-panel {
@@ -3701,34 +3721,78 @@
         .feedback-success-toast.visible,
         .site-toast.visible {
             opacity: 1;
-            transform: translate(-50%, 0);
+            transform: translate(-50%, 0) scale(1);
         }
 
+        /* 图标做成小圆片：成功绿 / 失败红，是整条提示唯一的颜色锚点。
+           文字保持正文色，所以不会破坏全站的黑白基调 */
         .feedback-success-toast > i,
         .site-toast > i {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 22px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: rgba(47, 133, 90, 0.12);
             color: #2f855a;
-            font-size: 1.2rem;
+            font-size: 0.95rem;
+            line-height: 1;
         }
 
         [data-theme="dark"] .feedback-success-toast > i,
         [data-theme="dark"] .site-toast > i {
+            background: rgba(104, 199, 145, 0.16);
             color: #68c791;
+        }
+
+        /* 连着点两次复制（微信 → QQ）时，文字换了但动画不重播的话，
+           新提示就是硬切进来的，看着像卡了一下。
+           所以已经在屏幕上时，给它补一遍入场动画。
+           用 @keyframes 而不是重设 transition：transition 的起点是
+           「当前已经可见」的状态，去掉再加回来几乎看不出变化；
+           动画则是每次重新加类都老老实实从 0% 开始播。 */
+        @keyframes toastPop {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -14px) scale(0.96);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, 0) scale(1);
+            }
+        }
+        /* fill: both 会让动画播完停在终态（= .visible 的样子），
+           所以隐藏之前必须把这个类摘掉，否则 opacity 会被钉在 1、收不起来 */
+        .feedback-success-toast.is-replaying,
+        .site-toast.is-replaying {
+            animation: toastPop 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .feedback-success-toast.is-replaying,
+            .site-toast.is-replaying {
+                animation: none;
+            }
         }
 
         /* 失败提示（复制失败等）：图标和描边转成警示色，文案仍是正文色 */
         .site-toast.is-error {
-            border-color: #f0b8b4;
+            border-color: rgba(248, 81, 73, 0.35);
         }
 
         .site-toast.is-error > i {
+            background: rgba(178, 43, 43, 0.12);
             color: #b22b2b;
         }
 
         [data-theme="dark"] .site-toast.is-error {
-            border-color: #6b3230;
+            border-color: rgba(248, 81, 73, 0.42);
         }
 
         [data-theme="dark"] .site-toast.is-error > i {
+            background: rgba(240, 138, 132, 0.16);
             color: #f08a84;
         }
 
@@ -5404,5 +5468,559 @@
             }
             .archive-link {
                 font-size: 0.89rem;
+            }
+        }
+
+        /* ==================== 问题反馈视图 ==================== */
+        /* 站内视图（index.html?view=feedback）。控件样式沿用
+           project_subpage/blog/feedback.html 那一套，这里只负责把它摆进站内。
+
+           对齐：hero 和表单共用同一条左边线，都不居中。
+           原来 .feedback-body 写了 margin: auto，760px 的列在 1080px 的容器里
+           居中，左边就空出一大块，和上面的标题错开——所以这里只能是 margin-left: 0。
+           两块的 max-width 也取同一个值，右边线才对得齐。 */
+        .feedback-view {
+            padding-top: 26px;
+            padding-bottom: 56px;
+        }
+        .feedback-view .feedback-hero {
+            max-width: 760px;
+        }
+        .feedback-view .feedback-body {
+            width: 100%;
+            max-width: 760px;
+            margin: 40px 0 0;
+        }
+
+        /* 顶部那张「反馈的文章」小卡片。
+           注意：display:flex 会盖掉 [hidden] 自带的 display:none
+           （作者样式优先于浏览器默认样式），没带文章信息时必须显式收回来，
+           否则会留一条空白卡片在表单上方 */
+        .feedback-view .article-context-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 20px;
+            margin-bottom: 24px;
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            font-size: 0.9375rem;
+            color: var(--color-text-secondary);
+        }
+        .feedback-view .article-context-card[hidden] {
+            display: none;
+        }
+        .feedback-view .article-context-card > i {
+            font-size: 1.25rem;
+            color: var(--color-text-tertiary);
+        }
+        .feedback-view .article-context-card .label {
+            font-weight: 500;
+            color: var(--color-text-tertiary);
+        }
+        .feedback-view .article-context-card .article-title {
+            font-weight: 500;
+            color: var(--color-text-primary);
+        }
+
+        .feedback-view .notice-card {
+            padding: 24px 28px;
+            margin-bottom: 28px;
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-xs);
+        }
+        .feedback-view .notice-card p {
+            margin: 0;
+            font-size: 0.875rem;
+            color: var(--color-text-secondary);
+            line-height: 1.8;
+        }
+        .feedback-view .notice-card p + p {
+            margin-top: 12px;
+        }
+        .feedback-view .disclaimer {
+            padding-top: 16px;
+            margin-top: 16px;
+            border-top: 1px solid var(--color-border);
+            font-size: 0.8125rem;
+            color: var(--color-text-tertiary);
+            line-height: 1.75;
+        }
+
+        /* 勾选框：真 input 铺满整块并透明，视觉交给后面的 SVG 勾 */
+        .feedback-view .agree-checkbox {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 32px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .feedback-view .agree-checkbox input {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 2;
+        }
+        .feedback-view .agree-checkbox svg {
+            display: block;
+            width: 1.25em;
+            height: 1.25em;
+            flex-shrink: 0;
+            overflow: visible;
+            color: var(--color-text-tertiary);
+            transition: color 0.4s ease;
+        }
+        .feedback-view .agree-checkbox svg .box {
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .feedback-view .agree-checkbox svg .check {
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 7;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-dasharray: 48;
+            stroke-dashoffset: 48;
+        }
+        .feedback-view .agree-checkbox input:checked ~ svg {
+            color: var(--color-text-primary);
+        }
+        .feedback-view .agree-checkbox input:focus-visible ~ svg {
+            outline: 2px solid var(--color-accent);
+            outline-offset: 4px;
+            border-radius: 4px;
+        }
+        /* 勾选时让那道勾「画」出来，比直接跳成实心更像手写 */
+        .feedback-view .agree-checkbox input:checked ~ svg .check {
+            animation: feedbackDrawCheck 0.45s cubic-bezier(0.4, 0, 0.2, 1) 0.1s forwards;
+        }
+        .feedback-view .agree-checkbox .checkbox-text {
+            font-size: 0.8125rem;
+            color: var(--color-text-secondary);
+            line-height: 1.6;
+        }
+        @keyframes feedbackDrawCheck {
+            to { stroke-dashoffset: 0; }
+        }
+
+        /* 表单本体 */
+        .feedback-view .feedback-form {
+            display: grid;
+            gap: 24px;
+        }
+        .feedback-view .feedback-form .agree-checkbox {
+            margin: 0;
+        }
+        .feedback-view .form-field,
+        .feedback-view .field {
+            display: grid;
+            gap: 8px;
+        }
+        .feedback-view .form-field label,
+        .feedback-view .field-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--color-text-primary);
+        }
+        .feedback-view .required {
+            margin-left: 2px;
+            font-weight: 400;
+            color: var(--color-text-tertiary);
+        }
+        .feedback-view .required-star {
+            margin-right: 4px;
+            color: #e53935;
+        }
+        .feedback-view .form-field input,
+        .feedback-view .form-field textarea {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            background: var(--color-bg);
+            color: var(--color-text-primary);
+            font: inherit;
+            font-size: 0.9375rem;
+            box-sizing: border-box;
+            transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+        }
+        .feedback-view .form-field textarea {
+            min-height: 160px;
+            resize: vertical;
+        }
+        .feedback-view .form-field input::placeholder,
+        .feedback-view .form-field textarea::placeholder {
+            color: var(--color-text-tertiary);
+            opacity: 1;
+        }
+        .feedback-view .form-field input:focus-visible,
+        .feedback-view .form-field textarea:focus-visible {
+            outline: none;
+            border-color: var(--color-text-secondary);
+            box-shadow: 0 0 0 3px var(--color-border);
+        }
+
+        /* 单选组：选中项描边加深 + 浅底，不另外画圆点 */
+        .feedback-view .radio-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .feedback-view .radio-group label {
+            display: inline-flex;
+            align-items: center;
+            padding: 8px 14px;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            font-size: 0.8125rem;
+            color: var(--color-text-secondary);
+            cursor: pointer;
+            user-select: none;
+            transition: border-color var(--transition-fast),
+                        background var(--transition-fast),
+                        color var(--transition-fast);
+        }
+        @media (hover: hover) and (pointer: fine) {
+            .feedback-view .radio-group label:hover {
+                border-color: var(--color-text-tertiary);
+            }
+        }
+        .feedback-view .radio-group input {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+        .feedback-view .radio-group input:checked + span {
+            color: var(--color-text-primary);
+            font-weight: 500;
+        }
+        .feedback-view .radio-group label:has(input:checked) {
+            border-color: var(--color-text-primary);
+            background: var(--color-surface);
+        }
+        .feedback-view .radio-group label:has(input:focus-visible) {
+            outline: 2px solid var(--color-accent);
+            outline-offset: 2px;
+        }
+
+        /* 评分组：选中项直接反白 */
+        .feedback-view .rating-group {
+            display: flex;
+            gap: 8px;
+        }
+        .feedback-view .rating-group label {
+            width: 44px;
+            height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            font-size: 0.875rem;
+            color: var(--color-text-secondary);
+            cursor: pointer;
+            user-select: none;
+            transition: border-color var(--transition-fast),
+                        background var(--transition-fast),
+                        color var(--transition-fast);
+        }
+        @media (hover: hover) and (pointer: fine) {
+            .feedback-view .rating-group label:hover {
+                border-color: var(--color-text-tertiary);
+            }
+        }
+        .feedback-view .rating-group input {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+        .feedback-view .rating-group label:has(input:checked) {
+            border-color: var(--color-text-primary);
+            background: var(--color-text-primary);
+            color: var(--color-bg);
+        }
+        .feedback-view .rating-group label:has(input:focus-visible) {
+            outline: 2px solid var(--color-accent);
+            outline-offset: 2px;
+        }
+        .feedback-view .rating-hint {
+            margin-top: 4px;
+            font-size: 0.75rem;
+            color: var(--color-text-tertiary);
+        }
+
+        /* 「其他」的补充输入框：选到「其他」才由 JS 打开 */
+        .feedback-view .other-input {
+            display: none;
+            margin-top: 10px;
+        }
+        .feedback-view .other-input.visible {
+            display: block;
+        }
+
+        /* 联系方式：选「允许」才出现 */
+        .feedback-view .contact-input {
+            display: none;
+            margin-top: 14px;
+            padding: 18px;
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+        }
+        .feedback-view .contact-input.visible {
+            display: grid;
+            gap: 16px;
+            animation: fadeSlideIn 0.35s cubic-bezier(0.4, 0, 0.2, 1) both;
+        }
+        .feedback-view .contact-input .field-label {
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: var(--color-text-secondary);
+        }
+        .feedback-view .other-input input,
+        .feedback-view .contact-input input[type="text"],
+        .feedback-view .contact-input input[type="email"] {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            background: var(--color-bg);
+            color: var(--color-text-primary);
+            font: inherit;
+            font-size: 0.875rem;
+            box-sizing: border-box;
+            transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+        }
+        .feedback-view .other-input input::placeholder,
+        .feedback-view .contact-input input::placeholder {
+            color: var(--color-text-tertiary);
+        }
+        .feedback-view .other-input input:focus-visible,
+        .feedback-view .contact-input input:focus-visible {
+            outline: none;
+            border-color: var(--color-text-secondary);
+            box-shadow: 0 0 0 3px var(--color-border);
+        }
+        .feedback-view .contact-input input:disabled {
+            background: var(--color-surface);
+            cursor: not-allowed;
+        }
+
+        /* 按钮 */
+        .feedback-view .action-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-top: 8px;
+        }
+        .feedback-view .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 11px 28px;
+            border: none;
+            border-radius: var(--radius-md);
+            background: var(--color-accent);
+            color: var(--color-bg);
+            /* 只取字体、不取 line-height：写 font: inherit 会把全站的 1.7
+               一起继承过来，再叠加 16px 的图标，按钮会比原来高 7px。
+               原来的 feedback.html 也是只写了 font-family，保持按钮的
+               line-height: normal，高度才是 42 而不是 49 */
+            font-family: inherit;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background var(--transition-fast),
+                        transform var(--transition-fast),
+                        box-shadow var(--transition-fast),
+                        opacity var(--transition-fast);
+        }
+        @media (hover: hover) and (pointer: fine) {
+            .feedback-view .btn-primary:hover:not(:disabled) {
+                background: var(--color-accent-hover);
+                transform: translateY(-1px);
+                box-shadow: var(--shadow-sm);
+            }
+            .feedback-view .btn-primary:hover:not(:disabled) i {
+                transform: translateX(3px);
+            }
+        }
+        .feedback-view .btn-primary:active:not(:disabled) {
+            transform: translateY(0);
+            box-shadow: none;
+        }
+        .feedback-view .btn-primary:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .feedback-view .btn-primary i {
+            font-size: 1rem;
+            transition: transform var(--transition-fast);
+        }
+        .feedback-view .btn-primary.loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+        .feedback-view .btn-primary.loading i {
+            animation: feedbackSpin 1s linear infinite;
+        }
+        @keyframes feedbackSpin {
+            to { transform: rotate(360deg); }
+        }
+        .feedback-view .btn-primary:focus-visible,
+        .feedback-view .btn-ghost:focus-visible {
+            outline: 2px solid var(--color-accent);
+            outline-offset: 4px;
+        }
+        .feedback-view .btn-ghost {
+            padding: 6px 0;
+            border: none;
+            background: none;
+            font: inherit;
+            font-size: 0.8125rem;
+            color: var(--color-text-tertiary);
+            cursor: pointer;
+            transition: color var(--transition-fast);
+        }
+        @media (hover: hover) and (pointer: fine) {
+            .feedback-view .btn-ghost:hover {
+                color: var(--color-text-secondary);
+            }
+        }
+        .feedback-view .submit-hint {
+            margin-top: -4px;
+            font-size: 0.75rem;
+            color: var(--color-text-tertiary);
+            line-height: 1.6;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .feedback-view .contact-input.visible { animation: none; }
+            .feedback-view .agree-checkbox input:checked ~ svg .check {
+                animation: none;
+                stroke-dashoffset: 0;
+            }
+            .feedback-view .btn-primary.loading i { animation: none; }
+        }
+
+        @media (max-width: 600px) {
+            .feedback-view {
+                padding-top: 14px;
+                padding-bottom: 40px;
+            }
+            .feedback-view .feedback-body {
+                margin-top: 30px;
+            }
+            .feedback-view .notice-card {
+                padding: 20px 22px;
+            }
+            .feedback-view .rating-group label {
+                width: 40px;
+                height: 40px;
+            }
+            .feedback-view .contact-input {
+                padding: 16px;
+            }
+        }
+
+        /* ==================== 文章评论视图 ==================== */
+        /* 站内视图（index.html?view=comments）。评论组件一点没动：还是文章正文
+           下面那套 .comments-stage / .giscus / 骨架，这里只补标题区和底栏，
+           并且和反馈页共用同一条左边线（标题和内容都贴容器左边，不居中）。
+
+           宽度取 860 而不是反馈页的 760：这块和文章页里的评论区是同一份数据，
+           两边一样宽，从文章切过来才不会觉得评论「变窄了」。 */
+        .comments-view {
+            padding-top: 26px;
+            padding-bottom: 56px;
+        }
+        .comments-view .comments-view-head {
+            max-width: 860px;
+        }
+        .comments-view .comments-view-body {
+            width: 100%;
+            max-width: 860px;
+            margin: 40px 0 0;
+        }
+        /* .article-bottombar 在文章页用的是贴着正文的负边距，这里要正常间距 */
+        .comments-view .comments-view-bottombar {
+            margin: 32px 0 0;
+            padding-top: 20px;
+            border-top: 1px solid var(--color-border-light);
+        }
+
+        /* ==================== 反馈提交成功视图 ==================== */
+        /* 版式取自原来的 thanks.html，只是不再单独占一个 HTML：
+           web3forms 提交后整页跳到 ?view=thanks，这里接住并做个倒计时。 */
+        .thanks-view {
+            padding-bottom: 40px;
+        }
+        .thanks-view .thanks-page {
+            width: 100%;
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 88px 24px 96px;
+            text-align: center;
+        }
+        .thanks-view .thanks-icon {
+            width: 56px;
+            height: 56px;
+            margin: 0 auto 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--color-border);
+            border-radius: 50%;
+            background: var(--color-surface);
+            color: var(--color-text-primary);
+            font-size: 1.5rem;
+        }
+        .thanks-view .thanks-page h1 {
+            margin-bottom: 12px;
+            font-size: 1.5rem;
+            font-weight: 600;
+            line-height: 1.4;
+            letter-spacing: -0.01em;
+            color: var(--color-text-primary);
+        }
+        .thanks-view .thanks-page p {
+            margin-bottom: 36px;
+            font-size: 0.9375rem;
+            color: var(--color-text-secondary);
+            line-height: 1.8;
+        }
+        /* 倒计时是页面最后一行：和上文之间留约 12px（36px 下边距 - 24px） */
+        .thanks-view .redirect-countdown {
+            margin-top: -24px;
+            margin-bottom: 0;
+            font-size: 0.8125rem;
+            color: var(--color-text-tertiary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        @media (max-width: 600px) {
+            .thanks-view .thanks-page {
+                padding: 56px 20px 72px;
+            }
+            .thanks-view .thanks-page h1 {
+                font-size: 1.375rem;
             }
         }

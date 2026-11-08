@@ -326,7 +326,7 @@
             </section>
 
             <!-- 版本号：从页脚挪到这里，收在关于页右下角 -->
-            <p class="about-version">版本 0.4.22.075</p>
+            <p class="about-version">版本 0.4.22.104</p>
         </div>
 
         <!-- ==================== 文章详情视图 ==================== -->
@@ -367,11 +367,197 @@
             <hr class="divider-thin">
             <div class="article-bottombar">
                 <span class="back-link" id="backBtn2"><i class="ri-arrow-left-line"></i> 返回</span>
-                <a class="article-feedback" id="articleFeedback" href="project_subpage/blog/feedback.html"
+                <!-- href 先在 HTML 里写好兜底地址，JS 打开文章时会换成带 fa / ft 的那条，
+                     同时接管点击（站内切视图，不整页刷新） -->
+                <a class="article-feedback" id="articleFeedback" href="index.html?view=feedback"
                    title="对这篇文章提意见、报 Bug 或建议">
                     <i class="ri-feedback-line" aria-hidden="true"></i>
                     <span>问题反馈</span>
                 </a>
+            </div>
+        </div>
+
+        <!-- ==================== 问题反馈视图 ==================== -->
+        <!-- 文章页底部「问题反馈」、卡片「⋯」菜单、文章不可用页的入口都切到这里，
+             不再跳原来的 project_subpage/blog/feedback.html（那个文件已归档到 archive/）。
+             标题版式直接复用「本周折腾」那套 .tweaks-eyebrow / .tweaks-title /
+             .tweaks-lead，两页看起来是同一层级的站内页。
+             文章信息走地址栏的 fa / ft 带进来（fa=文章 id，ft=标题）：
+             不能复用 ?article=，那个参数的含义是「直接打开这篇文章」，
+             init() 会先按它进文章视图。 -->
+        <div id="view-feedback" class="view feedback-view" style="display:none;">
+            <header class="feedback-hero">
+                <p class="tweaks-eyebrow">// FEEDBACK</p>
+                <h1 class="tweaks-title">问题反馈</h1>
+                <p class="tweaks-lead">文章读着别扭、排版串了、某个功能不好用，都可以写在这里。你的意见会帮助这个博客变得更好。</p>
+            </header>
+
+            <div class="feedback-body">
+                <div class="article-context-card" id="feedbackArticleCard" hidden>
+                    <i class="ri-article-line" aria-hidden="true"></i>
+                    <div>
+                        <span class="label">反馈的文章：</span>
+                        <span class="article-title" id="feedbackArticleTitle"></span>
+                    </div>
+                </div>
+
+                <div class="notice-card">
+                    <p>反馈后请耐心等待，我们会处理你的反馈。</p>
+                    <p class="disclaimer">
+                        提交的数据会被保留。你的信息会在第三方服务商中保留 30 天，请勿在表单中填写密码或其他敏感信息。
+                    </p>
+                </div>
+
+                <!-- 原生表单提交：web3forms 收下后把整页带到 ?view=thanks。
+                     redirect 值由 script.js 补成绝对地址（web3forms 只认绝对 https）。 -->
+                <form class="feedback-form" id="feedbackForm" action="https://api.web3forms.com/submit" method="POST">
+                    <input type="hidden" name="access_key" value="14cc0dde-c616-4604-a802-84686ae0c843">
+                    <input type="hidden" name="redirect" value="index.html?view=thanks">
+                    <input type="hidden" name="subject" value="博客问题反馈">
+                    <input type="hidden" name="from_name" value="Annie 的博客">
+
+                    <!-- 自动填充的文章信息 -->
+                    <input type="hidden" name="article_id" id="feedbackArticleId" value="">
+                    <input type="hidden" name="article_title" id="feedbackArticleTitleInput" value="">
+
+                    <!-- ① 反馈类型：必选 -->
+                    <div class="field">
+                        <span class="field-label" id="feedbackTypeLabel"><span class="required-star" aria-hidden="true">*</span>反馈类型<span class="required">（必选）</span></span>
+                        <div class="radio-group" role="radiogroup" aria-labelledby="feedbackTypeLabel">
+                            <label><input type="radio" name="type" value="文章问题" required><span>文章问题</span></label>
+                            <label><input type="radio" name="type" value="Bug反馈"><span>Bug 反馈</span></label>
+                            <label><input type="radio" name="type" value="功能建议"><span>功能建议</span></label>
+                            <label><input type="radio" name="type" value="排版样式"><span>排版样式</span></label>
+                            <label><input type="radio" name="type" value="其他" id="feedbackTypeOther"><span>其他</span></label>
+                        </div>
+                        <div class="other-input" id="feedbackTypeOtherBox">
+                            <input type="text" name="type_other" id="feedbackTypeOtherText" placeholder="请简要说明具体类型">
+                        </div>
+                    </div>
+
+                    <!-- ② 整体评价：必选 -->
+                    <div class="field">
+                        <span class="field-label" id="feedbackRatingLabel"><span class="required-star" aria-hidden="true">*</span>整体评价<span class="required">（必选）</span></span>
+                        <div class="rating-group" role="radiogroup" aria-labelledby="feedbackRatingLabel">
+                            <label><input type="radio" name="rating" value="1" required><span>1</span></label>
+                            <label><input type="radio" name="rating" value="2"><span>2</span></label>
+                            <label><input type="radio" name="rating" value="3"><span>3</span></label>
+                            <label><input type="radio" name="rating" value="4"><span>4</span></label>
+                            <label><input type="radio" name="rating" value="5"><span>5</span></label>
+                        </div>
+                        <p class="rating-hint">1 表示不满意，5 表示很满意</p>
+                    </div>
+
+                    <!-- ③ 反馈内容：必填 -->
+                    <div class="form-field">
+                        <label for="feedbackMessage"><span class="required-star" aria-hidden="true">*</span>反馈内容<span class="required">（必填）</span></label>
+                        <textarea
+                            id="feedbackMessage"
+                            name="message"
+                            rows="6"
+                            placeholder="请描述你的建议或遇到的问题"
+                            required
+                        ></textarea>
+                    </div>
+
+                    <!-- ④ 是否允许联系 -->
+                    <div class="field">
+                        <span class="field-label" id="feedbackContactAllowedLabel"><span class="required-star" aria-hidden="true">*</span>是否允许我们联系你<span class="required">（必选）</span></span>
+                        <div class="radio-group" role="radiogroup" aria-labelledby="feedbackContactAllowedLabel">
+                            <label><input type="radio" name="contact_allowed" value="允许" id="feedbackContactYes"><span>允许</span></label>
+                            <label><input type="radio" name="contact_allowed" value="不允许" id="feedbackContactNo" checked><span>不允许</span></label>
+                        </div>
+                        <p class="rating-hint">选择「允许」后需留下联系方式，方便我们回复你</p>
+
+                        <!-- 选择「允许」时才出现 -->
+                        <div class="contact-input" id="feedbackContactBox">
+                            <div class="field">
+                                <span class="field-label" id="feedbackContactTypeLabel"><span class="required-star" aria-hidden="true">*</span>联系方式类型<span class="required">（必选）</span></span>
+                                <div class="radio-group" role="radiogroup" aria-labelledby="feedbackContactTypeLabel">
+                                    <label><input type="radio" name="contact_type" value="微信" id="feedbackContactWechat"><span>微信</span></label>
+                                    <label><input type="radio" name="contact_type" value="邮箱" id="feedbackContactEmail"><span>邮箱</span></label>
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <label class="field-label" for="feedbackContactValue"><span class="required-star" aria-hidden="true">*</span><span class="contact-value-label-text" id="feedbackContactValueLabel">你的联系方式</span><span class="required">（必填）</span></label>
+                                <input
+                                    type="text"
+                                    id="feedbackContactValue"
+                                    name="contact_value"
+                                    placeholder="请先选择联系方式类型"
+                                    autocomplete="off"
+                                    disabled
+                                >
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ⑤ 同意声明：必填 -->
+                    <label class="agree-checkbox" for="feedbackAgree">
+                        <input type="checkbox" id="feedbackAgree" name="consent" value="同意" required>
+                        <svg viewBox="0 0 64 64" aria-hidden="true">
+                            <rect class="box" x="6" y="6" width="52" height="52" rx="8" ry="8"></rect>
+                            <path class="check" d="M 18 33 L 28 43 L 46 22"></path>
+                        </svg>
+                        <span class="checkbox-text">我已阅读并同意上述说明</span>
+                    </label>
+
+                    <div class="action-row">
+                        <button class="btn-primary" id="feedbackSubmit" type="submit" disabled>
+                            提交反馈
+                            <i class="ri-send-plane-line" aria-hidden="true"></i>
+                        </button>
+                        <button class="btn-ghost" id="feedbackCancel" type="button">返回首页</button>
+                    </div>
+
+                    <p class="submit-hint" id="feedbackSubmitHint">请填写必填项后提交</p>
+                </form>
+            </div>
+        </div>
+
+        <!-- ==================== 文章评论视图 ==================== -->
+        <!-- 卡片「⋯」菜单里的「查看评论」切到这里，不再跳
+             原来的 project_subpage/blog/comments.html（那个文件已归档到 archive/）。
+             评论还是同一套 giscus（同 repo / category / term），和文章正文下面
+             那一块是同一份数据，区别只在 reactionsEnabled：这里 1（独立入口留着
+             表情回应），文章内是 0。
+             文章信息走地址栏 ca / ct（ca=文章 id，ct=标题），理由和反馈页一样：
+             ?article= 在主页面里的含义是「打开这篇文章」，不能混用。 -->
+        <div id="view-comments" class="view comments-view" style="display:none;">
+            <header class="comments-view-head">
+                <p class="tweaks-eyebrow">// COMMENTS</p>
+                <h1 class="tweaks-title" id="commentsViewTitle">评论</h1>
+                <p class="tweaks-lead" id="commentsViewLead">这篇文章的留言都在下面。</p>
+            </header>
+
+            <div class="comments-view-body">
+                <!-- 骨架由 script.js 的 buildCommentsSkeleton() 现插，
+                     和文章页那块评论区复用同一套骨架，不在这里重复写一份 -->
+                <div class="comments-stage" id="commentsViewStage">
+                    <div class="giscus" id="commentsViewWidget"></div>
+                </div>
+
+                <div class="article-bottombar comments-view-bottombar">
+                    <span class="back-link" id="commentsViewBack"><i class="ri-arrow-left-line" aria-hidden="true"></i> 返回</span>
+                    <a class="article-feedback" id="commentsViewFeedback" href="index.html?view=feedback">
+                        <i class="ri-feedback-line" aria-hidden="true"></i>
+                        <span>问题反馈</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== 反馈提交成功视图 ==================== -->
+        <!-- web3forms 的 redirect 是一次真实的页面加载，会带着 ?view=thanks
+             重新进站点，所以 init() 必须能直接打开这个视图。
+             倒计时结束回首页，并在顶部弹一条「反馈已提交」的提示。 -->
+        <div id="view-thanks" class="view thanks-view" style="display:none;">
+            <div class="thanks-page">
+                <div class="thanks-icon"><i class="ri-check-line" aria-hidden="true"></i></div>
+                <h1>感谢你的反馈</h1>
+                <p>你的意见已提交，会用于改进这个博客。<br>页面会在倒计时结束后自动返回首页。</p>
+                <p class="redirect-countdown" id="thanksCountdown" role="status" aria-live="polite">3 秒后自动返回首页</p>
             </div>
         </div>
 
@@ -512,7 +698,7 @@
     </div>
 
     <div class="site-toast" id="siteToast" role="status" aria-live="polite" hidden>
-        <i class="ri-link" aria-hidden="true"></i>
+        <i class="ri-checkbox-circle-line" aria-hidden="true"></i>
         <span id="siteToastText"></span>
     </div>
 

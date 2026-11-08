@@ -219,7 +219,7 @@
         <h1 class="unavailable-title" id="unavailableTitle">当前文章不对外开放</h1>
         <p class="unavailable-description">这篇文章正在构建中，暂时无法查看，感谢你的理解。</p>
         <div class="unavailable-actions">
-          <a href="feedback.html" class="unavailable-action" id="unavailableFeedbackLink" target="_top">
+          <a href="../../index.html?view=feedback" class="unavailable-action" id="unavailableFeedbackLink" target="_top">
             <i class="ri-feedback-line" aria-hidden="true"></i>
             意见反馈
           </a>
@@ -232,6 +232,8 @@
     (function () {
       // 反馈链接带上文章 id 和标题，反馈页会显示「反馈的文章：xxx」，
       // 方便定位是哪篇文章出的问题。
+      // 参数名用 fa / ft：主页面的 ?article= 是「打开这篇文章」的意思，
+      // 这里混用会让点完反馈反而进了文章页。
       const feedbackLink = document.getElementById('unavailableFeedbackLink');
       if (!feedbackLink) return;
 
@@ -252,8 +254,8 @@
       } catch (e) { /* 跨域时读不到父页面，就用当前地址里的参数 */ }
 
       const target = new URL(feedbackLink.getAttribute('href'), window.location.href);
-      if (articleId) target.searchParams.set('article', articleId);
-      if (articleTitle) target.searchParams.set('title', articleTitle);
+      if (articleId) target.searchParams.set('fa', articleId);
+      if (articleTitle) target.searchParams.set('ft', articleTitle);
       feedbackLink.href = target.href;
     })();
   </script>

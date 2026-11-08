@@ -25,8 +25,10 @@
         if (embeddedPageFrame && embeddedPageFrame.contentWindow) {
             embeddedPageFrame.contentWindow.postMessage({ type: 'annie-theme', theme: theme }, '*');
         }
-        const giscusFrame = document.querySelector('.giscus-frame');
-        if (giscusFrame && giscusFrame.contentWindow) {
+        /* 页面上可能同时挂着两个 giscus iframe（文章正文下那块 + 评论视图那块），
+           要全部同步，只取第一个的话另一个会停在旧主题上 */
+        document.querySelectorAll('.giscus-frame').forEach(function (giscusFrame) {
+            if (!giscusFrame.contentWindow) return;
             giscusFrame.contentWindow.postMessage(
                 {
                     giscus: {
@@ -37,7 +39,7 @@
                 },
                 'https://giscus.app'
             );
-        }
+        });
     }
 
     function init() {

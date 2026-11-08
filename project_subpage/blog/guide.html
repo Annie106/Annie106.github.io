@@ -997,10 +997,8 @@
 │   │   ├── article_unavailable.html ← 未开放文章的提示页
 │   │   ├── article_14_baidu.html ← 文章 14 的内嵌页面
 │   │   ├── manor_photo.html ← 文章 11 的内嵌图文页
-│   │   ├── comments.html    ← 独立评论页
 │   │   ├── submission.html  ← 电影投稿表单
-│   │   ├── feedback.html    ← 反馈表单
-│   │   ├── thanks.html      ← 反馈提交成功页
+│   │   ├── thanks.html      ← 投稿成功页（电影投稿面板还在用）
 │   │   ├── guide.html       ← 你正在看的这份指南
 │   │   └── building.html    ← 未完成项目提示页
 │   └── projects/            ← 你自己的项目页
@@ -1011,7 +1009,9 @@
 │
 └── archive/                 ← 归档，不参与网页显示
     ├── music-player.js      ← 旧版播放器，现在没用到
-    └── feedback-tx.html     ← 旧版反馈页，现在没用到
+    ├── feedback-tx.html     ← 旧版腾讯问卷反馈页，现在没用到
+    ├── feedback.html        ← 反馈页跳转桩（旧链接由 404.html 送到 ?view=feedback）
+    └── comments.html        ← 评论页跳转桩（旧链接由 404.html 送到 ?view=comments）
 </code></pre>
 
                 <h3 class="guide-subtitle">
@@ -1041,7 +1041,7 @@
                 </h3>
                 <p><code>posts-data.js</code> 里的 <code>window.BLOG_POSTS</code> 才是文章数据；首页、文章列表和归档共用它。<code>tweaks-data.js</code> 保存博客更新记录，首页卡片和「本周折腾」视图共用它。<code>script.js</code> 负责筛选、搜索、页面切换和文章渲染，不存文章正文。</p>
                 <p><code>theme.js</code> 管深浅色切换，还会记住访客的选择。<code>touch-hover.js</code> 修的是「手机上点一下按钮，按钮就一直亮着不恢复」的问题，它给页面加一个标记，样式表据此决定要不要显示鼠标悬停效果。<code>image-loading.js</code> 管图片加载：先用模糊占位顶上，图加载完再淡入变清晰，也负责 <code>data-fast-src</code> / <code>data-slow-src</code> 那套高速/慢速链接的切换。<code>background-music.js</code> 管背景音乐，歌单在文件最开头。<code>movie-announcement.js</code> 管电影相关提示。<code>copyToClipboard.js</code> 就是「点一下微信图标自动复制」那个功能。</p>
-                <p><code>archive/</code> 文件夹里是留档的旧文件，页面不会加载它们。<code>music-player.js</code> 是旧版播放器（现在用 <code>background-music.js</code>），<code>feedback-tx.html</code> 是旧版腾讯问卷反馈页（现在用 <code>blog/feedback.html</code>）。不用管它们，删了也不影响网页。</p>
+                <p><code>archive/</code> 文件夹里是留档的旧文件，页面不会加载它们。<code>music-player.js</code> 是旧版播放器（现在用 <code>background-music.js</code>），<code>feedback-tx.html</code> 是旧版腾讯问卷反馈页。<code>feedback.html</code> 和 <code>comments.html</code> 是从 <code>project_subpage/blog/</code> 挪过来的跳转桩——反馈页和评论区早就并进主页面了（<code>?view=feedback</code> / <code>?view=comments</code>），旧链接由根目录的 <code>404.html</code> 接住再送过去。不用管它们，删了也不影响网页。</p>
 
                 <div class="guide-tip">
                     <div class="guide-tip-title">
@@ -1251,7 +1251,7 @@
 };</code></pre>
                 <p>前面的 <code>10</code> 是文章 id。没配过的文章会自动显示「复制文章链接」「查看评论」「问题反馈」三个默认项。</p>
                 <p>菜单项支持三种类型：<code>link</code>（打开指定网址或页面）、<code>article</code>（打开站内文章详情）、<code>externalPage</code>（打开这篇文章自己配置的独立页面）。想加一项就照上面的格式复制一行。</p>
-                <p>反馈表单在 <code>project_subpage/blog/feedback.html</code>，反馈类型包括「文章问题」「Bug 反馈」「功能建议」「排版样式」和「其他」。</p>
+                <p>反馈表单是站内视图 <code>index.html?view=feedback</code>（和「全部折腾」同一套，不单独占一个页面）：表单结构在 <code>index.html</code> 的 <code>#view-feedback</code> 里，样式在 <code>css/style.css</code> 的「问题反馈视图」一节，校验和提交逻辑在 <code>js/script.js</code> 的「问题反馈 / 提交成功」一节。反馈类型包括「文章问题」「Bug 反馈」「功能建议」「排版样式」和「其他」。<code>project_subpage/blog/feedback.html</code> 现在只是个跳转桩，旧链接跟过来会自动落到新地址。</p>
 
                 <!-- 6.7 分享文章 -->
                 <h3 class="guide-subtitle">
