@@ -832,7 +832,7 @@
         <div class="guide-intro">
             <p>这是一个部署、修改和使用此博客的操作指南。</p>
             <p>本指南将带你从零开始，了解如何修改、使用并部署这个博客。</p>
-            <p>GitHub项目地址：<a href="https://github.com/annie106/annie106" target="_blank" rel="noopener noreferrer">https://github.com/annie106/annie106</a></p>
+            <p>GitHub 项目地址：<a href="https://github.com/Annie106/Annie106.github.io" target="_blank" rel="noopener noreferrer">github.com/Annie106/Annie106.github.io</a></p>
         </div>
 
         <!-- ==================== 名词 ==================== -->
@@ -867,7 +867,7 @@
                         <i class="ri-information-line"></i>
                         用户名想清楚再填
                     </div>
-                    <p>假设你填 <code>xiaoming</code>，以后博客网址就是 <code>https://xiaoming.github.io/仓库名</code>。注册完基本改不了。</p>
+                    <p>假设你填 <code>xiaoming</code>，个人主页仓库名设为 <code>xiaoming.github.io</code> 时，网址是 <code>https://xiaoming.github.io/</code>；普通项目仓库则会带上仓库名，例如 <code>https://xiaoming.github.io/myblog/</code>。用户名会出现在网址里，注册前先确认拼写。</p>
                 </div>
             </div>
         </section>
@@ -883,7 +883,7 @@
                     <span class="guide-step-num">A</span>
                     下载 ZIP（最简单）
                 </h3>
-                <p>打开 <a href="https://github.com/annie106/annie106" target="_blank" rel="noopener noreferrer">github.com/annie106/annie106</a>，点右上角绿色的 <strong>Code</strong> 按钮，菜单最下面有一项 <strong>Download ZIP</strong>，点它。</p>
+                <p>打开 <a href="https://github.com/Annie106/Annie106.github.io" target="_blank" rel="noopener noreferrer">github.com/Annie106/Annie106.github.io</a>，点右上角绿色的 <strong>Code</strong> 按钮，菜单最下面有一项 <strong>Download ZIP</strong>，点它。</p>
                 <p>下载完找到压缩包，右键解压（Windows 11 可以直接选「全部解压缩」）。</p>
 
                 <div class="guide-warning">
@@ -896,18 +896,18 @@
 
                 <h3 class="guide-subtitle">
                     <span class="guide-step-num">B</span>
-                    Fork 一份（打算做成自己的网站就选这个）
+                    Fork 一份（想从这份代码继续改就选这个）
                 </h3>
-                <p>在项目页面右上角点 <strong>Fork</strong>，再点 <strong>Create fork</strong>。GitHub 会把整个项目复制到你的账号下，之后你改的是自己那份。</p>
-                <p>好处是仓库已经在你自己名下了，第八步开 Pages、传文件都不用再折腾。</p>
+                <p>在项目页面右上角点 <strong>Fork</strong>，再点 <strong>Create fork</strong>。GitHub 会把项目复制到你的账号下。Fork 后仓库默认仍叫 <code>Annie106.github.io</code>；要发布成自己的个人主页，先在仓库 Settings 中把仓库名改成 <code>你的用户名.github.io</code>，再按第八步开启 Pages。</p>
+                <p>如果只是下载 ZIP，改完后要在自己的 GitHub 账号中新建仓库并上传；不能直接把修改发布到原项目。</p>
 
                 <div class="guide-tip">
                     <div class="guide-tip-title">
                         <i class="ri-question-line"></i>
                         选哪个
                     </div>
-                    <p>只想先看看长什么样：选 A。<br>
-                    打算直接做成自己的网站：选 B。</p>
+                    <p>只想先看看或本地试改：选 A。<br>
+                    想基于原项目继续维护：选 B；发布个人主页前还要把仓库名改成自己的 <code>用户名.github.io</code>。</p>
                 </div>
             </div>
         </section>
@@ -968,8 +968,9 @@
 
                 <pre><code>博客文件夹/
 │
-├── index.html               ← 主页面，最常改的就是它
+├── index.html               ← 首页、文章、归档、折腾、电影、关于等视图
 ├── movie.html               ← 电影播放页
+├── 404.html                 ← 找不到页面时的提示与旧链接兜底
 ├── favicon.svg              ← 浏览器标签页上的小图标
 ├── share_cover.jpg          ← 分享给微信/QQ 时的封面缩略图
 ├── README.md                ← 说明书，不影响网页
@@ -981,22 +982,27 @@
 │   └── style.css            ← 所有样式：颜色、字号、间距、深色模式
 │
 ├── js/
-│   ├── script.js            ← 文章内容、标签、页面切换
+│   ├── posts-data.js        ← 全部文章数据
+│   ├── tweaks-data.js       ← 博客更新记录（首页与折腾视图共用）
+│   ├── script.js            ← 页面切换、筛选、搜索与文章渲染
 │   ├── theme.js             ← 深色模式切换
 │   ├── touch-hover.js       ← 修手机点击后按钮常亮的问题
 │   ├── background-music.js  ← 背景音乐
 │   ├── image-loading.js     ← 图片加载策略
+│   ├── movie-announcement.js ← 电影服务公告提示
 │   └── copyToClipboard.js   ← 点图标复制联系方式
 │
 ├── project_subpage/         ← 子页面都放这里
 │   ├── blog/                ← 博客自带的页面
-│   │   ├── building.html    ← 没做完的项目
-│   │   ├── articl...le.html ← 未开放文章的提示页
+│   │   ├── article_unavailable.html ← 未开放文章的提示页
+│   │   ├── article_14_baidu.html ← 文章 14 的内嵌页面
+│   │   ├── manor_photo.html ← 文章 11 的内嵌图文页
+│   │   ├── comments.html    ← 独立评论页
 │   │   ├── submission.html  ← 电影投稿表单
 │   │   ├── feedback.html    ← 反馈表单
 │   │   ├── thanks.html      ← 反馈提交成功页
 │   │   ├── guide.html       ← 你正在看的这份指南
-│   │   └── manor_photo.html ← 第五人格归宿照图文页（文章 id 11 用的就是它）
+│   │   └── building.html    ← 未完成项目提示页
 │   └── projects/            ← 你自己的项目页
 │       ├── appeal-guide/
 │       │   └── index.html   ← 你自己的项目
@@ -1012,7 +1018,7 @@
                     <i class="ri-file-text-line"></i>
                     根目录
                 </h3>
-                <p><code>index.html</code> 是整个博客的骨架。首页、文章列表、文章详情、电影、关于，五个界面全挤在这一个文件里。你的头像、名字、导航栏、社交图标、页脚也都在这里改。</p>
+                <p><code>index.html</code> 是整个博客的骨架。导航里的首页、文章、归档、电影、关于，以及文章详情和「本周折腾」等视图都在这里；头像、名字、导航栏、社交图标、页脚也在这里改。</p>
                 <p><code>movie.html</code> 是独立的视频播放页，想加视频改它底部的 <code>VIDEO_LIST</code>。</p>
                 <p><code>favicon.svg</code> 是浏览器标签页上那个小图标。<code>share_cover.jpg</code> 是把链接分享到微信、QQ 时显示的封面缩略图，改法见「6.9 换分享卡片封面」。<code>README.md</code> 是纯文字说明，不显示在网页上。</p>
 
@@ -1033,8 +1039,8 @@
                     <i class="ri-code-line"></i>
                     js 文件夹
                 </h3>
-                <p><code>script.js</code> 是博客的大脑，也是第二重要的文件。<strong>你写的所有文章都在这里面</strong>，标签筛选、页面切换也归它管。</p>
-                <p><code>theme.js</code> 管深浅色切换，还会记住访客的选择。<code>touch-hover.js</code> 修的是「手机上点一下按钮，按钮就一直亮着不恢复」的问题，它给页面加一个标记，样式表据此决定要不要显示鼠标悬停效果。<code>image-loading.js</code> 管图片加载：先用模糊占位顶上，图加载完再淡入变清晰，也负责 <code>data-fast-src</code> / <code>data-slow-src</code> 那套高速/慢速链接的切换。<code>background-music.js</code> 管背景音乐，歌单在文件最开头。<code>copyToClipboard.js</code> 就是「点一下微信图标自动复制」那个功能。</p>
+                <p><code>posts-data.js</code> 里的 <code>window.BLOG_POSTS</code> 才是文章数据；首页、文章列表和归档共用它。<code>tweaks-data.js</code> 保存博客更新记录，首页卡片和「本周折腾」视图共用它。<code>script.js</code> 负责筛选、搜索、页面切换和文章渲染，不存文章正文。</p>
+                <p><code>theme.js</code> 管深浅色切换，还会记住访客的选择。<code>touch-hover.js</code> 修的是「手机上点一下按钮，按钮就一直亮着不恢复」的问题，它给页面加一个标记，样式表据此决定要不要显示鼠标悬停效果。<code>image-loading.js</code> 管图片加载：先用模糊占位顶上，图加载完再淡入变清晰，也负责 <code>data-fast-src</code> / <code>data-slow-src</code> 那套高速/慢速链接的切换。<code>background-music.js</code> 管背景音乐，歌单在文件最开头。<code>movie-announcement.js</code> 管电影相关提示。<code>copyToClipboard.js</code> 就是「点一下微信图标自动复制」那个功能。</p>
                 <p><code>archive/</code> 文件夹里是留档的旧文件，页面不会加载它们。<code>music-player.js</code> 是旧版播放器（现在用 <code>background-music.js</code>），<code>feedback-tx.html</code> 是旧版腾讯问卷反馈页（现在用 <code>blog/feedback.html</code>）。不用管它们，删了也不影响网页。</p>
 
                 <div class="guide-tip">
@@ -1043,7 +1049,7 @@
                         关于 project_subpage
                     </div>
                     <p><code>project_subpage/</code> 下面分成两个文件夹：<code>blog/</code> 是博客自带的页面（没做完的项目、未开放文章提示页、反馈表单、反馈成功页、这份指南），<code>projects/</code> 是放你自己项目页的地方。想加新页面，在 <code>projects/</code> 里建一个文件夹放 <code>index.html</code> 就行。</p>
-                    <p>这些页面可以配置成「把子页面嵌进来显示」或「点一下跳过去」，写法在 6.6 节。移动或改名之后，记得同步改 <code>js/script.js</code> 里写死的路径，否则会 404。</p>
+                    <p>这些页面可以配置成「把子页面嵌进来显示」或「点一下跳过去」，写法在 6.6 节。移动或改名之后，记得同步改 <code>js/posts-data.js</code> 中的页面路径，或对应的 <code>articleMenus</code> 配置，否则会 404。</p>
                 </div>
             </div>
         </section>
@@ -1060,7 +1066,7 @@
                         <i class="ri-error-warning-line"></i>
                         动手之前先备份
                     </div>
-                    <p>把 <code>index.html</code> 和 <code>js/script.js</code> 各复制一份，名字后面加个「备份」。改坏了随时能拿回来。</p>
+                    <p>动手前先备份准备修改的文件；通常至少备份 <code>index.html</code>、<code>js/posts-data.js</code> 和 <code>js/script.js</code>，名字后面加个「备份」。改坏了随时能拿回来。</p>
                 </div>
 
                 <div class="guide-tip">
@@ -1105,6 +1111,7 @@
                 <pre><code>&lt;ul class="nav-links" id="navLinks"&gt;
     &lt;li&gt;&lt;a href="#" class="active" data-nav="home"&gt;首页&lt;/a&gt;&lt;/li&gt;
     &lt;li&gt;&lt;a href="#" data-nav="blog"&gt;文章&lt;/a&gt;&lt;/li&gt;
+    &lt;li&gt;&lt;a href="#" data-nav="archive"&gt;归档&lt;/a&gt;&lt;/li&gt;
     &lt;li&gt;&lt;a href="movie.html" data-nav="movie"&gt;电影&lt;/a&gt;&lt;/li&gt;
     &lt;li&gt;&lt;a href="about-rh-studio.html" data-nav="about"&gt;关于&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;</code></pre>
@@ -1181,7 +1188,7 @@
                     <i class="ri-article-line"></i>
                     6.6 写文章、改文章
                 </h3>
-                <p>文章都在 <code>js/script.js</code> 开头。打开它，搜索 <code>const blogPosts</code>，里面每一项就是一篇文章：</p>
+                <p>文章数据在 <code>js/posts-data.js</code>。打开它，搜索 <code>window.BLOG_POSTS</code>，数组里的每一项就是一篇文章；<code>js/script.js</code> 会读取这份数据并负责显示：</p>
                 <pre><code>{
     id: 1,
     title: '文章标题',
@@ -1200,10 +1207,11 @@
                 <p>各字段的意思：</p>
                 <ul>
                     <li><code>id</code>：文章编号，<strong>不能跟别的文章重复</strong></li>
-                    <li><code>title</code> / <code>date</code> / <code>excerpt</code>：标题、日期、摘要。日期就是个文字，不会自动排序</li>
+                    <li><code>title</code> / <code>date</code> / <code>excerpt</code>：标题、发布日期（<code>YYYY-MM-DD</code>）和摘要。首页按日期倒序取最近 6 篇；「文章」视图按数据数组顺序显示（置顶文章排前面），「归档」按日期倒序</li>
                     <li><code>tags</code>：标签，用来看筛选按钮，可以有多个，写成 <code>['随笔', '阅读']</code></li>
                     <li><code>pinned</code>：写 <code>true</code> 就是置顶</li>
-                    <li><code>featured</code>：<code>true</code> 显示在首页，<code>false</code> 只在文章页显示</li>
+                    <li><code>featured</code>：旧字段，当前页面不读取它。首页会按日期显示最近 6 篇（置顶文章始终靠前），完整文章列表由「文章」视图展示</li>
+                    <li><code>updated</code>：可选。填最近一次改这篇的日期（格式同 <code>date</code>）。写了之后，文章卡片和详情页的日期都优先显示它，详情页还会在下面补一行「发布于 原发布日」；不写、或跟 <code>date</code> 一样就只显示 <code>date</code>。首页排序、时间线和归档分组也用这个日期算</li>
                     <li><code>isPublic</code>：可选。设为 <code>false</code> 后，文章详情区域会显示“当前文章不对外开放”，并隐藏文章标题、元信息和正文；改为 <code>true</code> 或删掉此字段即可重新开放。没有设置时默认开放</li>
                     <li><code>content</code>：正文，写在反引号（键盘左上角 <span class="guide-kbd">`</span> 那个键）中间，可以用 <code>&lt;p&gt;</code> 分段、<code>&lt;h2&gt;</code> 加小标题</li>
                     <li><code>embeddedPage</code>：填相对路径如 <code>'project_subpage/projects/xxx/index.html'</code>，这篇文章会把那个网页嵌进来显示</li>
@@ -1217,7 +1225,7 @@
                         <i class="ri-lock-line"></i>
                         暂停展示不等于保密
                     </div>
-                    <p><code>isPublic: false</code> 会在文章详情区域显示未开放提示，并且不把正文插入前端页面 DOM。可是这是静态博客，文章数据仍在公开的 <code>js/script.js</code> 文件中，访客仍可能查看源码。因此这个开关只是控制页面展示，不能用来保护敏感或机密内容。</p>
+                    <p><code>isPublic: false</code> 会在文章详情区域显示未开放提示，并且不把正文插入前端页面 DOM。可是这是静态博客，文章数据仍在公开的 <code>js/posts-data.js</code> 文件中，访客仍可能查看源码。因此这个开关只是控制页面展示，不能用来保护敏感或机密内容。</p>
                 </div>
 
                 <div class="guide-warning">
@@ -1233,7 +1241,7 @@
                     <p>保存后如果网页突然一片空白，八成就是上面某一条。按 <span class="guide-kbd">Ctrl</span> + <span class="guide-kbd">Z</span> 撤销再检查。</p>
                 </div>
 
-                <p>首页顶上那排筛选按钮，搜索 <code>'all', '置顶'</code> 能找到，改成你自己常用的标签。<code>'all'</code> 是「全部」，建议留着。</p>
+                <p>首页标签行由 <code>js/script.js</code> 中的 <code>HOME_TAGS</code> 固定配置（当前是「置顶」「随笔」）；「最新」和「全部」由程序单独处理。文章视图的标签筛选则从文章数据读取。新增首页筛选项时，改 <code>HOME_TAGS</code>，并确认文章的 <code>tags</code> 使用同样的文字。</p>
 
                 <p>文章卡片右上角那个「⋯」菜单可以给某篇文章单独配，搜索 <code>const articleMenus</code>：</p>
                 <pre><code>const articleMenus = {
@@ -1294,7 +1302,7 @@
                 <ul>
                     <li>页面文件：<code>project_subpage/blog/manor_photo.html</code></li>
                     <li>图片：根目录 <code>images/manor_photos/</code>（<code>manor_01.jpg</code> / <code>manor_02.jpg</code>）</li>
-                    <li>文章数据：<code>js/script.js</code> 里 id 为 11 的那一项，<code>embeddedPage: 'project_subpage/blog/manor_photo.html'</code></li>
+                    <li>文章数据：<code>js/posts-data.js</code> 里 id 为 11 的那一项，<code>embeddedPage: 'project_subpage/blog/manor_photo.html'</code></li>
                 </ul>
 
                 <p>换照片只改两处 <code>&lt;img&gt;</code>。因为页面在 <code>project_subpage/blog/</code>、图片在根目录的 <code>images/</code>，所以要往上退两级：</p>
@@ -1455,7 +1463,7 @@
                         <i class="ri-error-warning-line"></i>
                         别在 script.js 里改关于页
                     </div>
-                    <p><code>js/script.js</code> 的 <code>siteConfig</code> 里有一个 <code>aboutText</code> 字段，看着像是关于页的正文，但程序并没有读取它，在那里改不会有任何变化。详见 6.14 节。</p>
+                    <p><code>js/script.js</code> 里保留了一份名为 <code>siteConfig</code> 的旧配置，但当前页面没有读取它，在那里改个人资料不会有任何变化。详见 6.14 节。</p>
                 </div>
 
                 <!-- 6.14 坑 -->
@@ -1463,7 +1471,7 @@
                     <i class="ri-alert-line"></i>
                     6.14 有个地方改了没用
                 </h3>
-                <p>在 <code>js/script.js</code> 里搜索 <code>siteConfig</code>，会看到一段配置：</p>
+                <p>在 <code>js/script.js</code> 里搜索 <code>siteConfig</code>，会看到一段尚未接入页面的旧配置：</p>
                 <pre><code>const siteConfig = {
     authorName: '...',
     subtitle: '...',
@@ -1480,8 +1488,7 @@
                         <i class="ri-error-warning-line"></i>
                         改这里不会有任何变化
                     </div>
-                    <p>这段配置目前的代码<strong>并没有真正读取它</strong>，只是留在文件里备用。你在里面改名字、改简介，网页上不会有反应。</p>
-                    <p>要改个人信息，请去 <code>index.html</code> 里改（看 6.5 节）。这个坑很多人踩过，改了半天没动静就是因为改错了地方。</p>
+                    <p>这份配置目前<strong>没有被页面读取</strong>，改它不会改变网站显示。名字、简介等首页信息请在 <code>index.html</code> 修改（看 6.5 节）；关于页面也在 <code>index.html</code> 中（看 6.13 节）。</p>
                 </div>
 
                 <!-- 6.15 配色 -->
@@ -1692,7 +1699,7 @@ html:not(.is-touch-input) .options:hover {
                     <span class="guide-step-num">A</span>
                     网页上传（最简单）
                 </h3>
-                <p>登录 GitHub，点右上角的 <strong>+</strong>，选 <strong>New repository</strong>。仓库名用英文，比如 <code>myblog</code>——这个名字也会出现在你的网址里。下面选 <strong>Public</strong>（公开），因为私有仓库用不了免费的 Pages。其他初始化选项都不要勾，直接点 <strong>Create repository</strong>。</p>
+                <p>登录 GitHub，点右上角的 <strong>+</strong>，选 <strong>New repository</strong>。要发布成个人主页，仓库名必须是 <code>你的用户名.github.io</code>，网址就是 <code>https://你的用户名.github.io/</code>；普通项目站可以用 <code>myblog</code> 等名称，网址会带上仓库名。初次设置建议选 <strong>Public</strong>，其他初始化选项都不要勾，点 <strong>Create repository</strong>。</p>
                 <p>创建好之后，页面上有个 <strong>uploading an existing file</strong> 的链接，点进去。然后把你博客文件夹里的<strong>所有文件和文件夹</strong>一起拖进上传区域。</p>
                 <p>注意是拖文件夹<strong>里面的东西</strong>，不要把最外面那层文件夹本身拖进去。等它传完，下面随便写一句说明，点绿色的 <strong>Commit changes</strong>。</p>
 
@@ -1734,9 +1741,9 @@ git push</code></pre>
                     开启 Pages，拿到网址
                 </h3>
                 <p>文件传上去了但还不能访问。最后一步：进你的仓库页面，点上面的 <strong>Settings</strong>，左边菜单里找到 <strong>Pages</strong>。把 <strong>Source</strong> 从 None 改成 <strong>Deploy from a branch</strong>，<strong>Branch</strong> 选 <strong>main</strong>，右边文件夹保持 <strong>/ (root)</strong>，点 <strong>Save</strong>。</p>
-                <p>等一两分钟刷新这个页面，顶上会冒出一个绿色提示，里面就是你的网址：</p>
+                <p>等一两分钟刷新这个页面，顶上会冒出一个绿色提示，里面就是你的网址。个人主页仓库名为 <code>用户名.github.io</code> 时：</p>
                 <pre><code>https://你的用户名.github.io/仓库名/</code></pre>
-                <p>比如用户名 <code>xiaoming</code>、仓库名 <code>myblog</code>，网址就是 <code>https://xiaoming.github.io/myblog/</code>。如果仓库名刚好跟用户名一样，网址会短一点。</p>
+                <p>比如用户名 <code>xiaoming</code>、仓库名 <code>myblog</code>，项目站网址是 <code>https://xiaoming.github.io/myblog/</code>；如果仓库名是 <code>xiaoming.github.io</code>，个人主页网址则是 <code>https://xiaoming.github.io/</code>。</p>
                 <p>以后更新内容：本地改好 → 传上去 → 等一两分钟 → 刷新网站，改动就生效了。</p>
 
                 <div class="guide-warning">
@@ -1782,7 +1789,15 @@ git push</code></pre>
                             </tr>
                             <tr>
                                 <td><code>js/script.js</code></td>
-                                <td>文章全部消失（数据就在这个文件里），导航点了没反应，页面也切不动。这个最不能删。</td>
+                                <td>页面切换、筛选、搜索和文章渲染等功能失效。这个是核心脚本，不能删。</td>
+                            </tr>
+                            <tr>
+                                <td><code>js/posts-data.js</code></td>
+                                <td>文章数据无法加载，首页、文章列表和归档会没有文章。</td>
+                            </tr>
+                            <tr>
+                                <td><code>js/tweaks-data.js</code></td>
+                                <td>首页的博客更新卡片和「本周折腾」列表没有数据。</td>
                             </tr>
                             <tr>
                                 <td><code>js/theme.js</code></td>
@@ -1842,8 +1857,8 @@ git push</code></pre>
                 <p><strong>改完文件，网页没变化？</strong><br>
                 九成是浏览器缓存，按 <span class="guide-kbd">Ctrl</span> + <span class="guide-kbd">F5</span> 强制刷新。还不行就看看文件是不是真保存了——VS Code 里文件名旁边有小圆点就表示没保存。</p>
 
-                <p><strong>网页突然一片空白？</strong><br>
-                一般是 <code>js/script.js</code> 被改坏了：漏逗号、引号不配对、或 id 重复。按 <span class="guide-kbd">Ctrl</span> + <span class="guide-kbd">Z</span> 撤销再检查。也可以按 <span class="guide-kbd">F12</span> 打开开发者工具切到 Console，红色报错会告诉你第几行有问题。</p>
+                <p><strong>网页突然一片空白或文章不见了？</strong><br>
+                页面功能异常时检查 <code>js/script.js</code>；文章列表为空时检查 <code>js/posts-data.js</code> 是否存在、是否被正确加载，以及文章对象之间的逗号和引号。按 <span class="guide-kbd">F12</span> 打开开发者工具切到 Console，红色报错通常会指出问题位置。</p>
 
                 <p><strong>图片不显示？</strong><br>
                 检查路径拼写（大小写敏感，<code>Images/a.jpg</code> 和 <code>images/a.jpg</code> 是两个东西）、图片是否真在那个文件夹、网络图片的网址能否直接打开。</p>
@@ -1868,9 +1883,9 @@ git push</code></pre>
                     <li>下载源码：Download ZIP 解压，或者 Fork 一份</li>
                     <li>装 VS Code + 中文包 + Live Server</li>
                     <li>用 VS Code 打开博客文件夹，点 Go Live 确认能打开</li>
-                    <li>备份 <code>index.html</code> 和 <code>js/script.js</code></li>
+                    <li>备份 <code>index.html</code>、<code>js/posts-data.js</code> 和 <code>js/script.js</code></li>
                     <li>在 <code>index.html</code> 里改头像、名字、导航、社交图标、页脚</li>
-                    <li>在 <code>js/script.js</code> 里写文章（id 别重复）</li>
+                    <li>在 <code>js/posts-data.js</code> 里写文章（id 别重复）</li>
                     <li>在 <code>css/style.css</code> 里调配色和字号</li>
                     <li>传到 GitHub，Settings → Pages 开启，拿到网址</li>
                     <li>把网址发给朋友</li>

@@ -588,7 +588,9 @@
             white-space: nowrap;
             user-select: none;
         }
-        html:not(.is-touch-input) .tag-pill:hover {
+        /* :not(.active) 不能省：选中项是「黑底白字」，
+           悬停时如果再把字色压成主文字色，就成了黑底黑字，标签直接看不见 */
+        html:not(.is-touch-input) .tag-pill:not(.active):hover {
             border-color: #ccc;
             color: var(--color-text-primary);
         }
@@ -2577,6 +2579,15 @@
         .view.active-view {
             animation: fadeSlideIn 0.35s ease both;
         }
+        /* 快速来回切换视图（首页 ⇄ 文章）时不播入场动画。
+           动画从 opacity:0 起步、350ms 才走完，来回切得比这快的话
+           页面几乎一直停在半透明状态，看起来就是在闪。
+           .is-switch-throttled 由 script.js 在切换前打到 <html> 上，
+           并且只在所有视图都还没有 active 类时才增删，不会引起重播。 */
+        html.is-switch-throttled .view.active-view,
+        html.is-switch-throttled .article-detail {
+            animation: none !important;
+        }
         .about-intro {
             padding: 64px max(24px, calc((100% - 1040px) / 2));
             background: var(--color-surface);
@@ -2839,8 +2850,24 @@
             margin-bottom: 28px;
             display: flex;
             flex-wrap: wrap;
-            gap: 14px;
+            /* 行距收紧：发布日期/标签是第一行，「发布于 原发布日」独占第二行，14px 会显得太散 */
+            gap: 8px 14px;
             align-items: center;
+        }
+        /* 「发布于 原发布日」：只有文章发布后改过（有 updated）才出现。
+           主日期已经是最近更新日，这一行把原发布日补在下面，
+           独占一行、弱化到和辅助信息同级，不跟主日期抢注意力。 */
+        .article-updated {
+            flex: 0 0 100%;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            color: var(--color-text-tertiary);
+            line-height: 1.5;
+        }
+        .article-updated i {
+            font-size: 0.9rem;
+            opacity: 0.85;
         }
         .article-full-title,
         .article-full-meta,
@@ -4275,7 +4302,7 @@
         [data-theme="dark"] .tag-pill {
             background: var(--color-surface);
         }
-        html:not(.is-touch-input) [data-theme="dark"] .tag-pill:hover {
+        html:not(.is-touch-input) [data-theme="dark"] .tag-pill:not(.active):hover {
             border-color: var(--color-border);
         }
         [data-theme="dark"] .tag-pill.active {
@@ -4720,4 +4747,662 @@
             .movie-error-backdrop,
             .movie-error-panel,
             .movie-error-btn { transition: none; }
+        }
+
+        /* ==================== 本周折腾 ==================== */
+        /* 首页文章下方的「博客更新日志」：一行三张卡片，平铺、不翻页。
+           配色跟着文章卡片走，只把悬停底色换成浅灰 + 上浮 2px
+           （参考图里是粉底粉边，这里按本站的黑白基调收回来）。 */
+        :root {
+            --tweak-border: rgba(17, 17, 17, 0.07);
+            --tweak-border-hover: rgba(17, 17, 17, 0.13);
+            /* 悬停底色：比页面底色深一点点，暗色主题下反过来用白色蒙版 */
+            --tweak-hover-bg: #f4f4f5;
+            --tweak-hover-shadow: 0 10px 24px rgba(15, 23, 42, 0.07);
+        }
+        [data-theme="dark"] {
+            --tweak-border: rgba(255, 255, 255, 0.08);
+            --tweak-border-hover: rgba(255, 255, 255, 0.16);
+            --tweak-hover-bg: rgba(255, 255, 255, 0.05);
+            --tweak-hover-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+        }
+
+        .tweak-section {
+            margin-top: 46px;
+        }
+        .tweak-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+        .tweak-title {
+            font-size: 1.06rem;
+            font-weight: 700;
+            line-height: 1.4;
+            letter-spacing: 0.01em;
+            color: var(--color-text-primary);
+        }
+        /* 「全部折腾 →」：和标题同一行靠右，做成轻按钮而不是胶囊，
+           视觉上让位给左边的大标题。指向独立页，所以是 <a> */
+        .tweak-all {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 0;
+            border: 0;
+            background: none;
+            cursor: pointer;
+            color: var(--color-text-tertiary);
+            font-size: 0.78rem;
+            font-weight: 500;
+            line-height: 1.6;
+            white-space: nowrap;
+            text-decoration: none;
+            transition: color var(--transition-fast);
+        }
+        .tweak-all:hover,
+        .tweak-all:focus-visible {
+            color: var(--color-text-primary);
+            text-decoration: none;
+        }
+        .tweak-all i {
+            font-size: 0.92rem;
+            transition: transform var(--transition-fast);
+        }
+        /* 箭头往右挪一点点，暗示「去下一页」 */
+        .tweak-all:hover i {
+            transform: translateX(2px);
+        }
+
+        .tweak-list {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+        }
+        /* 收起状态：只留前三张，其余不参与布局（不用 max-height 动画，
+           高度算不准会抖） */
+        .tweak-list.is-collapsed .tweak-card:nth-child(n + 4) {
+            display: none;
+        }
+
+        .tweak-card {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 16px 18px 18px;
+            border: 1px solid var(--tweak-border);
+            border-radius: 14px;
+            background: var(--color-bg);
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+            transition:
+                transform 0.2s ease,
+                box-shadow 0.2s ease,
+                border-color 0.2s ease,
+                background-color 0.2s ease;
+        }
+        /* 悬停：浅灰底 + 抬起，和文章卡片同一套手感 */
+        @media (hover: hover) and (pointer: fine) {
+            .tweak-card:hover {
+                transform: translateY(-2px);
+                background: var(--tweak-hover-bg);
+                border-color: var(--tweak-border-hover);
+                box-shadow: var(--tweak-hover-shadow);
+            }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .tweak-card { transition: none; }
+            .tweak-card:hover { transform: none; }
+            .tweak-all i { transition: none; }
+        }
+
+        .tweak-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+        .tweak-date {
+            color: var(--color-text-tertiary);
+            font-size: 0.73rem;
+            font-weight: 500;
+            line-height: 1.6;
+            letter-spacing: 0.01em;
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+        }
+        .tweak-cat {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            min-width: 0;
+            color: var(--color-text-primary);
+            font-size: 0.78rem;
+            font-weight: 600;
+            line-height: 1.6;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .tweak-emoji {
+            font-size: 0.86em;
+            line-height: 1;
+            /* Windows 的彩色 emoji 偏大，压一点基线别把行高撑开 */
+            transform: translateY(0.5px);
+        }
+        .tweak-text {
+            color: var(--color-text-secondary);
+            font-size: 0.8rem;
+            line-height: 1.75;
+            /* 固定三行，超出的用省略号收掉；展开也只显示三行，
+               完整内容需要时再放进详情页 */
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        @media (max-width: 860px) {
+            .tweak-list {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+        @media (max-width: 600px) {
+            .tweak-section {
+                margin-top: 34px;
+            }
+            .tweak-title {
+                font-size: 1rem;
+            }
+            .tweak-list {
+                grid-template-columns: minmax(0, 1fr);
+                gap: 12px;
+            }
+            .tweak-card {
+                padding: 14px 16px 16px;
+                border-radius: 12px;
+            }
+        }
+
+        /* ==================== 本周折腾视图 ==================== */
+        /* 首页「全部折腾 →」点进来的完整列表（不占导航栏，所以没有对应高亮项）：
+           一列通栏的小记，比首页的卡片宽、松。悬停只换浅灰底色、不做位移
+           —— 长列表里卡片一动就「跳」，很吵。 */
+        #view-tweaks {
+            padding-top: 26px;
+        }
+        .tweaks-eyebrow {
+            margin-bottom: 18px;
+            color: var(--color-text-tertiary);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 0.72rem;
+            font-weight: 500;
+            letter-spacing: 0.14em;
+            line-height: 1;
+        }
+        .tweaks-title {
+            font-size: 2.15rem;
+            font-weight: 800;
+            line-height: 1.25;
+            letter-spacing: -0.01em;
+            color: var(--color-text-primary);
+        }
+        .tweaks-lead {
+            margin-top: 16px;
+            color: var(--color-text-secondary);
+            font-size: 0.93rem;
+            line-height: 1.95;
+        }
+        /* 和归档那一页一样：标题贴着容器左边，列表收窄居中，
+           正文一列不超过 760px，长句更好读 */
+        .tweaks-feed {
+            width: 100%;
+            max-width: 760px;
+            margin: 46px auto 0;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+        .tweak-entry {
+            padding: 22px 24px 24px;
+            border: 1px solid var(--tweak-border);
+            border-radius: 12px;
+            background: var(--color-bg);
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+        }
+        @media (hover: hover) and (pointer: fine) {
+            .tweak-entry:hover {
+                background: var(--tweak-hover-bg);
+                border-color: var(--tweak-border-hover);
+            }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .tweak-entry { transition: none; }
+        }
+        .tweak-entry .tweak-meta {
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .tweak-entry .tweak-date {
+            font-size: 0.78rem;
+        }
+        .tweak-entry .tweak-cat {
+            font-size: 0.86rem;
+        }
+        /* 这一页不截断：小记本来就是想看完整的那两三句 */
+        .tweak-entry .tweak-text {
+            display: block;
+            overflow: visible;
+            color: var(--color-text-secondary);
+            font-size: 0.91rem;
+            line-height: 1.9;
+        }
+        .tweaks-empty {
+            color: var(--color-text-tertiary);
+            font-size: 0.88rem;
+        }
+
+        @media (max-width: 600px) {
+            #view-tweaks {
+                padding-top: 14px;
+            }
+            .tweaks-title {
+                font-size: 1.72rem;
+            }
+            .tweaks-lead {
+                font-size: 0.88rem;
+            }
+            .tweaks-feed {
+                margin-top: 34px;
+                gap: 16px;
+            }
+            .tweak-entry {
+                padding: 18px 18px 20px;
+                border-radius: 12px;
+            }
+            .tweak-entry .tweak-text {
+                font-size: 0.87rem;
+            }
+        }
+
+        /* ==================== 时间线 ==================== */
+        /* 年 → 月 → 文章三层，年月都能折叠。
+           左侧那条竖线是「层级轨道」，月份的短竖线平时只给当前月份，
+           鼠标移上去才亮起来（参考图里是白色/粉色，这里按全站基调改成浅灰）。 */
+        /* 悬停时刻度线的浅灰；深色下换成白色蒙版，别用同一支灰 */
+        :root {
+            --tl-bar-hover: #bfbfbf;
+        }
+        [data-theme="dark"] {
+            --tl-bar-hover: rgba(255, 255, 255, 0.36);
+        }
+        .timeline-section {
+            margin-top: 46px;
+        }
+        .timeline {
+            margin-top: 4px;
+        }
+        .tl-year + .tl-year {
+            margin-top: 16px;
+        }
+
+        .tl-year-head,
+        .tl-month-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            width: 100%;
+            border: 0;
+            border-radius: 8px;
+            background: none;
+            font: inherit;
+            color: inherit;
+            cursor: pointer;
+            text-align: left;
+            transition: background-color 0.18s ease;
+        }
+        .tl-year-head {
+            padding: 7px 4px 7px 14px;
+        }
+        .tl-year-head:hover,
+        .tl-month-head:hover {
+            background: var(--tweak-hover-bg);
+        }
+        .tl-year-label {
+            font-size: 0.98rem;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            color: var(--color-text-primary);
+        }
+        /* 「14 篇」+ 折叠箭头，靠右对齐 */
+        .tl-side {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            color: var(--color-text-tertiary);
+            font-size: 0.78rem;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        .tl-side i {
+            font-size: 1.05rem;
+            line-height: 1;
+            transition: transform var(--transition-fast);
+        }
+        .tl-year.is-collapsed .tl-year-head .tl-side i {
+            transform: rotate(-90deg);
+        }
+
+        /* 月份所在的这一竖列就是轨道线。
+           折叠和月份共用同一套高度动画：由 JS 驱动 height，
+           这里只给两端的静态形态，并在收起后把内容藏掉。 */
+        .tl-months {
+            position: relative;
+            margin-left: 14px;
+            border-left: 1px solid var(--color-border-light);
+            height: auto;
+            transition: visibility 0s linear 0s;
+        }
+        .tl-year.is-collapsed .tl-months {
+            height: 0;
+            overflow: hidden;
+            visibility: hidden;
+            transition: visibility 0s linear 0.28s;
+        }
+        /* 动画期间才裁切：常开 overflow 会把月份左侧那根压在轨道线上的
+           刻度线裁掉半像素，静止状态下看着发虚 */
+        .tl-months.is-animating {
+            overflow: hidden;
+        }
+
+        .tl-month-head {
+            position: relative;
+            padding: 7px 4px 7px 20px;
+        }
+        /* 月份左侧的短竖线。压在轨道线上，像刻度 */
+        .tl-month-head::before {
+            content: '';
+            position: absolute;
+            left: -1px;
+            top: 6px;
+            bottom: 6px;
+            width: 2px;
+            border-radius: 2px;
+            background: transparent;
+            transition: background-color 0.18s ease;
+        }
+        /* 只有悬停时才亮这根刻度线：平时整列是透明的，
+           不要在「当前月份」上常驻一根深色竖线（看着像选中状态，是干扰） */
+        .tl-month-head:hover::before,
+        .tl-month-head:focus-visible::before {
+            background: var(--tl-bar-hover);
+        }
+        .tl-month-label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--color-text-primary);
+        }
+        /* 展开时箭头朝下 */
+        .tl-month.is-open .tl-month-head .tl-side i {
+            transform: rotate(90deg);
+        }
+
+        /* 文章列表：再嵌一层浅轨道，层级一眼能看出 */
+        /* 折叠靠「高度」做动画（由 JS 用 WAAPI 驱动），这里只定义两端形态：
+           - 收起：height: 0，内容靠 overflow 裁掉；
+           - 展开：height: auto，跟着内容走。
+           visibility 延迟到收完再切，否则文字会「先消失、再收高度」，
+           看起来像闪了一下。收起后设成 hidden，里面的链接也不会被 Tab 选中。 */
+        .tl-posts {
+            list-style: none;
+            /* 下间距交给最后一条文章自己的 margin：
+               给列表留 padding 的话，border-box 下 height:0 也收不掉它，
+               收起后会残留一条几像素的空档 */
+            margin: 0 0 0 20px;
+            padding: 0 0 0 24px;
+            border-left: 1px solid var(--color-border-light);
+            overflow: hidden;
+            height: 0;
+            visibility: hidden;
+            transition: visibility 0s linear 0.28s;
+        }
+        .tl-month.is-open > .tl-posts {
+            height: auto;
+            visibility: visible;
+            transition: visibility 0s linear 0s;
+        }
+
+        .tl-post {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            padding: 5px 8px;
+            border-radius: 7px;
+            transition: background-color 0.18s ease;
+        }
+        .tl-post:hover {
+            background: var(--tweak-hover-bg);
+        }
+        /* 列表末尾的留白（open 时算进自然高度，收起时不影响） */
+        .tl-posts > .tl-post:last-child {
+            margin-bottom: 6px;
+        }
+        .tl-date {
+            flex: 0 0 auto;
+            color: var(--color-text-tertiary);
+            font-size: 0.77rem;
+            line-height: 1.7;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        .tl-post-title {
+            color: var(--color-text-secondary);
+            font-size: 0.85rem;
+            line-height: 1.7;
+            text-decoration: none;
+            transition: color var(--transition-fast);
+        }
+        /* 鼠标移到标题上，颜色略加深一档（不直接跳到主文字色，
+           不然整行会「抢」出层级） */
+        .tl-post-title:hover,
+        .tl-post-title:focus-visible {
+            color: #3d3d3d;
+        }
+        [data-theme="dark"] .tl-post-title:hover,
+        [data-theme="dark"] .tl-post-title:focus-visible {
+            color: #c8ced8;
+        }
+        .tl-empty {
+            color: var(--color-text-tertiary);
+            font-size: 0.86rem;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .tl-year-head,
+            .tl-month-head,
+            .tl-post,
+            .tl-side i,
+            .tl-month-head::before,
+            .tl-post-title { transition: none; }
+        }
+
+        @media (max-width: 600px) {
+            .timeline-section {
+                margin-top: 34px;
+            }
+            .tl-year-head {
+                padding-left: 8px;
+            }
+            .tl-months {
+                margin-left: 8px;
+            }
+            .tl-month-head {
+                padding-left: 16px;
+            }
+            .tl-posts {
+                margin-left: 16px;
+                padding-left: 16px;
+            }
+            .tl-post {
+                gap: 8px;
+                padding: 5px 6px;
+            }
+            .tl-post-title {
+                font-size: 0.83rem;
+            }
+        }
+
+        /* ==================== 归档视图 ==================== */
+        /* 站内第五个视图（导航「归档」）：按年份分组的一列文章，
+           左侧是带小圆环的竖线，圆环用全站唯一那支强调色。 */
+        #view-archive {
+            padding-top: 26px;
+        }
+        .archive-eyebrow {
+            margin-bottom: 18px;
+            color: var(--card-accent);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 0.72rem;
+            font-weight: 500;
+            letter-spacing: 0.14em;
+            line-height: 1;
+        }
+        .archive-title {
+            font-size: 2.15rem;
+            font-weight: 800;
+            line-height: 1.25;
+            letter-spacing: -0.01em;
+            color: var(--color-text-primary);
+        }
+        .archive-lead {
+            margin-top: 16px;
+            color: var(--color-text-secondary);
+            font-size: 0.93rem;
+            line-height: 1.95;
+        }
+
+        /* 正文比标题区窄一档，和参考图一样：左边缩进、整体偏中间 */
+        .archive-feed {
+            width: 100%;
+            max-width: 660px;
+            margin: 46px auto 0;
+        }
+        .archive-year {
+            position: relative;
+            padding-left: 34px;
+        }
+        .archive-year + .archive-year {
+            margin-top: 46px;
+        }
+        /* 竖线从圆环下方一直落到最后一条 */
+        .archive-year::before {
+            content: '';
+            position: absolute;
+            left: 7px;
+            top: 22px;
+            bottom: 6px;
+            width: 1px;
+            background: var(--color-border);
+        }
+        .archive-ring {
+            position: absolute;
+            left: 0;
+            top: 5px;
+            width: 15px;
+            height: 15px;
+            border: 1.5px solid var(--card-accent);
+            border-radius: 50%;
+            background: var(--color-bg);
+        }
+        .archive-year-label {
+            font-size: 1.28rem;
+            font-weight: 700;
+            line-height: 1.5;
+            letter-spacing: 0.01em;
+            color: var(--color-text-primary);
+        }
+        .archive-list {
+            list-style: none;
+            margin-top: 12px;
+        }
+        .archive-item {
+            display: flex;
+            align-items: baseline;
+            gap: 24px;
+            padding: 12px 0;
+        }
+        .archive-date {
+            flex: 0 0 auto;
+            width: 108px;
+            color: var(--color-text-tertiary);
+            font-size: 0.84rem;
+            line-height: 1.7;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        .archive-link {
+            color: var(--color-text-secondary);
+            font-size: 0.93rem;
+            line-height: 1.7;
+            text-decoration: none;
+            transition: color var(--transition-fast);
+        }
+        /* 鼠标移到标题上只略微加深，不跳到纯黑 */
+        .archive-link:hover,
+        .archive-link:focus-visible {
+            color: #3d3d3d;
+        }
+        [data-theme="dark"] .archive-link:hover,
+        [data-theme="dark"] .archive-link:focus-visible {
+            color: #c8ced8;
+        }
+        .archive-empty {
+            color: var(--color-text-tertiary);
+            font-size: 0.9rem;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .archive-link { transition: none; }
+        }
+
+        @media (max-width: 600px) {
+            #view-archive {
+                padding-top: 14px;
+            }
+            .archive-title {
+                font-size: 1.72rem;
+            }
+            .archive-lead {
+                font-size: 0.88rem;
+            }
+            .archive-feed {
+                margin-top: 34px;
+            }
+            .archive-year {
+                padding-left: 26px;
+            }
+            .archive-year::before {
+                left: 5px;
+            }
+            .archive-ring {
+                width: 13px;
+                height: 13px;
+            }
+            .archive-year-label {
+                font-size: 1.12rem;
+            }
+            /* 手机上日期单独一行，标题不再被挤成一条窄缝 */
+            .archive-item {
+                flex-direction: column;
+                gap: 3px;
+                padding: 10px 0;
+            }
+            .archive-date {
+                width: auto;
+                font-size: 0.78rem;
+            }
+            .archive-link {
+                font-size: 0.89rem;
+            }
         }

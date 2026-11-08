@@ -77,6 +77,7 @@
             <ul class="nav-links" id="navLinks">
                 <li><a href="#" class="active" data-nav="home" aria-current="page">首页</a></li>
                 <li><a href="#" data-nav="blog">文章</a></li>
+                <li><a href="#" data-nav="archive">归档</a></li>
                 <li><a href="movie.html" data-nav="movie">电影</a></li>
                 <li><a href="about-rh-studio.html" data-nav="about">关于</a></li>
             </ul>
@@ -199,6 +200,35 @@
             <div class="home-more" style="text-align:center;margin-top:20px;">
                 <a href="#" class="tag-pill" data-nav="blog" style="text-decoration:none;cursor:pointer;">查看全部文章 →</a>
             </div>
+
+            <!-- ==================== 本周折腾 ==================== -->
+            <!-- 本周对博客本身的更新与修改（不是文章）。
+                 数据在 js/tweaks-data.js，这里只露前三张，
+                 「全部折腾」切到站内的折腾视图（#view-tweaks）看完整列表。 -->
+            <section class="tweak-section" id="tweakSection" aria-labelledby="tweakTitle">
+                <div class="tweak-head">
+                    <h2 class="tweak-title" id="tweakTitle">本周折腾</h2>
+                    <a class="tweak-all" id="tweakAll" href="index.html?view=tweaks">
+                        <span>全部折腾</span>
+                        <i class="ri-arrow-right-line" aria-hidden="true"></i>
+                    </a>
+                </div>
+                <div class="tweak-list is-collapsed" id="tweakList"></div>
+            </section>
+
+            <!-- ==================== 时间线 ==================== -->
+            <!-- 按「年 → 月 → 文章」归档，年、月都能点开/收起。
+                 数据直接取 blogPosts，新发文章不用另外维护。 -->
+            <section class="timeline-section" id="timelineSection" aria-labelledby="timelineTitle">
+                <div class="tweak-head">
+                    <h2 class="tweak-title" id="timelineTitle">时间线</h2>
+                    <a class="tweak-all" id="timelineAll" href="index.html?view=archive" title="按年份查看全部文章">
+                        <span>完整归档</span>
+                        <i class="ri-arrow-right-line" aria-hidden="true"></i>
+                    </a>
+                </div>
+                <div class="timeline" id="timelineMount"></div>
+            </section>
         </div>
 
         <!-- ==================== 文章列表视图 ==================== -->
@@ -225,6 +255,30 @@
                 </div>
             </div>
             <div class="posts-list" id="postsListBlog"></div>
+        </div>
+
+        <!-- ==================== 归档视图 ==================== -->
+        <!-- 按年份分组，数据由 js/script.js 的 renderArchive() 从 blogPosts 生成，
+             和首页时间线、文章列表共用同一份文章数据。 -->
+        <div id="view-archive" class="view" style="display:none;">
+            <header class="archive-hero">
+                <p class="archive-eyebrow">// ARCHIVE</p>
+                <h1 class="archive-title">归档</h1>
+                <p class="archive-lead">目前共计 <span id="archiveCount">0</span> 篇文章，时间是最诚实的记录者。</p>
+            </header>
+            <div class="archive-feed" id="archiveFeed"></div>
+        </div>
+
+        <!-- ==================== 本周折腾视图 ==================== -->
+        <!-- 首页「全部折腾 →」点进来的完整列表；不占导航栏位置。
+             数据是 js/tweaks-data.js 的 BLOG_TWEAKS，和首页那三张卡片共用。 -->
+        <div id="view-tweaks" class="view" style="display:none;">
+            <header class="tweaks-hero">
+                <p class="tweaks-eyebrow">// NOTES</p>
+                <h1 class="tweaks-title">本周折腾</h1>
+                <p class="tweaks-lead">来不及写成长文的，都以小记的形式堆在这里。短，但都是真的。</p>
+            </header>
+            <div class="tweaks-feed" id="tweaksFeed"></div>
         </div>
 
         <!-- ==================== 电影视图 ==================== -->
@@ -270,7 +324,7 @@
             </section>
 
             <!-- 版本号：从页脚挪到这里，收在关于页右下角 -->
-            <p class="about-version">版本 0.4.21.097</p>
+            <p class="about-version">版本 0.4.22.072</p>
         </div>
 
         <!-- ==================== 文章详情视图 ==================== -->
@@ -496,6 +550,8 @@
     <script src="js/touch-hover.js"></script>
     <script src="js/theme.js"></script>
     <script src="js/image-loading.js"></script>
+    <script src="js/posts-data.js"></script>
+    <script src="js/tweaks-data.js"></script>
     <script src="js/script.js"></script>
     <!-- 电影板块服务公告：播放器加载完成即出现，无关闭入口 -->
     <script src="js/movie-announcement.js"></script>

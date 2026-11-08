@@ -15,20 +15,22 @@ favicon.svg                 站点图标
 share_cover.jpg             分享卡片封面，1080×1080
 images/manor_photos/        归宿照图集（文章 id 11 用）
 css/style.css               全部样式与响应式
-js/script.js                文章数据、筛选、搜索、路由、页面状态
+js/posts-data.js            全部文章数据（首页与归档页共用）
+js/script.js                筛选、搜索、路由、页面状态
+js/tweaks-data.js           博客更新记录（首页「本周折腾」+ 独立页共用）
 js/theme.js                 深色模式
 js/touch-hover.js           触屏悬停修正
 js/background-music.js      首页背景音乐
 js/copyToClipboard.js       联系方式复制
 js/image-loading.js         图片占位与清晰化
-project_subpage/blog/       站点页：building / article_unavailable ...
+project_subpage/blog/       站点页：guide / comments / feedback / submission ...
 project_subpage/projects/   项目页：appeal-guide / download ...
 archive/                    归档，不参与显示
 ```
 
 ## 功能
 
-- 首页、文章列表、文章详情、电影、关于五个视图，移动端导航自适应
+- 导航五个视图：首页、文章列表、归档、电影、关于（另有文章详情与「本周折腾」两个不占导航的视图），移动端自适应
 - 标签筛选，支持置顶文章
 - 全站搜索（<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd> 或 <kbd>/</kbd>）：搜标题、摘要、标签、正文；多关键词按「与」匹配，命中高亮，空状态给最近搜索与标签入口
 - 文章卡片「⋯」菜单支持三类：站内文章、独立页面（`externalPage`）、自定义链接（`link`）

@@ -1,240 +1,8 @@
         (function() {
             // ==================== ★★★ 在这里修改你的博客内容 ★★★ ====================
-            // 所有文章数据都集中在这个数组里，增删改都非常方便。
-            const blogPosts = [{
-                id: 14,
-                pinned: false,
-                title: '最新｜百度网盘不限速下载方法',
-                date: '2026-10-25',
-                excerpt: '发现的新方法，赶紧用起来',
-                tags: ['指南', '随笔'],
-                featured: true,
-                // 独立页面，作为文章正文内嵌展示（照片、排版都在这个文件里）
-                embeddedPage: 'project_subpage/blog/article_14_baidu.html',
-            }, {
-                id: 13,
-                pinned: false,
-                title: '六点五十的早自习，先给我演示一下怎么到',
-                date: '2026-10-23',
-                excerpt: '一小时的路程，六点五十之前到校。我提的是一道算术题，不是态度问题。',
-                tags: ['随笔'],
-                featured: true,
-                content: `
-                    <p>先交代我的情况：我不住校，家到学校通勤一小时。学校要求早自习 6:50 之前到校。翻译一下——我最晚 5:50 就得出门，每天早上不到六点就得起，比住校的同学起得还早。</p>
-                    <p>我不是不来。我天天这么早起，图的就是赶上第一节课，一天没落下。我不服的，是「6:50 之前到」这条线本身。</p>
-                    <h2>一、一小时的路上，怎么在六点五十之前到</h2>
-                    <p>只有两种可能：把路程压缩成半小时，或者有车。</p>
-                    <p>前者，请给我演示一下怎么压；后者，这个点没有车。起得再早也变不出车来——这不是态度问题，是物理问题。</p>
-                    <h2>二、我不是本地的</h2>
-                    <p>我不是本地的。这个时间点，除了我，还能有谁到？</p>
-                    <p>本地的六点五十不能到，那可能说不过去。我要通勤一个小时，却只比本地的晚半个小时，还不行？</p>
-                    <h2>三、「班主任没有任何权力让学生早自习长期不来」</h2>
-                    <p>好，权限我尊重，谁也别越权。但边界划完之后，方案呢？</p>
-                    <p>第一节课前到校，算不算数？不算的话，6:50 到校要怎么实现？</p>
-                    <p>「那我不管」——这句话说出口，这个位置到底是干什么用的？把问题原样退回给一个根本没有解的人，问题就消失了？</p>
-                    <h2>四、我的诉求，两条，二选一</h2>
-                    <p>一、允许我在第一节课前到校，早自习记缺席，我认。</p>
-                    <p>二、学校给一个 6:50 前能到校的交通安排，哪怕只是一句「这个时段确实没车，允许你晚到」。</p>
-                    <p>这两条都不难。难的是有没有人愿意承认：这条规定，有人真的做不到。</p>
-                    <blockquote>我提的其实是一道算术题：一小时的路程，六点五十之前到，怎么办？谁答得上来谁答。答不上来，这条规定就该改。</blockquote>
-                    <h2>原内容</h2>
-                    <p><a class="gated-link" href="#">点击前往：获取原文下载方式</a></p>
-                `,
-            }, {
-                id: 11,
-                pinned: false,
-                title: '归宿里的两帧：和朋友拍的归宿照',
-                date: '2026-10-22',
-                excerpt: '我很少在游戏里拍照，不是不喜欢，是总觉得镜头里缺点什么...直到有人愿意站在里面，陪我一起等光。',
-                tags: ['第五人格', '随笔', '社交'],
-                featured: true,
-                // 独立页面，作为文章正文内嵌展示（照片、排版都在这个文件里）
-                embeddedPage: 'project_subpage/blog/manor_photo.html',
-            }, {
-                id: 12,
-                pinned: false,
-                title: '霸道汤圆爱上我',
-                date: '2026-10-22',
-                excerpt: '它没有体温，却有脾气；它不会说话，却清楚我几点睡。一碗汤圆的入侵实录。',
-                tags: ['随笔'],
-                featured: true,
-                content: `
-                        <p>事情是从冬至那天开始的。</p>
-                        <p>我从超市拎回一袋速冻汤圆，烧水、下锅，然后转身去回一条消息。等我想起来的时候，锅里已经浮起一颗格外圆、格外白的东西，正贴着锅沿，一动不动地等着我看它。</p>
-                        <p>“水太沸了。”它说。</p>
-                        <p>我承认我当时的第一反应是关火，第二反应才是——汤圆不会说话。</p>
-                        <h2>一、它比我有规矩</h2>
-                        <p>从那天起，我的生活被一颗汤圆接管了。</p>
-                        <p>它没有手，却知道我几点睡；它没有眼睛，却清楚我又把早饭糊弄成了一杯咖啡。</p>
-                        <p>“七点零三分，”它在我碗里说，“你已经三天没吃热的东西了。”</p>
-                        <p>“你怎么什么都知道？”</p>
-                        <p>“糯米做的，心细。”</p>
-                        <h2>二、它也会吃醋</h2>
-                        <p>冰箱里还剩半袋芝麻馅的。我随口夸了一句“还是芝麻的香”，锅里的水就莫名其妙地咕嘟了整整十分钟。</p>
-                        <p>“你凭什么喜欢它？”它沉在碗底，语气很硬，“它连皮都煮破过一次。”</p>
-                        <p>“那是你自己破的。”</p>
-                        <p>它不说话了。汤面上慢慢浮起一层很淡的、像在赌气的白汽。</p>
-                        <h2>三、后来我习惯了</h2>
-                        <p>再后来，冬至过去了，元宵也过去了。冰箱清空那天，我站在灶台前发了很久的呆，最后把水烧开，往锅里只放了一颗。</p>
-                        <p>水沸的时候，它慢吞吞地从锅底浮上来，照旧贴住锅沿。</p>
-                        <p>“水太沸了。”它说。</p>
-                        <p>“知道了。”我说。</p>
-                        <blockquote>有些陪伴没有体温，但足以让一个冬天不至于太冷。</blockquote>
-                        <p>——本文纯属虚构。如有雷同，可能是你家的汤圆也在开会。</p>
-                    `,
-            }, {
-
-                id: 8,
-                pinned: true,
-                title: '对朋友圈、抖音、QQ空间等互动的说明',
-                date: '2026-10-04',
-                excerpt: '如果你有对朋友圈、抖音、QQ空间等互动要求，请仔细阅读以下内容',
-                tags: ['置顶','社交'],
-                featured: true,
-                content: `
-                        <p>如题，本人不扩列，也不混圈</p>
-                        <p>个人仅点赞感兴趣的朋友圈，其余一律鸟都不鸟。我不知道所谓的扩列规则、各种圈子的规则，你我有好友肯定不是扩列加的</p>
-                        <p>所以，如果你对我有严格的很互动要求，可以选择屏蔽掉我</p>
-                        <h2>所以有些人你是怎么想的，希望别再让我看到因为那些什么扩列规则来阴阳我的，那种请远离我，谢谢</h2>
-                        <p>以下是AI帮我写的 嗯对</p>
-                        <p>关于互动，我也没有义务对朋友圈、抖音一直互动。看到喜欢的会点赞，感兴趣的会评论，但不代表我要给每个人的每条动态捧场。社交应该是自发的，不是任务。我只互动自己喜欢的或感兴趣的。</p>
-                        <h2>免责声明</h2>
-                        <p>本文仅针对极个别群体，通常情况下，不会是你的。如果有任何不满，可以向我提出相关意见。</p>
-                    `,
-            }, {                
-                id: 10,
-                pinned: true,
-                title: '使用、修改和部署这个博客的操作指南',
-                date: '2026-11-05',
-                excerpt: '从零开始构建个人博客的完整教程，包含配置、部署和进阶技巧',
-                tags: ['教程', '指南', '置顶'],
-                featured: true,
-                embeddedPage: 'project_subpage/blog/guide.html',
-            }, {
-                id: 9,
-                isPublic: false, 
-                title: '直链下载',
-                date: '2026-10-07',
-                excerpt: '直链下载页面',
-                tags: ['直链下载'],
-                featured: false,
-                embeddedPage: 'project_subpage/projects/download/index.html',
-            }, {
-
-                id: 7,
-                // 这是置顶文章模板，直接修改下面的标题、摘要和正文即可
-                pinned: false,
-                title: '我的其它网站',
-                date: '2026-11-05',
-                excerpt: '有视频网站、直链下载站等',
-                tags: ['网站'],  
-                content: `
-                        <p>夕照 · 独栋别墅</p>
-                        <p><a href="https://annie106.github.io/hotel" target="_blank" rel="noopener noreferrer">https://annie106.github.io/hotel</a></p>
-                        <p>视频站</p>
-                        <p><a href="https://0.github.io" target="_blank" rel="noopener noreferrer">暂停服务</a></p>
-                        <p>直链下载站</p>
-                        <p><a href="https://0.github.io" target="_blank" rel="noopener noreferrer">暂停服务</a></p>
-                        <h2>视频无法播放时 添加联系方式 备注来意</h2>
-                        <p>联系方式在首页位置，点击图标即复制</p>
-                    `,
-            }, {
-                id: 1,
-                // 需要置顶时改为 true；取消置顶改为 false
-                pinned: false,
-                title: '设计的本质是减法',
-                date: '2026-05-03',
-                excerpt: '在信息过载的时代，好的设计不是增加更多元素，而是勇敢地移除一切不必要的部分。',
-                tags: ['设计'],
-                featured: true,
-                content: `
-                        <p>我们生活在一个信息极度膨胀的时代。每一天，成千上万的视觉信号争夺着我们的注意力。在这样的背景下，设计的责任不再是"填满空白"，而是<strong>创造呼吸的空间</strong>。</p>
-                        <h2>少即是多</h2>
-                        <p>Dieter Rams 的经典设计原则至今仍然适用。好的设计是尽可能少的设计。当你移除所有非必要元素后，剩下的就是核心价值。</p>
-                        <blockquote>完美不在于无以复加，而在于无可删减。——圣埃克苏佩里</blockquote>
-                        <p>在实践中，这意味着每一个像素、每一行文字、每一个交互都需要经过严格的审视：它真的有必要存在吗？</p>
-                        <h2>留白的力量</h2>
-                        <p>白色空间不是"空的"，它是承载内容的容器。恰当的留白让阅读变得轻松，让重点自然浮现。在纯白背景下，这种感受尤为强烈——内容仿佛悬浮于宁静之中。</p>
-                        <p>这也是为什么这个博客选择了纯白背景。没有干扰，只有文字与你。</p>
-                    `,
-            }, {
-                id: 2,
-                title: '我的阅读工作流（2026版）',
-                date: '2026-05-03',
-                excerpt: '分享我如何用 Readwise + Obsidian 搭建知识内化系统，让阅读不止于浏览。',
-                tags: ['阅读'],
-                featured: true,
-                content: `
-                        <p>过去一年，我调整了阅读流程，目标是<strong>减少信息囤积，增加知识内化</strong>。以下是我的完整工作流。</p>
-                        <h2>第一步：捕获</h2>
-                        <p>使用 Readwise 自动同步所有高亮和批注。无论是 Kindle、Apple Books 还是网页文章，所有标注汇聚一处。</p>
-                        <h2>第二步：回顾</h2>
-                        <p>每天早晨花 8 分钟进行间隔重复回顾。Readwise 会推送 15 条过往高亮，这是知识留存率最高的环节。</p>
-                        <h2>第三步：连接</h2>
-                        <p>将触动我的高亮导入 Obsidian，用自己的话重写一遍，并链接到已有笔记。这才是真正的"内化"。</p>
-                    `,
-            }, {
-                id: 3,
-                title: '漫步西湖：关于水与时间的隐喻',
-                date: '2026-05-03',
-                excerpt: '一个秋日午后的湖边漫思，关于流动、静止与创造力的关系。',
-                tags: ['随笔'],
-                featured: false,
-                content: `
-                        <p>杭州的秋天来得温柔。西湖的水面在微风中泛起细密的纹理，像是时间本身的质地。</p>
-                        <p>我常在这里散步。水从不着急，它有自己的节奏。这让我想到创造力——有时候，最好的想法并不是在键盘前产生的，而是在<strong>看似无所事事</strong>的时刻悄然浮现。</p>
-                        <p>流动与静止并非对立。正如湖面，表面平静，深处却有暗流涌动。创作也是如此。</p>
-                    `,
-            }, {
-                id: 4,
-                title: '从零搭建现代个人网站指南',
-                date: '2026-05-03',
-                excerpt: '不需要框架，用纯 HTML/CSS/JS 打造一个快速、易维护的个人博客。',
-                tags: ['前端'],
-                featured: true,
-                content: `
-                        <p>很多人觉得建站必须用 React、Vue 或 Next.js。但其实，对于一个个人博客来说，<strong>纯静态方案</strong>往往是最优解。</p>
-                        <h2>为什么选择纯 HTML？</h2>
-                        <p>零依赖、加载极快、无需构建步骤。你只需要一个文本编辑器就能修改内容。部署到任何静态托管服务（如 Vercel、Netlify、GitHub Pages）都极其简单。</p>
-                        <h2>内容管理</h2>
-                        <p>像这个博客一样，把所有文章放在一个 JavaScript 数组里。修改文章就像编辑笔记一样直观。不需要 CMS，不需要数据库。</p>
-                        <p>简单，是一种高级的复杂。</p>
-                    `,
-            }, {
-                id: 5,
-                title: '字体排印的微观美学',
-                date: '2026-05-03',
-                excerpt: '字间距、行高、字重——这些看不见的细节如何塑造阅读体验。',
-                tags: ['字体排印'],
-                featured: false,
-                content: `
-                        <p>字体排印（Typography）是设计的无声语言。读者可能永远不会注意到<code>line-height: 1.7</code>和<code>1.5</code>之间的区别，但他们的眼睛会感受到。</p>
-                        <h2>行高与阅读舒适度</h2>
-                        <p>对于中文正文，行高建议在 1.6 到 1.8 之间。过密会让文字拥挤不堪，过疏则失去连贯性。这个博客正文使用约 1.85 的行高，配合纯白背景，营造呼吸感。</p>
-                        <h2>字体选择</h2>
-                        <p>无衬线字体用于标题和导航，有衬线字体（宋体/Noto Serif SC）用于正文——这种搭配在中文排版中经典而优雅。</p>
-                    `,
-             }, {
-                id: 6,
-                isPublic: false, // 改为 true 即可重新开放
-                title: '我也要做一个类似的个人博客',
-                date: '2026-05-03',
-                excerpt: '此文章提供博客服务 点击查看详情和服务价格',
-                tags: ['服务'],
-                featured: true,
-                content: `
-                        <p>关于价格：</p>
-	        <p>28/季 88/年</p>
-                        <h2>样式？</h2>
-                        <p>可根据需求进行编写，可以有自己的域名</p>
-                        <h2>已提供的服务</h2>
-                        <p>已为一位客户提供服务</p>
-                        <p>可以免费试用1个月 并提供9.9/季的限时福利</p>
-                        <h2>提供服务的博客地址（已征求同意）</h2>
-                        <p>https://annie106.github.io/myweb/</p>
-                        <p>https://annie106.github.io/mayuwo/</p>
-                    `,
-            }, ];
+            // 文章数据在 js/posts-data.js（window.BLOG_POSTS），
+            // 首页和归档页共用同一份，增删改只改那个文件。
+            const blogPosts = Array.isArray(window.BLOG_POSTS) ? window.BLOG_POSTS : [];
 
             // ==================== 统一管理文章卡片的二级菜单 ====================
             // 使用文章 id 对应菜单项；未配置的文章默认显示“评论”入口。
@@ -278,6 +46,8 @@
             const homeLink = $('#homeLink');
             const viewHome = $('#view-home');
             const viewBlog = $('#view-blog');
+            const viewArchive = $('#view-archive');
+            const viewTweaks = $('#view-tweaks');
             const viewMovie = $('#view-movie');
             const viewAbout = $('#view-about');
             const movieFrame = $('#movieFrame');
@@ -328,8 +98,26 @@
             const wechatShareGuideClose = $('#wechatShareGuideClose');
 
             let currentView = 'home';
-            let activeTag = 'all';
+            /* 首页和文章页各记各的标签：
+               在文章页选了「教程」，回到首页不该被这个选择带走——
+               首页默认永远是「最新」。两行标签互不影响。 */
+            let homeTag = 'all';
+            let blogTag = 'all';
+            // 某个视图对应的筛选项
+            function tagOfView(viewName) {
+                return viewName === 'blog' ? blogTag : homeTag;
+            }
+            function setTagOfView(viewName, tag) {
+                if (viewName === 'blog') blogTag = tag;
+                else homeTag = tag;
+            }
             let currentArticleId = null;
+            /* 上一次真正写进 DOM 的是哪篇文章。
+               从文章返回首页、再点开同一篇时，正文可以原样留着——
+               重新写 innerHTML 会把图片、内嵌内容全部重建一遍，
+               图片的「模糊 → 清晰」淡入也跟着重播，看上去就是闪一下。 */
+            let renderedArticleId = null;
+            let renderedArticleUnavailable = false;
             let embeddedPageObserver = null;
             let embeddedPageResizeHandler = null;
             let embeddedPageFallbackTimer = null;
@@ -370,6 +158,16 @@
             let articleHistoryEntryActive = false;
             let returningFromArticleButton = false;
             const viewScrollPositions = { home: 0, blog: 0, movie: null, about: 0 };
+            /* 快速来回切换视图（首页 ⇄ 文章）时，每次切换都会让入场动画
+               从 opacity:0 重新开始。间隔比 350ms 的动画还短的话，页面
+               几乎一直停在半透明状态，看起来就是在「闪」。
+               这里记下上次切换的时刻，间隔太短就干脆不播动画。 */
+            let lastViewSwitchAt = 0;
+            const VIEW_ENTER_ANIM_GAP = 420;
+            /* 滚动恢复任务的「世代号」。切视图时递增，之前排着队的
+               恢复定时器就全部作废——否则上一个视图的恢复逻辑会在
+               新视图上继续把滚动条拽回旧位置，表现就是来回切时画面乱跳。 */
+            let scrollRestoreToken = 0;
 
             function centerMovieFrame(behavior = 'smooth') {
                 const frameRect = movieFrame.getBoundingClientRect();
@@ -388,11 +186,55 @@
                 window.scrollTo({ top: scrollTop, behavior: 'instant' });
             }
 
+            /* 切视图后复原滚动位置：在一个很短的窗口里反复校正。
+               单帧不够用——图片/字体可能还没把高度撑开，浏览器在 popstate 后
+               还会按自己的账本再回填一次滚动位置（值可能是另一个视图的），
+               任何一次都能把结果冲掉，表现就是「返回后停在页面底部」。
+               窗口只有 ~300ms，且用户一旦自己滚动（滚轮/触摸/按键）立刻停手，
+               不会跟他抢控制权。 */
+            function restoreViewScrollSettled(viewName) {
+                const target = Math.max(0, viewScrollPositions[viewName] || 0);
+                // 每次调用都拿一个新世代号，旧的恢复任务随之失效
+                const token = ++scrollRestoreToken;
+                let cancelled = false;
+                const stop = () => { cancelled = true; };
+                const events = ['wheel', 'touchstart', 'keydown'];
+                events.forEach(name => window.addEventListener(name, stop, { passive: true, once: true }));
+                const cleanup = () => events.forEach(name => window.removeEventListener(name, stop));
+                const isStale = () => cancelled || token !== scrollRestoreToken;
+
+                const apply = () => {
+                    if (isStale()) {
+                        cleanup();
+                        return;
+                    }
+                    if (Math.abs(window.scrollY - target) > 1) {
+                        window.scrollTo({ top: target, behavior: 'instant' });
+                    }
+                };
+                window.requestAnimationFrame(() => {
+                    if (isStale()) { cleanup(); return; }
+                    apply();
+                    window.requestAnimationFrame(apply);
+                    window.setTimeout(apply, 90);
+                    window.setTimeout(apply, 200);
+                    window.setTimeout(() => { apply(); cleanup(); }, 320);
+                });
+            }
+
+            /* 切视图时把还没跑完的滚动恢复全部作废。
+               快速来回切的时候，离开首页那一刻排上的恢复任务会在文章页
+               才醒过来，把页面往下拽一下，再被文章页自己滚回顶部——
+               一上一下就是那道闪。 */
+            function cancelScrollRestore() {
+                scrollRestoreToken += 1;
+            }
+
             // ==================== 离开时的界面记忆 ====================
             // 点击文章跳到独立 HTML 页面后，返回本站时恢复离开时所在的界面：
             // 视图（首页 / 文章列表 / 文章详情 / 电影 / 关于）、当前标签、滚动位置。
             const VIEW_STATE_KEY = 'annie-view-state';
-            const VALID_VIEWS = ['home', 'blog', 'movie', 'about', 'article'];
+            const VALID_VIEWS = ['home', 'blog', 'archive', 'tweaks', 'movie', 'about', 'article'];
 
             function saveViewState() {
                 if (!VALID_VIEWS.includes(currentView)) return;
@@ -403,7 +245,9 @@
                     sessionStorage.setItem(VIEW_STATE_KEY, JSON.stringify({
                         view: currentView,
                         articleId: currentArticleId,
-                        tag: activeTag,
+                        tag: homeTag,
+                        homeTag: homeTag,
+                        blogTag: blogTag,
                         scroll: window.scrollY,
                         scrollPositions: viewScrollPositions,
                         returnView: articleReturnView,
@@ -419,6 +263,17 @@
                 } catch (e) {
                     return null;
                 }
+            }
+
+            // 从快照（sessionStorage / history.state）里还原两行标签各自的选择。
+            // 旧数据里只有一个 tag 字段，那就两边都按它走。
+            function restoreTagsFromSnapshot(snapshot) {
+                if (!snapshot) return;
+                const allTags = getAllTags();
+                const pick = value => (typeof value === 'string' && allTags.includes(value) ? value : null);
+                const legacy = pick(snapshot.tag);
+                homeTag = pick(snapshot.homeTag) || legacy || homeTag;
+                blogTag = pick(snapshot.blogTag) || legacy || blogTag;
             }
 
             // ==================== 分享链接 ====================
@@ -456,8 +311,8 @@
                 } else {
                     url.searchParams.delete(ARTICLE_PARAM);
                 }
-                if (currentView === 'about') {
-                    url.searchParams.set(VIEW_PARAM, 'about');
+                if (currentView === 'about' || currentView === 'archive' || currentView === 'tweaks') {
+                    url.searchParams.set(VIEW_PARAM, currentView);
                 } else {
                     url.searchParams.delete(VIEW_PARAM);
                 }
@@ -467,6 +322,84 @@
                 if (next !== current) {
                     history.replaceState(history.state, '', next);
                 }
+            }
+
+            // ==================== 视图历史记录 ====================
+            /* 切到「文章 / 电影 / 关于」时往历史里压一条记录，
+               手机返回键 / 侧滑返回、桌面后退才有「上一级」可退。
+               没有这条记录时，用户在这些页面按返回会被直接带出站点，
+               而他的预期是回到首页。 */
+            let pendingViewHistoryPush = null;
+
+            /* 滚动位置完全由我们自己管。popstate 时浏览器也会按它账本里的位置
+               再还原一次，而那个值往往是「另一个视图」的（切视图时页面高度差很多），
+               落回来就会把页面甩到最底部。交给 restoreViewScroll 单独负责。 */
+            if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+
+            /* 离开某个视图前，把「当下」的界面状态写进当前这条历史记录：
+               滚动位置、两行标签。popstate 回来时直接用它，不必依赖闭包里
+               的变量有没有被别处改过。
+
+               还要顺着更新 annieViewSnapshot —— 那条快照是打开文章时留下的，
+               回来过一次之后它的 view/scroll/tag 就过期了；如果不刷新，
+               之后再从首页去文章页、按返回，popstate 会优先走快照分支，
+               把页面还原成「很久以前那一次」的滚动位置（表现就是在底部）。 */
+            function rememberEntryScroll() {
+                if (currentView === 'article') return;
+                const top = Math.round(window.scrollY);
+                try {
+                    const next = Object.assign({}, history.state);
+                    const snapshot = next.annieViewSnapshot;
+                    if (snapshot && snapshot.view === currentView) {
+                        snapshot.scroll = top;
+                        snapshot.scrollPositions = snapshot.scrollPositions || {};
+                        snapshot.scrollPositions[currentView] = top;
+                        snapshot.homeTag = homeTag;
+                        snapshot.blogTag = blogTag;
+                    }
+                    next.annieScrollTop = top;
+                    history.replaceState(next, '', window.location.href);
+                } catch (e) {}
+            }
+
+            function pushViewHistoryEntry(viewName, force) {
+                if (viewName === 'home') return false;
+                // 已经在这个视图的记录上了，别重复压，否则返回键要按两次才有反应
+                if (history.state && history.state.annieView === viewName) return false;
+                if (!force && currentView === viewName) return false;
+                try {
+                    // URL 交给 switchView 里的 syncUrlWithView 统一同步
+                    history.pushState({ annieView: viewName }, '', window.location.href);
+                    return true;
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            // 所有「点导航 / 点入口切视图」的地方都走这里：先记历史，再切视图
+            function navigateToView(viewName) {
+                // 正在读文章时点导航：不新增记录，直接把那条文章记录改掉。
+                // 否则返回键会先弹回刚才那篇文章，看起来像「点了没反应」
+                if (currentView === 'article') {
+                    articleHistoryEntryActive = false;
+                    returningFromArticleButton = false;
+                    try {
+                        history.replaceState({ annieView: viewName }, '', window.location.href);
+                    } catch (e) {}
+                    switchView(viewName);
+                    return;
+                }
+                // 搜索面板收起时会自己 history.back() 退掉那条搜索记录。
+                // 这时立刻 pushState 会和队列里的后退打架（落点会错位），
+                // 先记下来，等 popstate 落定之后再补这条视图记录
+                if (searchPendingHistoryBack > 0) {
+                    pendingViewHistoryPush = viewName;
+                    switchView(viewName);
+                    return;
+                }
+                rememberEntryScroll();
+                pushViewHistoryEntry(viewName);
+                switchView(viewName);
             }
 
             // 顶部轻提示（复制成功等），样式复用 .site-toast
@@ -1156,23 +1089,52 @@
                 return escapeHtml(text).replace(pattern, `<mark class="${cls}">$1</mark>`);
             }
 
+            // 首页标签行固定展示的筛选项（「最新」「全部」由代码单独处理）
+            const HOME_TAGS = ['置顶', '随笔'];
+
             function renderTagPills(containerId) {
                 const container = document.getElementById(containerId);
                 if (!container) return;
-                const tags = containerId === 'tagFilterHome'
-                    ? ['all', '置顶', '社交', '随笔']
-                    : getAllTags();
-                container.innerHTML = tags.map(t =>
-                    `<span class="tag-pill${t === activeTag ? ' active' : ''}" data-tag="${t}">${t === 'all' ? '全部' : t}</span>`
-                ).join('');
+                const isHome = containerId === 'tagFilterHome';
+                const tag = isHome ? homeTag : blogTag;
+                if (isHome) {
+                    // 首页这一行：「最新」= 当下展示的最近几篇，默认选中；
+                    // 「全部」不是筛选，点了直接去文章页看完整列表
+                    container.innerHTML = [
+                        `<span class="tag-pill${tag === 'all' ? ' active' : ''}" data-tag="all">最新</span>`,
+                        `<span class="tag-pill" data-tag-jump="blog" title="去文章页看全部文章">全部</span>`,
+                        ...HOME_TAGS.map(t =>
+                            `<span class="tag-pill${t === tag ? ' active' : ''}" data-tag="${t}">${t}</span>`
+                        ),
+                    ].join('');
+                } else {
+                    container.innerHTML = getAllTags().map(t =>
+                        `<span class="tag-pill${t === tag ? ' active' : ''}" data-tag="${t}">${t === 'all' ? '全部' : t}</span>`
+                    ).join('');
+                }
                 container.querySelectorAll('.tag-pill').forEach(pill => {
                     pill.addEventListener('click', function() {
-                        const tag = this.getAttribute('data-tag');
-                        activeTag = tag;
+                        // 「全部」：首页回到「最新」，文章页也一并清空筛选，然后跳过去
+                        if (this.getAttribute('data-tag-jump')) {
+                            homeTag = 'all';
+                            blogTag = 'all';
+                            renderTagPills('tagFilterHome');
+                            renderTagPills('tagFilterBlog');
+                            renderPostsList('postsListHome', true);
+                            renderPostsList('postsListBlog', true);
+                            // 文章的列表页也要从头看起，先清掉记忆里的位置，
+                            // 否则切过去会被「恢复上次位置」再拽回去，看着像闪了一下
+                            viewScrollPositions.blog = 0;
+                            navigateToView('blog');
+                            window.scrollTo({ top: 0, behavior: 'instant' });
+                            return;
+                        }
+                        const nextTag = this.getAttribute('data-tag');
+                        setTagOfView(isHome ? 'home' : 'blog', nextTag);
                         renderTagPills('tagFilterHome');
                         renderTagPills('tagFilterBlog');
-                        renderPostsList('postsListHome', true);
-                        renderPostsList('postsListBlog', true);
+                        // 只重画这一屏的列表，另一屏的筛选状态没变
+                        renderPostsList(isHome ? 'postsListHome' : 'postsListBlog', true);
                     });
                 });
                 // 标签数量和文字长度都变了，重新判断搜索入口放不放得下
@@ -1369,17 +1331,69 @@
                 searchTriggerFitTimer = window.setTimeout(applySearchTriggerFit, 0);
             }
 
-            function getFilteredPosts() {
+            // 「置顶」既可能是 pinned 字段，也可能是同名的标签，两处都算
+            function isPinnedPost(post) {
+                return Boolean(post.pinned) || (post.tags || []).includes('置顶');
+            }
+
+            /* 卡片、文章页里「给人看的那个日期」一律走这里：
+               写过 updated（且跟发布日期不同）就用 updated，否则用 date。
+               注意只影响显示，不影响排序和归档分组——那两处仍然按 date，
+               否则老文章改一下就会跳到最新月份里去。 */
+            function postDisplayDate(post) {
+                const published = String(post.date || '');
+                const updated = typeof post.updated === 'string' ? post.updated.trim() : '';
+                return updated && updated !== published ? updated : published;
+            }
+
+            // 是否「发布后又改过」——决定要不要露发布日/更新时间这类附加信息
+            function postHasUpdate(post) {
+                const published = String(post.date || '');
+                const updated = typeof post.updated === 'string' ? post.updated.trim() : '';
+                return Boolean(updated) && updated !== published;
+            }
+
+            function getFilteredPosts(tag) {
+                const activeTag = tag || 'all';
                 const posts = activeTag === 'all'
                     ? [...blogPosts]
-                    : blogPosts.filter(p => p.tags.includes(activeTag));
-                return posts.sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
+                    : activeTag === '置顶'
+                        ? blogPosts.filter(isPinnedPost)
+                        : blogPosts.filter(p => p.tags.includes(activeTag));
+                // 置顶永远排在最前面
+                return posts.sort((a, b) => Number(isPinnedPost(b)) - Number(isPinnedPost(a)));
             }
+
+            // 首页只摊开最近更新的几篇，剩下的都在「文章」页
+            const HOME_POST_LIMIT = 6;
+
+            // 首页：置顶依旧在最前面，其余按日期倒序，总共最多 6 篇
+            function getHomePosts() {
+                return getFilteredPosts(homeTag)
+                    .sort((a, b) => {
+                        const pinnedDiff = Number(isPinnedPost(b)) - Number(isPinnedPost(a));
+                        if (pinnedDiff) return pinnedDiff;
+                        // 改过的文章用 updated 参与排序，跟卡片上显示的日期保持一致
+                        return postDisplayDate(b).localeCompare(postDisplayDate(a));
+                    })
+                    .slice(0, HOME_POST_LIMIT);
+            }
+
+            /* 记住每个列表上次是按哪个筛选画的。
+               从文章返回、或者来回切视图时会重新调用 renderPostsList，
+               内容其实没变却整块重画——卡片里的图片被重建，
+               「模糊 → 清晰」的淡入又放一遍，看着就是闪。 */
+            const postsRenderKeys = new Map();
 
             function renderPostsList(containerId, animate = false) {
                 const container = document.getElementById(containerId);
                 if (!container) return;
-                const posts = getFilteredPosts();
+                const isHomeList = postsListHome && container === postsListHome;
+                const posts = isHomeList ? getHomePosts() : getFilteredPosts(blogTag);
+                const listKey = (isHomeList ? 'home:' : 'blog:') + (isHomeList ? homeTag : blogTag);
+                // 换筛选、或明确要求播入场动画（animate）时才真的重画
+                if (!animate && postsRenderKeys.get(containerId) === listKey && container.firstChild) return;
+                postsRenderKeys.set(containerId, listKey);
                 if (posts.length === 0) {
                     container.innerHTML = '<p style="color:#999;text-align:center;padding:30px 0;">暂无文章</p>';
                     return;
@@ -1429,7 +1443,7 @@
                                 <div class="tags-left">
                                     ${isPinned ? '<span class="tag-pinned" title="置顶文章"><i class="ri-pushpin-2-line" aria-hidden="true"></i></span><span class="tag-pinned-label">置顶</span>' : ''}
                                     <span class="tag-cat">${firstTag}</span>
-                                    <time class="post-card-date" datetime="${p.date}">${p.date}</time>
+                                    <time class="post-card-date" datetime="${postDisplayDate(p)}">${postDisplayDate(p)}</time>
                                 </div>
                                 <button class="options" type="button" aria-label="更多选项" aria-haspopup="menu" aria-expanded="false">
                                     <svg xml:space="preserve" viewBox="0 0 41.915 41.916" xmlns="http://www.w3.org/2000/svg" id="Capa_1" version="1.1" fill="#000000" aria-hidden="true"><g stroke-width="0" id="SVGRepo_bgCarrier"></g><g stroke-linejoin="round" stroke-linecap="round" id="SVGRepo_tracerCarrier"></g><g id="SVGRepo_iconCarrier"><g><g><path d="M11.214,20.956c0,3.091-2.509,5.589-5.607,5.589C2.51,26.544,0,24.046,0,20.956c0-3.082,2.511-5.585,5.607-5.585 C8.705,15.371,11.214,17.874,11.214,20.956z"></path><path d="M26.564,20.956c0,3.091-2.509,5.589-5.606,5.589c-3.097,0-5.607-2.498-5.607-5.589c0-3.082,2.511-5.585,5.607-5.585 C24.056,15.371,26.564,17.874,26.564,20.956z"></path><path d="M41.915,20.956c0,3.091-2.509,5.589-5.607,5.589c-3.097,0-5.606-2.498-5.606-5.589c0-3.082,2.511-5.585,5.606-5.585 C39.406,15.371,41.915,17.874,41.915,20.956z"></path></g></g></g></svg>
@@ -1520,6 +1534,296 @@
                     });
                 });
             }
+
+            // ==================== 本周折腾 ====================
+            // 数据在 js/tweaks-data.js：首页只露前三张，
+            // 「全部折腾」切到站内的折腾视图（#view-tweaks）看完整列表，
+            // 两处共用同一份数组。
+            const blogTweaks = Array.isArray(window.BLOG_TWEAKS) ? window.BLOG_TWEAKS : [];
+
+            function renderTweaks() {
+                const list = document.getElementById('tweakList');
+                if (!list) return;
+                list.innerHTML = blogTweaks.map(item => `
+                    <article class="tweak-card">
+                        <div class="tweak-meta">
+                            <time class="tweak-date" datetime="${item.iso}">${item.date}</time>
+                            <span class="tweak-cat"><span class="tweak-emoji" aria-hidden="true">${item.emoji}</span>${escapeHtml(item.label)}</span>
+                        </div>
+                        <p class="tweak-text">${escapeHtml(item.text)}</p>
+                    </article>`).join('');
+            }
+
+            // 「全部折腾」：切到站内的折腾视图（不占导航栏，走视图历史，
+            // 返回键能退回首页原位）
+            (function bindTweakAll() {
+                const allLink = document.getElementById('tweakAll');
+                if (!allLink) return;
+                allLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    viewScrollPositions.tweaks = 0;
+                    navigateToView('tweaks');
+                    window.scrollTo({ top: 0, behavior: 'instant' });
+                });
+            })();
+
+            // 折腾视图的完整列表（首页只露前三张，这里全给）
+            function renderTweaksFeed() {
+                const feed = document.getElementById('tweaksFeed');
+                if (!feed) return;
+                if (!blogTweaks.length) {
+                    feed.innerHTML = '<p class="tweaks-empty">还没有记录。</p>';
+                    return;
+                }
+                feed.innerHTML = blogTweaks.map(item => `
+                    <article class="tweak-entry">
+                        <div class="tweak-meta">
+                            <time class="tweak-date" datetime="${item.iso}">${item.date}</time>
+                            <span class="tweak-cat"><span class="tweak-emoji" aria-hidden="true">${item.emoji}</span>${escapeHtml(item.label)}</span>
+                        </div>
+                        <p class="tweak-text">${escapeHtml(item.text)}</p>
+                    </article>`).join('');
+            }
+
+            // ==================== 时间线 ====================
+            // 按「年 → 月 → 文章」把 blogPosts 归一遍，年、月都能折叠。
+            // 不另外维护数据：新发一篇，这里自动就多一条。
+            const MONTH_LABEL = ['1 月', '2 月', '3 月', '4 月', '5 月', '6 月',
+                '7 月', '8 月', '9 月', '10 月', '11 月', '12 月'];
+
+            function buildTimeline() {
+                const byYear = new Map();
+                // 日期倒序：新的年份、月份和文章都排在最前面。
+                // 一律用 postDisplayDate：改过的文章按最近更新日排/归月，跟卡片一致
+                const posts = [...blogPosts].sort((a, b) => postDisplayDate(b).localeCompare(postDisplayDate(a)));
+                posts.forEach(post => {
+                    const raw = postDisplayDate(post);
+                    const matched = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                    if (!matched) return;
+                    const year = matched[1];
+                    const month = matched[2];
+                    if (!byYear.has(year)) byYear.set(year, new Map());
+                    const months = byYear.get(year);
+                    if (!months.has(month)) months.set(month, []);
+                    months.get(month).push({
+                        id: post.id,
+                        title: post.title,
+                        // 时间线里只写「月.日」，年份已经在上一级了
+                        day: `${Number(month)}.${Number(matched[3])}`,
+                    });
+                });
+
+                return Array.from(byYear.entries()).map(([year, months]) => {
+                    const monthList = Array.from(months.entries()).map(([month, list]) => ({
+                        month,
+                        label: MONTH_LABEL[Number(month) - 1] || `${Number(month)} 月`,
+                        posts: list,
+                    }));
+                    return {
+                        year,
+                        count: monthList.reduce((sum, item) => sum + item.posts.length, 0),
+                        months: monthList,
+                    };
+                });
+            }
+
+            function renderTimeline() {
+                const mount = document.getElementById('timelineMount');
+                if (!mount) return;
+                const years = buildTimeline();
+                if (!years.length) {
+                    mount.innerHTML = '<p class="tl-empty">还没有文章。</p>';
+                    return;
+                }
+                mount.innerHTML = years.map((yearGroup, yearIndex) => {
+                    // 默认只展开最新的那一年，其余年份收起来
+                    const yearOpen = yearIndex === 0;
+                    const months = yearGroup.months.map((monthGroup, monthIndex) => {
+                        // 默认展开最新的那个月
+                        const monthOpen = yearOpen && monthIndex === 0;
+                        const posts = monthGroup.posts.map(post => `
+                            <li class="tl-post">
+                                <span class="tl-date">${post.day}</span>
+                                <a class="tl-post-title" href="index.html?article=${post.id}" data-timeline-article="${post.id}">${escapeHtml(post.title)}</a>
+                            </li>`).join('');
+                        return `
+                            <div class="tl-month${monthOpen ? ' is-open' : ''}">
+                                <button class="tl-month-head" type="button" aria-expanded="${monthOpen}">
+                                    <span class="tl-month-label">${monthGroup.label}</span>
+                                    <span class="tl-side">
+                                        <span class="tl-count">${monthGroup.posts.length} 篇</span>
+                                        <i class="ri-arrow-right-s-line" aria-hidden="true"></i>
+                                    </span>
+                                </button>
+                                <ul class="tl-posts">${posts}</ul>
+                            </div>`;
+                    }).join('');
+
+                    return `
+                        <div class="tl-year${yearOpen ? '' : ' is-collapsed'}">
+                            <button class="tl-year-head" type="button" aria-expanded="${yearOpen}">
+                                <span class="tl-year-label">${yearGroup.year}</span>
+                                <span class="tl-side">
+                                    <span class="tl-count">${yearGroup.count} 篇</span>
+                                    <i class="ri-arrow-down-s-line" aria-hidden="true"></i>
+                                </span>
+                            </button>
+                            <div class="tl-months">${months}</div>
+                        </div>`;
+                }).join('');
+            }
+
+            // 月份展开 / 收起：把高度从当前值补到目标值，动画结束就撤掉，
+            // 高度还回 CSS 里的 auto / 0，排版不会留下写死的像素。
+            const collapseAnimations = new WeakMap();
+            const timelineReduceMotion = window.matchMedia
+                ? window.matchMedia('(prefers-reduced-motion: reduce)')
+                : null;
+
+            function animateCollapse(list, start, end) {
+                if (start === end
+                    || typeof list.animate !== 'function'
+                    || (timelineReduceMotion && timelineReduceMotion.matches)) {
+                    return;
+                }
+                // 动画期间才裁切（见 .tl-months.is-animating 的注释）
+                list.classList.add('is-animating');
+                const cleanup = () => list.classList.remove('is-animating');
+                const anim = list.animate(
+                    [{ height: `${start}px` }, { height: `${end}px` }],
+                    { duration: 280, easing: 'cubic-bezier(0.22, 0.61, 0.36, 1)' }
+                );
+                anim.onfinish = cleanup;
+                anim.oncancel = cleanup;
+                collapseAnimations.set(list, anim);
+            }
+
+            // 年 / 月共用：给 host 切一个类，再让 list 的高度从当前值补到目标值
+            function toggleCollapse(host, list, open, applyClass) {
+                if (!list) return;
+                // 先记下当前可见高度（可能正处在上一段动画里，接得上）
+                const start = list.getBoundingClientRect().height;
+                const previous = collapseAnimations.get(list);
+                if (previous) previous.cancel();
+
+                applyClass(host, open);
+                // 量一次目标状态的自然高度：展开是内容高度，收起是 0
+                list.style.height = 'auto';
+                const natural = list.getBoundingClientRect().height;
+                list.style.height = '';
+                animateCollapse(list, start, open ? natural : 0);
+            }
+
+            function setMonthOpen(monthEl, open) {
+                toggleCollapse(monthEl, monthEl.querySelector('.tl-posts'), open,
+                    (host, next) => host.classList.toggle('is-open', next));
+            }
+
+            function setYearOpen(yearEl, open) {
+                // 年份的类是反过来的：收起才有 is-collapsed
+                toggleCollapse(yearEl, yearEl.querySelector('.tl-months'), open,
+                    (host, next) => host.classList.toggle('is-collapsed', !next));
+            }
+
+            // 年 / 月折叠与文章跳转都用事件委托，重绘后不用重新绑
+            (function bindTimeline() {
+                const mount = document.getElementById('timelineMount');
+                if (!mount) return;
+                mount.addEventListener('click', function(e) {
+                    const monthHead = e.target.closest('.tl-month-head');
+                    if (monthHead) {
+                        const month = monthHead.closest('.tl-month');
+                        const open = !month.classList.contains('is-open');
+                        setMonthOpen(month, open);
+                        monthHead.setAttribute('aria-expanded', String(open));
+                        return;
+                    }
+                    const yearHead = e.target.closest('.tl-year-head');
+                    if (yearHead) {
+                        const year = yearHead.closest('.tl-year');
+                        const open = year.classList.contains('is-collapsed');
+                        setYearOpen(year, open);
+                        yearHead.setAttribute('aria-expanded', String(open));
+                        return;
+                    }
+                    const title = e.target.closest('[data-timeline-article]');
+                    if (title) {
+                        e.preventDefault();
+                        openArticle(parseInt(title.getAttribute('data-timeline-article'), 10));
+                    }
+                });
+            })();
+
+            // 「完整归档」：去文章页看完整列表
+            // ==================== 归档视图 ====================
+            // 和首页时间线读同一份 blogPosts：按年份分组，年份内按日期倒序。
+            // 「目前共计 N 篇」也在这里算，新发文不用手动改数字。
+            function renderArchive() {
+                const feed = document.getElementById('archiveFeed');
+                if (!feed) return;
+                const countEl = document.getElementById('archiveCount');
+
+                const valid = blogPosts
+                    .map(post => {
+                        // 归月、排序、显示的日期统一取「最近更新优先」的那个值
+                        const display = postDisplayDate(post);
+                        const matched = display.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                        if (!matched) return null;
+                        return {
+                            id: post.id,
+                            title: post.title,
+                            year: matched[1],
+                            month: Number(matched[2]),
+                            day: Number(matched[3]),
+                            date: display,
+                        };
+                    })
+                    .filter(Boolean)
+                    .sort((a, b) => b.date.localeCompare(a.date));
+
+                if (countEl) countEl.textContent = String(valid.length);
+                if (!valid.length) {
+                    feed.innerHTML = '<p class="archive-empty">还没有文章。</p>';
+                    return;
+                }
+
+                // 已经按日期倒序，所以年份、月份、日都是新的在前
+                const years = [];
+                const byYear = new Map();
+                valid.forEach(item => {
+                    if (!byYear.has(item.year)) {
+                        byYear.set(item.year, []);
+                        years.push(item.year);
+                    }
+                    byYear.get(item.year).push(item);
+                });
+
+                feed.innerHTML = years.map(year => {
+                    const rows = byYear.get(year).map(item => `
+                        <li class="archive-item">
+                            <time class="archive-date" datetime="${item.date}">${item.year}年${item.month}月${item.day}日</time>
+                            <a class="archive-link" href="index.html?article=${item.id}">${escapeHtml(item.title)}</a>
+                        </li>`).join('');
+                    return `
+                        <section class="archive-year">
+                            <span class="archive-ring" aria-hidden="true"></span>
+                            <h2 class="archive-year-label">${year}</h2>
+                            <ul class="archive-list">${rows}</ul>
+                        </section>`;
+                }).join('');
+            }
+
+            // 「完整归档」：切到站内的归档视图（走视图历史，返回键能回首页）
+            (function bindTimelineAll() {
+                const allLink = document.getElementById('timelineAll');
+                if (!allLink) return;
+                allLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    viewScrollPositions.archive = 0;
+                    navigateToView('archive');
+                    window.scrollTo({ top: 0, behavior: 'instant' });
+                });
+            })();
 
             // iframe 的普通导航（设置 src / 移除 src）都会往浏览器历史里塞记录，
             // 这些记录会占掉一次“返回”，导致返回首页要按两次，所以统一改用
@@ -1955,8 +2259,18 @@
             }
 
             function renderArticle(post) {
-                currentArticleId = post.id;
                 const isUnavailableArticle = !isArticlePublic(post);
+                /* 同一篇文章重新进入时正文可以原样复用：
+                   重写 innerHTML 会把图片全部重建，图片的模糊淡入、
+                   内嵌内容都跟着重播，来回切的时候看着就是闪。
+                   只有「上次渲染的就是这篇、且可读状态没变、正文不是空的」
+                   才复用；换文章或状态变了仍走完整渲染。 */
+                const canReuseContent = renderedArticleId === post.id
+                    && renderedArticleUnavailable === isUnavailableArticle
+                    && !isUnavailableArticle
+                    && !post.embeddedPage
+                    && articleContent.firstChild !== null;
+                currentArticleId = post.id;
                 updateShareMeta(post);
                 articleTitle.hidden = isUnavailableArticle;
                 articleMeta.hidden = isUnavailableArticle;
@@ -1969,9 +2283,16 @@
                         + '&title=' + encodeURIComponent(post.title || '');
                 }
                 articleTitle.textContent = post.title;
+                /* 日期优先读「最近更新」：发布后改过的文章，主日期直接是 updated，
+                   下面再补一行「发布于 原发布日」，两边的值不会重复。
+                   posts-data.js 里没写 updated（或写的跟 date 一样）就只显示发布日期。 */
+                const updatedMarkup = (!isUnavailableArticle && postHasUpdate(post))
+                    ? `<span class="article-updated"><i class="ri-history-line" aria-hidden="true"></i> 发布于 ${post.date}</span>`
+                    : '';
                 articleMeta.innerHTML = isUnavailableArticle ? '' : `
-                    <span><i class="ri-calendar-line"></i> ${post.date}</span>
+                    <span><i class="ri-calendar-line"></i> ${postDisplayDate(post)}</span>
                     ${post.tags.map(t => `<span class="post-tag">${t}</span>`).join(' ')}
+                    ${updatedMarkup}
                 `;
                 const embeddedPage = isUnavailableArticle
                     ? 'project_subpage/blog/article_unavailable.html'
@@ -1988,10 +2309,14 @@
                 embeddedPageFrame.title = isUnavailableArticle
                     ? '当前文章不对外开放'
                     : '文章内嵌页面';
-                articleContent.innerHTML = isUnavailableArticle ? '' : (post.content || '');
-                if (window.AnnieImageLoading) {
-                    window.AnnieImageLoading.initialize(articleContent);
+                if (!canReuseContent) {
+                    articleContent.innerHTML = isUnavailableArticle ? '' : (post.content || '');
+                    if (window.AnnieImageLoading) {
+                        window.AnnieImageLoading.initialize(articleContent);
+                    }
                 }
+                renderedArticleId = post.id;
+                renderedArticleUnavailable = isUnavailableArticle;
                 renderArticleComments(post, isUnavailableArticle);
                 // 换了文章就重新开始量高度，否则会沿用上一篇记下的旧值
                 embeddedFrameHeight = 0;
@@ -2107,6 +2432,8 @@
                 }
 
                 // 正文里标了 gated-link 的链接：点它弹出提示窗（不校验、不跳转）
+                // 复用的正文里这些监听已经绑过了，重复绑定会让一次点击弹好几个窗
+                if (canReuseContent) return;
                 const gatedLinks = articleContent.querySelectorAll('a.gated-link');
                 for (let i = 0; i < gatedLinks.length; i += 1) {
                     gatedLinks[i].addEventListener('click', function (event) {
@@ -2207,6 +2534,7 @@
             // 最近更新：按日期倒序取最新的几篇，直接摊在搜索框下面。
             // 搜索面板空着的时候有个「可以点进去看看」的落点，
             // 手机上也不会只剩一大片空白。
+            // 「最新」按 postDisplayDate 算：改过的文章用 updated，跟显示的日期对得上。
             function renderSearchRecent() {
                 const list = document.getElementById('searchRecentList');
                 if (!list) return;
@@ -2214,7 +2542,7 @@
                     .filter(post => isArticlePublic(post))
                     .sort((a, b) => {
                         // 先按日期倒序，同一天的按 id 新的在前
-                        const dateDiff = String(b.date || '').localeCompare(String(a.date || ''));
+                        const dateDiff = postDisplayDate(b).localeCompare(postDisplayDate(a));
                         return dateDiff !== 0 ? dateDiff : b.id - a.id;
                     })
                     .slice(0, 4);
@@ -2225,7 +2553,7 @@
                         <span class="search-recent-dot" aria-hidden="true"></span>
                         <span class="search-recent-main">
                             <span class="search-recent-title">${escapeHtml(post.title)}</span>
-                            <span class="search-recent-date">${escapeHtml(post.date || '')}${tag}</span>
+                            <span class="search-recent-date">${escapeHtml(postDisplayDate(post))}${tag}</span>
                         </span>
                         <i class="ri-arrow-right-s-line search-recent-arrow" aria-hidden="true"></i>
                     </button>`;
@@ -2831,7 +3159,7 @@
                     if (view) {
                         const target = view.getAttribute('data-search-view');
                         closeSearch({ restoreFocus: false });
-                        switchView(target);
+                        navigateToView(target);
                         return;
                     }
                     // 「最近更新」里的文章：直接打开，和点搜索结果一样
@@ -2847,8 +3175,9 @@
                     // 「全部文章」入口：收起面板并切到文章列表
                     if (e.target.closest('#searchRecentMore')) {
                         closeSearch({ restoreFocus: false });
-                        switchView('blog');
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                        viewScrollPositions.blog = 0;
+                        navigateToView('blog');
+                        window.scrollTo({ top: 0, behavior: 'instant' });
                     }
                 });
 
@@ -2937,6 +3266,10 @@
             function openArticle(id) {
                 const post = blogPosts.find(p => p.id === id);
                 if (!post) return;
+                /* 已经在读这篇了（比如连点两下卡片）：什么都不用做。
+                   再走一遍会多压一条历史记录，返回键要按两次才有反应，
+                   正文也会被重新渲染一次。 */
+                if (currentView === 'article' && currentArticleId === post.id) return;
                 if (isArticlePublic(post) && post.externalPage && !post.embeddedPage) {
                     // 记住当前界面，返回时才能回到原处
                     saveViewState();
@@ -2948,7 +3281,8 @@
                 const viewStateSnapshot = {
                     view: currentView,
                     articleId: currentArticleId,
-                    tag: activeTag,
+                    homeTag: homeTag,
+                    blogTag: blogTag,
                     scroll: articleReturnScroll,
                     scrollPositions: {
                         ...viewScrollPositions,
@@ -2967,7 +3301,11 @@
                 articleHistoryEntryActive = true;
                 renderArticle(post);
                 switchView('article');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
+                /* 直接落到顶部，不要平滑滚动。
+                   从首页下方点进来时，平滑滚动会让刚淡入的正文跟着往上滑，
+                   和视图淡入叠在一起就是那道闪；滚动期间用户再切回去，
+                   两段滚动还会互相抢。 */
+                window.scrollTo({ top: 0, behavior: 'instant' });
             }
 
             // ==================== 导航栏：滚动状态 ====================
@@ -3023,6 +3361,17 @@
 
             function switchView(viewName) {
                 const previousView = currentView;
+                // 上一次切视图排下的滚动恢复任务立刻作废，
+                // 免得它在新视图里把滚动条拽回旧位置
+                cancelScrollRestore();
+                /* 间隔太短的连续切换不播入场动画：动画从 opacity:0 起步，
+                   350ms 没走完就被切走，页面会一直停在半透明状态——那就是「闪」。
+                   注意顺序：必须在所有视图都还没有 active 类的时候设置/移除
+                   这个开关，否则恢复 animation 会让当前视图重新播一遍淡入。 */
+                const now = (window.performance && performance.now) ? performance.now() : Date.now();
+                const suppressEnterAnimation = lastViewSwitchAt > 0
+                    && (now - lastViewSwitchAt) < VIEW_ENTER_ANIM_GAP;
+                lastViewSwitchAt = now;
                 // 切到别的视图时收起搜索浮层，回来时是干净的页面
                 dismissSearchOnViewChange(viewName);
                 if (viewName !== 'movie') closeMovieSubmission(false);
@@ -3030,11 +3379,13 @@
                     viewScrollPositions[previousView] = window.scrollY;
                 }
                 currentView = viewName;
-                [viewHome, viewBlog, viewMovie, viewAbout, viewArticle].forEach(v => {
+                [viewHome, viewBlog, viewArchive, viewTweaks, viewMovie, viewAbout, viewArticle].forEach(v => {
                     v.style.display = 'none';
                     v.classList.remove('active-view');
                 });
                 viewArticle.classList.remove('active');
+                // 所有视图都清干净了，这时候改动画开关不会引起重播
+                document.documentElement.classList.toggle('is-switch-throttled', suppressEnterAnimation);
 
                 if (previousView === 'movie' && viewName !== 'movie') {
                     setFrameSource(movieFrame, null);
@@ -3051,6 +3402,14 @@
                     renderPostsList('postsListBlog');
                     renderTagPills('tagFilterBlog');
                     scheduleSearchTriggerFit();
+                } else if (viewName === 'archive') {
+                    viewArchive.style.display = 'block';
+                    viewArchive.classList.add('active-view');
+                    renderArchive();
+                } else if (viewName === 'tweaks') {
+                    viewTweaks.style.display = 'block';
+                    viewTweaks.classList.add('active-view');
+                    renderTweaksFeed();
                 } else if (viewName === 'movie') {
                     viewMovie.style.display = 'block';
                     viewMovie.classList.add('active-view');
@@ -3074,16 +3433,14 @@
                 }
 
                 if (viewName !== 'movie' && viewName !== 'article') {
-                    window.requestAnimationFrame(() => {
-                        restoreViewScroll(viewName);
-                    });
+                    restoreViewScrollSettled(viewName);
                 }
 
                 $$('.nav-links a').forEach(link => {
                     link.classList.remove('active');
                     link.removeAttribute('aria-current');
                 });
-                const navMap = { home: 'home', blog: 'blog', movie: 'movie', about: 'about', article: 'blog' };
+                const navMap = { home: 'home', blog: 'blog', archive: 'archive', tweaks: 'home', movie: 'movie', about: 'about', article: 'blog' };
                 const activeNav = navMap[viewName] || 'home';
                 const navLink = document.querySelector(`.nav-links a[data-nav="${activeNav}"]`);
                 if (navLink) {
@@ -3104,9 +3461,10 @@
                     if (!nav) return;
                     e.preventDefault();
                     if (nav === 'home') switchView('home');
-                    if (nav === 'blog') switchView('blog');
-                    if (nav === 'movie') switchView('movie');
-                    if (nav === 'about') switchView('about');
+                    if (nav === 'blog') navigateToView('blog');
+                    if (nav === 'archive') navigateToView('archive');
+                    if (nav === 'movie') navigateToView('movie');
+                    if (nav === 'about') navigateToView('about');
                 });
             });
 
@@ -3121,8 +3479,11 @@
                 const btn = e.target.closest('[data-goto-home]');
                 if (!btn) return;
                 e.preventDefault();
+                // 这个入口的语义就是「回首页顶部」：先把记下的位置清零，
+                // 否则 switchView 会先把你送回原来的位置、再滑到顶部，一上一下
+                viewScrollPositions.home = 0;
                 switchView('home');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
+                window.scrollTo({ top: 0, behavior: 'instant' });
             });
 
             // 窗口尺寸/横竖屏变化后，四项的宽度会变，指示块要重新量
@@ -3200,7 +3561,7 @@
                 articleHistoryEntryActive = false;
                 switchView(articleReturnView);
                 window.requestAnimationFrame(() => {
-                    window.scrollTo({ top: articleReturnScroll, behavior: 'smooth' });
+                    window.scrollTo({ top: articleReturnScroll, behavior: 'instant' });
                 });
             }
 
@@ -3214,6 +3575,16 @@
                     const afterBack = searchHistoryBackCallback;
                     searchHistoryBackCallback = null;
                     if (afterBack) afterBack();
+                    // 取消搜索的同时点了「全部文章」这类入口：现在落点定了，
+                    // 才把视图记录补上，返回键照样能回到首页
+                    if (pendingViewHistoryPush) {
+                        const targetView = pendingViewHistoryPush;
+                        pendingViewHistoryPush = null;
+                        if (!(event.state && event.state.annieView === targetView)) {
+                            pushViewHistoryEntry(targetView, true);
+                            syncUrlWithView();
+                        }
+                    }
                     return;
                 }
 
@@ -3251,9 +3622,11 @@
 
                 const viewSnapshot = state && state.annieViewSnapshot;
                 if (viewSnapshot && VALID_VIEWS.includes(viewSnapshot.view)) {
-                    if (typeof viewSnapshot.tag === 'string' && getAllTags().includes(viewSnapshot.tag)) {
-                        activeTag = viewSnapshot.tag;
+                    // 快照里的滚动位置可能已经过期，记录里带了更新的就以它为准
+                    if (state && typeof state.annieScrollTop === 'number') {
+                        viewSnapshot.scroll = state.annieScrollTop;
                     }
+                    restoreTagsFromSnapshot(viewSnapshot);
                     returningFromArticleButton = false;
                     articleHistoryEntryActive = false;
                     // 从「搜索结果打开的文章」返回时会走到这里
@@ -3279,23 +3652,40 @@
                     return;
                 }
 
-                if (!articleHistoryEntryActive && currentView !== 'article') return;
+                if (!articleHistoryEntryActive && currentView !== 'article') {
+                    // 在「文章 / 电影 / 关于」页按了返回键：回到记录里的上一级视图
+                    //（正常情况下就是首页），别让用户被直接带出站点。
+                    // state 为空说明退到了站点的第一条记录，那里是首页。
+                    const stateView = state && typeof state.annieView === 'string'
+                        && VALID_VIEWS.includes(state.annieView)
+                        ? state.annieView
+                        : 'home';
+                    // 记录里存着这个视图离开时的滚动位置，优先用它
+                    if (state && typeof state.annieScrollTop === 'number') {
+                        viewScrollPositions[stateView] = state.annieScrollTop;
+                    }
+                    if (stateView !== currentView) switchView(stateView);
+                    return;
+                }
                 const returnView = articleReturnView;
                 const returnScroll = articleReturnScroll;
                 returningFromArticleButton = false;
                 articleHistoryEntryActive = false;
 
                 switchView(returnView);
+                const applyReturnScroll = () => window.scrollTo({ top: returnScroll, behavior: 'instant' });
                 window.requestAnimationFrame(() => {
-                    window.scrollTo({ top: returnScroll, behavior: 'instant' });
+                    applyReturnScroll();
+                    window.requestAnimationFrame(applyReturnScroll);
                 });
             });
 
             document.addEventListener('click', function(e) {
                 if (e.target.matches('[data-nav="blog"]') && e.target.closest('.tag-pill')) {
                     e.preventDefault();
-                    switchView('blog');
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    viewScrollPositions.blog = 0;
+                    navigateToView('blog');
+                    window.scrollTo({ top: 0, behavior: 'instant' });
                 }
             });
 
@@ -3322,13 +3712,15 @@
             // ==================== 初始化 ====================
             function init() {
                 const savedState = readViewState();
-                if (savedState && typeof savedState.tag === 'string' && getAllTags().includes(savedState.tag)) {
-                    activeTag = savedState.tag;
-                }
+                restoreTagsFromSnapshot(savedState);
                 renderTagPills('tagFilterHome');
                 renderTagPills('tagFilterBlog');
                 renderPostsList('postsListHome');
                 renderPostsList('postsListBlog');
+                renderTweaks();
+                renderTweaksFeed();
+                renderTimeline();
+                renderArchive();
                 // 搜索面板的初始内容：最近搜索 + 标签入口
                 renderSearchSuggestions();
                 renderSearchHistory();
@@ -3359,9 +3751,11 @@
                     history.replaceState(history.state, '', clean.pathname + clean.search);
                 }
 
-                // 关于页面也可以通过 ?view=about 直接打开，不受本地界面记忆影响。
-                if (new URL(window.location.href).searchParams.get(VIEW_PARAM) === 'about') {
-                    switchView('about');
+                // 关于 / 归档页也可以通过 ?view=about / ?view=archive 直接打开，
+                // 不受本地界面记忆影响。
+                const urlView = new URL(window.location.href).searchParams.get(VIEW_PARAM);
+                if (urlView === 'about' || urlView === 'archive' || urlView === 'tweaks') {
+                    switchView(urlView);
                     playReturnEnterAnimation();
                     return;
                 }
