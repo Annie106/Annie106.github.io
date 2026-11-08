@@ -4167,6 +4167,13 @@
 
             // ==================== 事件绑定 ====================
             $$('.nav-links a').forEach(link => {
+                /* Nav items without href are not native links: Enter/Space must fire click */
+                link.addEventListener('keydown', function(e) {
+                    if (this.hasAttribute('href')) return;
+                    if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+                    e.preventDefault();
+                    this.click();
+                });
                 link.addEventListener('click', function(e) {
                     const nav = this.getAttribute('data-nav');
                     if (!nav) return;

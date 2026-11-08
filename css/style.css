@@ -320,6 +320,10 @@
         .nav-links a {
             isolation: isolate;
         }
+        /* The movie nav item carries no href: restore the pointer cursor */
+        .nav-links a:not([href]) {
+            cursor: pointer;
+        }
         .nav-links a::before {
             content: '';
             position: absolute;
