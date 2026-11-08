@@ -3226,7 +3226,13 @@
         #backBtn2 {
             margin-bottom: 0;
         }
-        #view-article.active + .site-footer {
+        /* 文章页底栏到页脚的距离：必须用「后续兄弟」选择器（~）。
+           页脚前面还隔着 #view-feedback / #view-comments / #view-thanks 三个视图，
+           它并不是 #view-article 的紧邻兄弟，写成 + 这条规则永远不生效，
+           页脚就会退回默认的 margin-top: 48px，
+           底栏上方 18.24px、下方 42.24px —— 看着就是「下面留白多出一截」。
+           改成 ~ 之后上下都是 18.24px（24 - 5.76），分割线到这一行、这一行到页脚等距。 */
+        #view-article.active ~ .site-footer {
             margin-top: 24px;
         }
         /* 文章页底部一行：左边「返回」，右边「问题反馈」，和顶部 .article-topbar 呼应。
