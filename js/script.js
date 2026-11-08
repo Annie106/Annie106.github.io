@@ -1379,6 +1379,16 @@
                     .slice(0, HOME_POST_LIMIT);
             }
 
+            /* 首页底部「查看全部文章 →」带上总篇数，省得点进去才知道有多少篇。
+               数量取「文章」视图里的全部文章（不加标签筛选），和点进去看到的条数一致。
+               直接写 textContent、不在里面套 <span>：那条 data-nav="blog" 的点击
+               判断用的是 e.target.matches(...)，多包一层元素会让点击落空。 */
+            function syncAllPostsCount() {
+                const link = document.getElementById('viewAllPosts');
+                if (!link || !blogPosts.length) return;
+                link.textContent = `查看全部 ${blogPosts.length} 篇文章 →`;
+            }
+
             /* 记住每个列表上次是按哪个筛选画的。
                从文章返回、或者来回切视图时会重新调用 renderPostsList，
                内容其实没变却整块重画——卡片里的图片被重建，
@@ -3717,6 +3727,7 @@
                 renderTagPills('tagFilterBlog');
                 renderPostsList('postsListHome');
                 renderPostsList('postsListBlog');
+                syncAllPostsCount();
                 renderTweaks();
                 renderTweaksFeed();
                 renderTimeline();

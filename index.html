@@ -198,7 +198,9 @@
                 </div>
             </div>
             <div class="home-more" style="text-align:center;margin-top:20px;">
-                <a href="#" class="tag-pill" data-nav="blog" style="text-decoration:none;cursor:pointer;">查看全部文章 →</a>
+                <!-- 文字由 script.js 的 syncAllPostsCount() 按 blogPosts 数量填成
+                     「查看全部 N 篇文章 →」；这里留一份兜底文案，JS 没跑也有内容 -->
+                <a href="#" class="tag-pill" id="viewAllPosts" data-nav="blog" style="text-decoration:none;cursor:pointer;">查看全部文章 →</a>
             </div>
 
             <!-- ==================== 本周折腾 ==================== -->
@@ -324,7 +326,7 @@
             </section>
 
             <!-- 版本号：从页脚挪到这里，收在关于页右下角 -->
-            <p class="about-version">版本 0.4.22.072</p>
+            <p class="about-version">版本 0.4.22.075</p>
         </div>
 
         <!-- ==================== 文章详情视图 ==================== -->
