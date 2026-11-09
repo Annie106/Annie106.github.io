@@ -32,9 +32,9 @@
     <!-- 旧版微信 / QQ 抓取器更认这一条，保留作兜底 -->
     <link rel="image_src" href="https://annie106.github.io/share_cover.jpg">
 
-    <!-- 现代化图标库 Remix Icon -->
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.3.0/fonts/remixicon.css" rel="stylesheet" />
+    <!-- 图标字体（Remix Icon）已本地化到 fonts/，由 css/style.css 顶部的
+         @import 引入。页面不用、也不要再单独引 CDN 图标样式表——
+         那会让图标在断网/CDN 抖动时消失。新增图标的写法见 AGENTS.md。 -->
 
     <link rel="preconnect" href="https://giscus.app" crossorigin>
     <link rel="preload" href="https://giscus.app/client.js" as="script" crossorigin="anonymous" fetchpriority="low">
@@ -192,9 +192,130 @@
                 </div>
             </div>
             <div class="posts-list" id="postsListHome">
-                <div class="home-loading" role="status" aria-live="polite">
-                    <span class="home-loading-spinner" aria-hidden="true"></span>
-                    <span>正在加载首页内容…</span>
+                <!-- 骨架屏：文章数据（js/posts-data.js + js/script.js）就绪前先占位。
+                     写死在 HTML 里而不是等 JS 生成，这样脚本还在下载、解析的那段
+                     时间里页面上就有东西，不会只剩一片空白。
+                     六张卡片对应首页最多展示的 6 篇（script.js 里的 HOME_POST_LIMIT），
+                     高度接近真实卡片，换成正文时页面不会明显跳一下。
+                     退场由 script.js 的 releaseSkeleton() 处理：淡出后再移除。 -->
+                <div class="home-skeleton" id="homeSkeleton">
+                    <span class="home-skeleton-status" role="status" aria-live="polite">正在加载首页内容…</span>
+                    <div class="home-skeleton-grid" aria-hidden="true">
+                        <article class="home-skeleton-card">
+                            <div class="home-skeleton-row">
+                                <span class="sk-block sk-cat"></span>
+                                <span class="sk-block sk-date"></span>
+                                <span class="sk-block sk-dot"></span>
+                            </div>
+                            <div class="home-skeleton-lines">
+                                <span class="sk-block sk-title"></span>
+                                <span class="sk-block sk-title sk-title--short"></span>
+                            </div>
+                            <div class="home-skeleton-lines">
+                                <span class="sk-block sk-text"></span>
+                                <span class="sk-block sk-text sk-text--short"></span>
+                            </div>
+                            <div class="home-skeleton-row home-skeleton-row--foot">
+                                <span class="sk-block sk-meta"></span>
+                                <span class="sk-block sk-meta sk-meta--sm"></span>
+                            </div>
+                        </article>
+                        <article class="home-skeleton-card">
+                            <div class="home-skeleton-row">
+                                <span class="sk-block sk-cat"></span>
+                                <span class="sk-block sk-date"></span>
+                                <span class="sk-block sk-dot"></span>
+                            </div>
+                            <div class="home-skeleton-lines">
+                                <span class="sk-block sk-title"></span>
+                                <span class="sk-block sk-title sk-title--short"></span>
+                            </div>
+                            <div class="home-skeleton-lines">
+                                <span class="sk-block sk-text"></span>
+                                <span class="sk-block sk-text sk-text--short"></span>
+                            </div>
+                            <div class="home-skeleton-row home-skeleton-row--foot">
+                                <span class="sk-block sk-meta"></span>
+                                <span class="sk-block sk-meta sk-meta--sm"></span>
+                            </div>
+                        </article>
+                        <article class="home-skeleton-card">
+                            <div class="home-skeleton-row">
+                                <span class="sk-block sk-cat"></span>
+                                <span class="sk-block sk-date"></span>
+                                <span class="sk-block sk-dot"></span>
+                            </div>
+                            <div class="home-skeleton-lines">
+                                <span class="sk-block sk-title"></span>
+                                <span class="sk-block sk-title sk-title--short"></span>
+                            </div>
+                            <div class="home-skeleton-lines">
+                                <span class="sk-block sk-text"></span>
+                                <span class="sk-block sk-text sk-text--short"></span>
+                            </div>
+                            <div class="home-skeleton-row home-skeleton-row--foot">
+                                <span class="sk-block sk-meta"></span>
+                                <span class="sk-block sk-meta sk-meta--sm"></span>
+                            </div>
+                        </article>
+                        <article class="home-skeleton-card">
+                            <div class="home-skeleton-row">
+                                <span class="sk-block sk-cat"></span>
+                                <span class="sk-block sk-date"></span>
+                                <span class="sk-block sk-dot"></span>
+                            </div>
+                            <div class="home-skeleton-lines">
+                                <span class="sk-block sk-title"></span>
+                                <span class="sk-block sk-title sk-title--short"></span>
+                            </div>
+                            <div class="home-skeleton-lines">
+                                <span class="sk-block sk-text"></span>
+                                <span class="sk-block sk-text sk-text--short"></span>
+                            </div>
+                            <div class="home-skeleton-row home-skeleton-row--foot">
+                                <span class="sk-block sk-meta"></span>
+                                <span class="sk-block sk-meta sk-meta--sm"></span>
+                            </div>
+                        </article>
+                        <article class="home-skeleton-card">
+                            <div class="home-skeleton-row">
+                                <span class="sk-block sk-cat"></span>
+                                <span class="sk-block sk-date"></span>
+                                <span class="sk-block sk-dot"></span>
+                            </div>
+                            <div class="home-skeleton-lines">
+                                <span class="sk-block sk-title"></span>
+                                <span class="sk-block sk-title sk-title--short"></span>
+                            </div>
+                            <div class="home-skeleton-lines">
+                                <span class="sk-block sk-text"></span>
+                                <span class="sk-block sk-text sk-text--short"></span>
+                            </div>
+                            <div class="home-skeleton-row home-skeleton-row--foot">
+                                <span class="sk-block sk-meta"></span>
+                                <span class="sk-block sk-meta sk-meta--sm"></span>
+                            </div>
+                        </article>
+                        <article class="home-skeleton-card">
+                            <div class="home-skeleton-row">
+                                <span class="sk-block sk-cat"></span>
+                                <span class="sk-block sk-date"></span>
+                                <span class="sk-block sk-dot"></span>
+                            </div>
+                            <div class="home-skeleton-lines">
+                                <span class="sk-block sk-title"></span>
+                                <span class="sk-block sk-title sk-title--short"></span>
+                            </div>
+                            <div class="home-skeleton-lines">
+                                <span class="sk-block sk-text"></span>
+                                <span class="sk-block sk-text sk-text--short"></span>
+                            </div>
+                            <div class="home-skeleton-row home-skeleton-row--foot">
+                                <span class="sk-block sk-meta"></span>
+                                <span class="sk-block sk-meta sk-meta--sm"></span>
+                            </div>
+                        </article>
+                    </div>
                 </div>
             </div>
             <div class="home-more" style="text-align:center;margin-top:20px;">
@@ -230,6 +351,16 @@
                     </a>
                 </div>
                 <div class="timeline" id="timelineMount"></div>
+            </section>
+
+            <!-- ==================== 标签云 ==================== -->
+            <!-- 取篇数最多的 4 个标签，点一下直接去文章页筛到这个标签。
+                 数据由 js/script.js 的 getTagStats() 算，排序和文章页标签栏一致。 -->
+            <section class="tagcloud-section" id="tagCloudSection" aria-labelledby="tagCloudTitle">
+                <div class="tweak-head">
+                    <h2 class="tweak-title" id="tagCloudTitle">标签云</h2>
+                </div>
+                <div class="tag-cloud" id="tagCloud"></div>
             </section>
         </div>
 
@@ -326,7 +457,7 @@
             </section>
 
             <!-- 版本号：从页脚挪到这里，收在关于页右下角 -->
-            <p class="about-version">版本 0.4.22.106</p>
+            <p class="about-version">版本 0.4.22.147</p>
         </div>
 
         <!-- ==================== 文章详情视图 ==================== -->
@@ -741,8 +872,8 @@
     <script src="js/posts-data.js"></script>
     <script src="js/tweaks-data.js"></script>
     <script src="js/script.js"></script>
-    <!-- 电影板块服务公告：播放器加载完成即出现，无关闭入口 -->
-    <script src="js/movie-announcement.js"></script>
+    <!-- 电影板块的停服公告在 movie.html 内部实现（阴影 + 卡片同一文档，
+         滚动时不会错位），父页面不再挂浮层 -->
     <script src="js/copyToClipboard.js"></script>
     <script src="js/background-music.js"></script>
     <script>

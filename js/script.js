@@ -936,6 +936,29 @@
                 return ['all', ...Array.from(tagSet)];
             }
 
+            /* 标签 + 统计，给文章页的标签栏用：篇数、该标签下最近一次更新的日期。
+               排序依次是「篇数多的在前 → 更新晚的在前 → 拼音首字母」，
+               最常用、最近还在写的标签会浮到左边，不用在一长排里找。
+               中文按拼音比较靠 Intl.Collator('zh-Hans-CN')，不用手写映射表。 */
+            function getTagStats() {
+                const stats = new Map();
+                blogPosts.forEach(p => {
+                    const date = postDisplayDate(p);
+                    (p.tags || []).forEach(t => {
+                        const item = stats.get(t) || { name: t, count: 0, latest: '' };
+                        item.count += 1;
+                        if (date > item.latest) item.latest = date;
+                        stats.set(t, item);
+                    });
+                });
+                const collator = new Intl.Collator('zh-Hans-CN');
+                return Array.from(stats.values()).sort((a, b) => {
+                    if (b.count !== a.count) return b.count - a.count;
+                    if (a.latest !== b.latest) return a.latest < b.latest ? 1 : -1;
+                    return collator.compare(a.name, b.name);
+                });
+            }
+
             function escapeHtml(value) {
                 return String(value).replace(/[&<>"']/g, character => ({
                     '&': '&amp;',
@@ -1174,6 +1197,10 @@
             // 首页标签行固定展示的筛选项（「最新」「全部」由代码单独处理）
             const HOME_TAGS = ['置顶', '随笔'];
 
+            /* 首页标签云显示几个标签。想多显示几个就改这个数字（比如 6），
+               标签会自动换行，不用管样式。 */
+            const TAG_CLOUD_LIMIT = 4;
+
             function renderTagPills(containerId) {
                 const container = document.getElementById(containerId);
                 if (!container) return;
@@ -1190,9 +1217,15 @@
                         ),
                     ].join('');
                 } else {
-                    container.innerHTML = getAllTags().map(t =>
-                        `<span class="tag-pill${t === tag ? ' active' : ''}" data-tag="${t}">${t === 'all' ? '全部' : t}</span>`
-                    ).join('');
+                    /* 标签后面跟篇数，但只在 2 篇以上才显示：大部分标签只有一篇，
+                       每个都挂个「1」既啰嗦又把标签栏撑成两行。
+                       数字前面加 #，和标签名拉开一眼能分清的层次。 */
+                    const withCount = (tagName, label, count, isActive) =>
+                        `<span class="tag-pill${isActive ? ' active' : ''}" data-tag="${escapeHtml(tagName)}">${escapeHtml(label)}${count >= 2 ? `<span class="tag-pill-count">#${count}</span>` : ''}</span>`;
+                    container.innerHTML = [
+                        withCount('all', '全部', blogPosts.length, tag === 'all'),
+                        ...getTagStats().map(item => withCount(item.name, item.name, item.count, item.name === tag)),
+                    ].join('');
                 }
                 container.querySelectorAll('.tag-pill').forEach(pill => {
                     pill.addEventListener('click', function() {
@@ -1477,6 +1510,40 @@
                「模糊 → 清晰」的淡入又放一遍，看着就是闪。 */
             const postsRenderKeys = new Map();
 
+            /* 首页骨架屏退场。
+               直接把骨架删掉（innerHTML 整个覆盖）是一帧硬切：灰块瞬间消失、
+               卡片瞬间出现，像闪了一下。这里换个做法——量下骨架此刻的位置和高度，
+               把它摘下来改成 fixed 定位盖在原地，让真实卡片在下面顶上来，
+               再让它淡出：骨架和内容在同一次重排里完成交替，看到的是交叉淡化。
+               尺寸按退场瞬间的 rect 写死，新内容比骨架高或矮都不会把它拉变形。 */
+            function releaseSkeleton(container) {
+                const skeleton = container.querySelector('.home-skeleton');
+                if (!skeleton) return;
+                const rect = skeleton.getBoundingClientRect();
+                skeleton.classList.add('home-skeleton--ghost');
+                skeleton.style.left = rect.left + 'px';
+                skeleton.style.top = rect.top + 'px';
+                skeleton.style.width = rect.width + 'px';
+                skeleton.style.height = rect.height + 'px';
+                // 先搬出列表：下面 innerHTML 会把列表整个换掉，
+                // 留在里面只会被一起删掉，动画也就无从谈起
+                document.body.appendChild(skeleton);
+                // 等下一帧再加 is-leaving。同一帧里刚插入就写 opacity:0，
+                // 起始态不会被算进过渡，整段动画会被跳过（直接消失）
+                if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                    // 减弱动效时没有过渡，跳过这一帧等待，否则影子会实心闪一下
+                    skeleton.classList.add('is-leaving');
+                } else {
+                    requestAnimationFrame(function () {
+                        skeleton.classList.add('is-leaving');
+                    });
+                }
+                // 淡出 260ms，多留一点余量再摘节点
+                window.setTimeout(function () {
+                    skeleton.remove();
+                }, 420);
+            }
+
             function renderPostsList(containerId, animate = false) {
                 const container = document.getElementById(containerId);
                 if (!container) return;
@@ -1487,9 +1554,14 @@
                 if (!animate && postsRenderKeys.get(containerId) === listKey && container.firstChild) return;
                 postsRenderKeys.set(containerId, listKey);
                 if (posts.length === 0) {
+                    releaseSkeleton(container);
                     container.innerHTML = '<p style="color:#999;text-align:center;padding:30px 0;">暂无文章</p>';
                     return;
                 }
+                // 首屏：骨架在场就交叉淡出，卡片本身不再播入场动画
+                // （不然透明度从 0 起步，骨架淡掉的那 260ms 里会看到一块空白）
+                const fromSkeleton = !!container.querySelector('.home-skeleton');
+                releaseSkeleton(container);
                 container.innerHTML = posts.map(p => {
                     // 卡片顶部的元信息行：日期 + 主标签（当作分类）+ 其余标签做成 #胶囊。
                     // 日期从原来的统计行挪到最上面，和标签排成一行，层次更干净。
@@ -1531,7 +1603,10 @@
                         if (!url) return '';
                         // 替换 URL 模板中的占位符
                         url = url.replace(/{id}/g, p.id).replace(/{title}/g, encodeURIComponent(p.title));
-                        const icon = item.type === 'externalPage' ? 'ri-external-link-line' : 'ri-arrow-up-right-line';
+                        // 注意命名顺序：Remix Icon 里是 arrow-right-up，没有 arrow-up-right。
+                        // 之前这里写反了顺序，字体里查不到那个类名，
+                        // 菜单里「自定义链接」那一项的图标一直是空白（不会报错，只是不显示）。
+                        const icon = item.type === 'externalPage' ? 'ri-external-link-line' : 'ri-arrow-right-up-line';
                         const target = new URL(url, window.location.href).origin === window.location.origin
                             ? ''
                             : ' target="_blank" rel="noopener noreferrer"';
@@ -1539,7 +1614,7 @@
                     }).join('');
 
                     return `
-                        <article class="task post-card${animate ? ' post-card-enter' : ''}" data-article-id="${p.id}" draggable="true">
+                        <article class="task post-card${animate && !fromSkeleton ? ' post-card-enter' : ''}" data-article-id="${p.id}" draggable="true">
                             <div class="tags">
                                 <div class="tags-left">
                                     ${isPinned ? '<span class="tag-pinned" title="置顶文章"><i class="ri-pushpin-2-line" aria-hidden="true"></i></span><span class="tag-pinned-label">置顶</span>' : ''}
@@ -1750,9 +1825,39 @@
                 });
             }
 
+            /* 首页时间线下面的标签云：取篇数最多的 4 个标签。
+               排序直接用 getTagStats()，和文章页标签栏是同一套规则
+               （篇数 → 更新时间 → 拼音），两处不会打架。
+               点一下等于「去文章页 + 筛到这个标签」，省得自己再找一遍。 */
+            function renderTagCloud() {
+                const mount = document.getElementById('tagCloud');
+                if (!mount) return;
+
+                const top = getTagStats().slice(0, TAG_CLOUD_LIMIT);
+                if (!top.length) { mount.innerHTML = ''; return; }
+
+                mount.innerHTML = top.map(item =>
+                    `<span class="tag-pill" data-cloud-tag="${escapeHtml(item.name)}">${escapeHtml(item.name)}<span class="tag-pill-count">#${item.count}</span></span>`
+                ).join('');
+
+                mount.querySelectorAll('[data-cloud-tag]').forEach(pill => {
+                    pill.addEventListener('click', function () {
+                        setTagOfView('blog', this.getAttribute('data-cloud-tag'));
+                        renderTagPills('tagFilterHome');
+                        renderTagPills('tagFilterBlog');
+                        renderPostsList('postsListBlog', true);
+                        // 清掉记忆里的位置，否则跳过去会被「恢复上次位置」拽回来
+                        viewScrollPositions.blog = 0;
+                        navigateToView('blog');
+                        window.scrollTo({ top: 0, behavior: 'instant' });
+                    });
+                });
+            }
+
             function renderTimeline() {
                 const mount = document.getElementById('timelineMount');
                 if (!mount) return;
+                renderTagCloud();
                 const years = buildTimeline();
                 if (!years.length) {
                     mount.innerHTML = '<p class="tl-empty">还没有文章。</p>';

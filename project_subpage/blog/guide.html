@@ -6,7 +6,6 @@
     <title>使用指南</title>
     <link rel="icon" type="image/svg+xml" href="../../favicon.svg">
     <link rel="stylesheet" href="../../css/style.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css">
     <style>
         /* ==================== 内嵌页面样式 ==================== */
         /* 作为 iframe 嵌入文章时，这里必须清掉站点样式表里的
@@ -981,6 +980,10 @@
 ├── css/
 │   └── style.css            ← 所有样式：颜色、字号、间距、深色模式
 │
+├── fonts/                   ← 图标字体（本地副本，平时不用动）
+│   ├── icons.css            ← 图标样式，由 style.css 自动引入
+│   └── remixicon.woff2      ← 字体文件，约 165 KB
+│
 ├── js/
 │   ├── posts-data.js        ← 全部文章数据
 │   ├── tweaks-data.js       ← 博客更新记录（首页与折腾视图共用）
@@ -989,7 +992,6 @@
 │   ├── touch-hover.js       ← 修手机点击后按钮常亮的问题
 │   ├── background-music.js  ← 背景音乐
 │   ├── image-loading.js     ← 图片加载策略
-│   ├── movie-announcement.js ← 电影服务公告提示
 │   └── copyToClipboard.js   ← 点图标复制联系方式
 │
 ├── project_subpage/         ← 子页面都放这里
@@ -1040,7 +1042,7 @@
                     js 文件夹
                 </h3>
                 <p><code>posts-data.js</code> 里的 <code>window.BLOG_POSTS</code> 才是文章数据；首页、文章列表和归档共用它。<code>tweaks-data.js</code> 保存博客更新记录，首页卡片和「本周折腾」视图共用它。<code>script.js</code> 负责筛选、搜索、页面切换和文章渲染，不存文章正文。</p>
-                <p><code>theme.js</code> 管深浅色切换，还会记住访客的选择。<code>touch-hover.js</code> 修的是「手机上点一下按钮，按钮就一直亮着不恢复」的问题，它给页面加一个标记，样式表据此决定要不要显示鼠标悬停效果。<code>image-loading.js</code> 管图片加载：先用模糊占位顶上，图加载完再淡入变清晰，也负责 <code>data-fast-src</code> / <code>data-slow-src</code> 那套高速/慢速链接的切换。<code>background-music.js</code> 管背景音乐，歌单在文件最开头。<code>movie-announcement.js</code> 管电影相关提示。<code>copyToClipboard.js</code> 就是「点一下微信图标自动复制」那个功能。</p>
+                <p><code>theme.js</code> 管深浅色切换，还会记住访客的选择。<code>touch-hover.js</code> 修的是「手机上点一下按钮，按钮就一直亮着不恢复」的问题，它给页面加一个标记，样式表据此决定要不要显示鼠标悬停效果。<code>image-loading.js</code> 管图片加载：先用模糊占位顶上，图加载完再淡入变清晰，也负责 <code>data-fast-src</code> / <code>data-slow-src</code> 那套高速/慢速链接的切换。<code>background-music.js</code> 管背景音乐，歌单在文件最开头。电影板块的停服公告写在 <code>movie.html</code> 自己里面。<code>copyToClipboard.js</code> 就是「点一下微信图标自动复制」那个功能。</p>
                 <p><code>archive/</code> 文件夹里是留档的旧文件，页面不会加载它们。<code>music-player.js</code> 是旧版播放器（现在用 <code>background-music.js</code>），<code>feedback-tx.html</code> 是旧版腾讯问卷反馈页。<code>feedback.html</code> 和 <code>comments.html</code> 是从 <code>project_subpage/blog/</code> 挪过来的跳转桩——反馈页和评论区早就并进主页面了（<code>?view=feedback</code> / <code>?view=comments</code>），旧链接由根目录的 <code>404.html</code> 接住再送过去。不用管它们，删了也不影响网页。</p>
 
                 <div class="guide-tip">
@@ -1154,6 +1156,7 @@
 &lt;/div&gt;</code></pre>
                 <p>换成自己的联系方式，就改 <code>copyToClipboard()</code> 括号里第一个东西，两边都要留英文单引号。第二个是点击后的提示文字，随便写。</p>
                 <p>想换图标：<code>&lt;i class="ri-wechat-fill"&gt;&lt;/i&gt;</code> 里的 <code>ri-wechat-fill</code> 就是图标名，去 <a href="https://remixicon.com/" target="_blank" rel="noopener noreferrer">remixicon.com</a> 挑一个替换掉。</p>
+                <p>图标字体已经下载到 <code>fonts/</code>，和网页在同一台服务器上：换图标、加图标都只改 HTML，不用动字体文件，也不会再出现「网络一抖图标就空白」的情况。</p>
                 <p>想加一个，就复制一整段 <code>&lt;a ...&gt;...&lt;/a&gt;</code> 粘在下面。比如加抖音：</p>
                 <pre><code>&lt;a href="https://www.douyin.com/user/你的主页" target="_blank" rel="noopener noreferrer" title="抖音"&gt;
     &lt;i class="ri-tiktok-fill"&gt;&lt;/i&gt;

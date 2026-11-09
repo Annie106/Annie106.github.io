@@ -1,10 +1,10 @@
 # Annie 的个人博客
 
-> 纯 AI 构建
+> 由 AI 辅助构建
 
 原生 HTML + CSS + JavaScript 的静态博客，无依赖、无构建。
 
-完整配置教程在站内「使用指南」文章（`project_subpage/blog/guide.html`），本文件只做速查。
+完整配置教程在站内「使用指南」文章（`project_subpage/blog/guide.html`），本文件只做速查。让 AI 改这个仓库之前，先让它读 `AGENTS.md`。
 
 ## 目录
 
@@ -15,6 +15,11 @@ favicon.svg                 站点图标
 share_cover.jpg             分享卡片封面，1080×1080
 images/manor_photos/        归宿照图集（文章 id 11 用）
 css/style.css               全部样式与响应式
+fonts/icons.css             图标字体样式（Remix Icon 本地副本，由 style.css 引入）
+fonts/remixicon.woff2       图标字体文件，约 165 KB
+_template.html              新建页面时复制这份，head 已经引对了样式
+tools/check-icons.js        图标自检：CDN 残留、图标名是否存在、页面是否引了样式
+AGENTS.md                   给 AI 工具的项目约定，跨工具生效
 js/posts-data.js            全部文章数据（首页与归档页共用）
 js/script.js                筛选、搜索、路由、页面状态
 js/tweaks-data.js           博客更新记录（首页「本周折腾」+ 独立页共用）
@@ -54,15 +59,23 @@ archive/                    归档，不参与显示
 | 背景音乐 | `js/background-music.js` 的 `musicList` |
 | 视频列表 | `movie.html` 的 `VIDEO_LIST` |
 | 样式 | `css/style.css` |
+| 图标 | 直接写 `<i class="ri-xxx"></i>`，字体已在本地 |
 | 分享封面 | 换图后同步 `index.html` 里的三处地址与宽高 |
 
 ### 新建独立 HTML 页面
 
-在 `<head>` 中复用博客主样式和 Remix Icon，页面正文、标题、按钮和表单控件会默认使用博客字体与主题变量，并可直接复用文章页的 `.article-topbar`、`.article-bottombar`、`.back-link`、`.article-feedback`、`.divider-thin` 等 UI 样式：
+直接复制 `_template.html` 改名，或只在 `<head>` 里引主样式：
 
 ```html
 <link rel="stylesheet" href="../../css/style.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.3.0/fonts/remixicon.css">
+```
+
+**只需要这一行。** 引了 style.css，正文、标题、按钮和表单控件就会默认使用博客字体与主题变量，也能直接复用文章页的 `.article-topbar`、`.article-bottombar`、`.back-link`、`.article-feedback`、`.divider-thin` 等 UI 样式。
+
+图标字体（Remix Icon）也在这一行里：字体文件放在 `fonts/`，由 `style.css` 顶部的 `@import` 带进来，所以不需要、也不要再引任何 CDN 图标样式表（那会让图标在 CDN 抖动时整片消失）。图标名去 [remixicon.com](https://remixicon.com/) 挑，本地是 v4.3.0 全量（近 3000 个），写进 HTML 就能用，不用重新生成任何文件。名字拼错不报错、只显示空白，所以改完跑一次检查——**双击根目录的 `check-icons.bat`**，或在项目目录里执行：
+
+```bash
+node tools/check-icons.js
 ```
 
 站点的顶部导航是一条**通栏、吸顶的半透明磨砂条**（`background` 给 64% 不透明白 + `backdrop-filter: blur(20px)`，页面一开始滚动时由 JS 给 `.site-header` 加 `.is-scrolled` 把底色压实到 78%，保证内容经过时文字仍清楚；不支持背景模糊的浏览器退回 96% 实底）：它在 HTML 里位于 `.main-container` 之外，样式靠「宽度加回左右留白 + 等量负 margin」顶到视口两侧，再用内边距让内容与 1080 主体容器对齐。条带高、控件高、导航胶囊高由 `:root` 里的 `--header-h` / `--header-control` / `--nav-h` 三个令牌统一控制（移动端在 `@media (max-width: 600px)` 里覆盖前两个），改它们即可整体缩放；需要给「顶部让位」的浮层（如音频提示条）读 `--header-h` 即可，别写死数字。

@@ -4,6 +4,22 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="referrer" content="no-referrer">
+<script>
+/* 电影板块已于 2026-11-09 停服。这个文件现在只作为首页「电影」视图的 iframe 内嵌页使用，
+   里头只剩停服公告。有人直接打开 /movie.html 时，让整页跳到 404，
+   免得看到一个不能播的空播放器。
+   判定方式：在 iframe 里时 window.top !== window.self，此时不跳，公告照常显示。
+   GitHub Pages 没有服务端重定向能力，所以这是客户端跳转，HTTP 状态码仍是 200。 */
+(function () {
+  if (window.top !== window.self) return;
+  document.documentElement.style.visibility = 'hidden';
+  try {
+    window.location.replace('404.html');
+  } catch (e) {
+    document.documentElement.style.visibility = '';
+  }
+})();
+</script>
 <title>视频播放</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <style>
@@ -664,6 +680,63 @@ html:not(.is-touch-input) [data-theme="dark"] .item:hover{background:rgba(255,25
 [data-theme="dark"] .contact-btn{background:#e7e9ee;border-color:#e7e9ee;color:#111}
 [data-theme="dark"] .contact-btn.ghost{background:transparent;border-color:rgba(255,255,255,.32);color:#e7e9ee}
 html:not(.is-touch-input) [data-theme="dark"] .contact-btn:hover{transform:scale(1.04)}
+/* ===== 停服公告 =====
+   阴影和公告都做在这个文档里，而不是父页面加一个 fixed 浮层去盖 iframe：
+   两者同处一个文档，父页面怎么滚动、地址栏怎么收起，都不会差出一两帧，
+   边缘也就不会漏出播放器。 */
+#serviceNotice{
+  position:fixed;inset:0;z-index:60;
+  display:flex;align-items:center;justify-content:center;
+  padding:32px 24px;
+  background:rgba(15,17,23,.45);
+  opacity:0;pointer-events:none;
+  transition:opacity .3s ease;
+}
+#serviceNotice.is-dim{opacity:1;pointer-events:auto}
+[data-theme="dark"] #serviceNotice{background:rgba(0,0,0,.55)}
+
+.sn-card{
+  width:min(420px,100%);
+  padding:26px 26px 22px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:var(--bg);
+  color:var(--txt);
+  box-shadow:0 1px 2px rgba(16,24,40,.05), 0 14px 36px -14px rgba(16,24,40,.22);
+  opacity:0;transform:translateY(8px);
+  transition:opacity .26s ease, transform .3s ease;
+}
+#serviceNotice.is-open .sn-card{opacity:1;transform:none}
+[data-theme="dark"] .sn-card{
+  background:#181c22;border-color:rgba(255,255,255,.08);
+  box-shadow:0 1px 2px rgba(0,0,0,.4), 0 16px 40px -16px rgba(0,0,0,.6);
+}
+.sn-kicker{
+  margin:0 0 10px;font-size:11.5px;font-weight:500;line-height:1.4;
+  letter-spacing:.12em;color:var(--dim);
+}
+.sn-title{
+  margin:0 0 12px;font-size:17px;font-weight:600;line-height:1.5;
+  letter-spacing:-.01em;
+}
+.sn-desc{margin:0;font-size:13.5px;line-height:1.8;color:var(--dim)}
+.sn-desc strong{color:var(--txt);font-weight:600}
+.sn-desc+.sn-desc{margin-top:9px}
+.sn-meta{
+  margin:18px 0 0;padding-top:14px;
+  border-top:1px solid var(--line);
+  font-size:12px;line-height:1.6;color:var(--dim);
+}
+@media (max-width:520px){
+  /* 左右各留 28：卡片比播放器窄一圈，不会和模块边缘严丝合缝 */
+  #serviceNotice{padding:24px 28px}
+  .sn-card{padding:22px 20px 18px;border-radius:12px}
+  .sn-title{font-size:16px}
+}
+@media (prefers-reduced-motion:reduce){
+  #serviceNotice,.sn-card{transition:none}
+  .sn-card{transform:none}
+}
 </style>
 <script>
 (function () {
@@ -2060,7 +2133,13 @@ html:not(.is-touch-input) [data-theme="dark"] .contact-btn:hover{transform:scale
 
   if (playlist.length) {
     nowTitle.textContent = '请选择视频';
-    setPanel(true);
+    /* 窄屏下一进来就顶开列表，抽屉会占满整个宽度（88vw），播放器只剩左边
+       一条黑边，看起来像页面坏了。小屏先让播放器完整露出来，
+       想看列表点左下角那个按钮；桌面宽度够，两侧能共存，保持自动展开。 */
+    if (!isMobile) setPanel(true);
+    /* 没有加载任何片子时画面是黑的，把中央播放按钮留住，
+       背后才看得出"这里原本是一个播放器"，而不是一块黑布。 */
+    playIcon.classList.add('persist');
   } else if (window.parent && window.parent !== window) {
     window.parent.postMessage({
       type: 'annie-movie-error',
@@ -2087,6 +2166,38 @@ html:not(.is-touch-input) [data-theme="dark"] .contact-btn:hover{transform:scale
     showBar();
     scheduleHide(2600);
   }, 400);
+})();
+</script>
+<div id="serviceNotice" role="status">
+  <div class="sn-card" role="note">
+    <p class="sn-kicker">服务公告</p>
+    <h2 class="sn-title">电影板块停止服务</h2>
+    <p class="sn-desc"><strong>上游存储服务已停止运营</strong>，本站的电影资源全部存放在它那里，取不回来，也搬不走。受此影响，<strong>电影板块自 2026 年 11 月 9 日起停止提供免费播放服务</strong>。</p>
+    <p class="sn-desc">这不是临时维护，也不是换个播放地址就能恢复——服务方停得很突然，连一份完整的善后说明都没有。之前发过的几篇和电影有关的文章会继续留着，只是播放功能不再提供。</p>
+    <p class="sn-desc">重新开放的时间待定。如果之后找到新的可行方案，会在这里和文章里一并说明。</p>
+    <p class="sn-meta">2026 年 11 月 9 日 · 感谢这段时间的陪伴</p>
+  </div>
+</div>
+
+<script>
+/* ===== 停服公告：等电影模块完全加载完再出现 =====
+   先铺阴影（.is-dim），两百多毫秒后卡片浮上来（.is-open）。
+   挂在 window 的 load 上而不是 DOMContentLoaded：load 之后图片、字体
+   也都到位了，阴影不会压在一个还在长的空壳上。 */
+(function () {
+  var notice = document.getElementById('serviceNotice');
+  if (!notice) return;
+
+  function reveal() {
+    notice.classList.add('is-dim');
+    setTimeout(function () { notice.classList.add('is-open'); }, 240);
+  }
+
+  if (document.readyState === 'complete') {
+    setTimeout(reveal, 0);
+  } else {
+    window.addEventListener('load', function () { setTimeout(reveal, 0); }, { once: true });
+  }
 })();
 </script>
 </body>

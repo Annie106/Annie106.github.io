@@ -1,3 +1,10 @@
+        /* 图标字体（Remix Icon 本地副本，含 @font-face 与全部 .ri-* 规则）。
+           放在第一行是因为 @import 必须出现在所有其它规则之前，往下挪一行
+           就会被浏览器整条忽略。路径按本文件的位置解析（css/ → ../fonts/），
+           所以无论页面在第几层目录，只要引了 css/style.css 就自带图标，
+           页面不用再单独写图标字体的 <link>。详见 AGENTS.md 与 _template.html。 */
+        @import url('../fonts/icons.css');
+
         /* ==================== CSS 变量 & 全局重置 ==================== */
         :root {
             --max-width: 1080px;
@@ -602,6 +609,19 @@
             background: var(--color-text-primary);
             color: #fff;
             border-color: var(--color-text-primary);
+        }
+        /* 标签后面的篇数：小一号、淡一点，别和标签名抢注意力。
+           选中时胶囊是黑底白字，数字跟着降一档透明度；深色主题下选中态
+           反过来是浅底深字，所以那边单独给一个深色值。 */
+        .tag-pill-count {
+            margin-left: 6px;
+            font-size: 0.72em;
+            font-weight: 400;
+            font-variant-numeric: tabular-nums;
+            color: var(--color-text-tertiary);
+        }
+        .tag-pill.active .tag-pill-count {
+            color: rgba(255, 255, 255, 0.62);
         }
         .home-tag-filter {
             gap: 16px;
@@ -2159,31 +2179,163 @@
             align-items: stretch;
             gap: 20px;
         }
-        .home-loading {
+        /* ==================== 首页骨架屏 ==================== */
+        /* 首页文章数据（js/posts-data.js + js/script.js）就绪前先铺一层占位卡片。
+           骨架直接写死在 index.html 里，所以脚本还在下载、解析的那几百毫秒里
+           就已经能看到它——那段时间原本只有纯白背景加一个转圈。
+           卡片结构照着真实卡片摆：元信息行 / 两行标题 / 两行摘要 / 底部统计行。 */
+        .home-skeleton {
+            /* 占位块和扫光各一套色值：浅底用淡灰，深底用低亮度白。
+               占位块的灰不能太淡——扫光是一道白光，压在同一块灰上才看得出
+               明暗变化；块本身接近白色的话，光扫过去几乎没有反馈。 */
+            --sk-fill: rgba(17, 17, 17, 0.09);
+            --sk-fill-soft: rgba(17, 17, 17, 0.07);
+            --sk-sheen: rgba(255, 255, 255, 0.95);
+            --sk-card-bg: var(--color-bg);
+            --sk-card-border: rgba(17, 17, 17, 0.07);
+            /* 铺满整个列表宽度：外层的 posts-list 是两列网格，
+               骨架自己内部再排一套网格 */
             grid-column: 1 / -1;
+            position: relative;
+            /* 光带两端会伸出容器，超出部分裁掉，否则会在左右边缘露头 */
+            overflow: hidden;
+        }
+        /* 深色下卡片本身就是一层很淡的白，占位块要再亮一点才分得出层次 */
+        [data-theme='dark'] .home-skeleton {
+            --sk-fill: rgba(255, 255, 255, 0.075);
+            --sk-fill-soft: rgba(255, 255, 255, 0.05);
+            --sk-sheen: rgba(255, 255, 255, 0.09);
+            --sk-card-bg: rgba(255, 255, 255, 0.035);
+            --sk-card-border: rgba(255, 255, 255, 0.09);
+        }
+        /* 一条斜向高光从左扫到右，2.1s 一轮。
+           整块骨架共用同一条光带（而不是每张卡片各扫一次），
+           六张卡片看起来是被同一次光扫过，节奏统一，也只跑一个动画。
+           用 translate 而不是 background-position：只走合成层，长列表不掉帧。 */
+        .home-skeleton::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: linear-gradient(100deg, transparent 36%, var(--sk-sheen) 50%, transparent 64%);
+            transform: translate3d(-100%, 0, 0);
+            animation: homeSkeletonSweep 2.1s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+            pointer-events: none;
+            will-change: transform;
+        }
+        /* 前 60% 走完一趟（约 1.26s），后 40% 停下歇一会儿再扫第二遍。
+           连续不停地扫会显得毛躁，留白之后更像「在等」而不是「在转」。 */
+        @keyframes homeSkeletonSweep {
+            0% { transform: translate3d(-100%, 0, 0); }
+            60%,
+            100% { transform: translate3d(100%, 0, 0); }
+        }
+        /* 真实卡片填进来时，骨架不会直接被删掉：JS 把它摘下来用 fixed 盖在
+           原位置再淡出（见 script.js 的 releaseSkeleton），于是交替是一次
+           交叉淡化而不是硬切。尺寸由 JS 按退场瞬间的 rect 写死，
+           不受新内容高度影响，所以不会跟着被拉长压扁。 */
+        .home-skeleton--ghost {
+            position: fixed;
+            z-index: 3;
+            margin: 0;
+            pointer-events: none;
+            opacity: 1;
+            transition: opacity 260ms ease;
+        }
+        .home-skeleton--ghost.is-leaving {
+            opacity: 0;
+        }
+        /* 淡出的过程中把扫光停掉：正在消散的骨架上还有一道光在跑，看着会发飘 */
+        .home-skeleton--ghost.is-leaving::after {
+            animation: none;
+        }
+        .home-skeleton-grid {
+            display: grid;
+            /* 列数和间距都跟着 .posts-list 走：桌面两列，760 以下一列 */
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 20px;
+        }
+        .home-skeleton-card {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 20px 22px 18px;
+            border: 1px solid var(--sk-card-border);
+            border-radius: 14px;
+            background: var(--sk-card-bg);
+        }
+        .home-skeleton-row {
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 10px;
-            padding: 32px 0;
-            color: var(--color-text-tertiary);
-            font-size: 0.86rem;
+            gap: 8px;
         }
-        .home-loading-spinner {
-            width: 18px;
-            height: 18px;
-            flex: 0 0 18px;
-            border: 2px solid var(--color-border);
-            border-top-color: var(--color-text-primary);
+        /* 底部统计行靠 margin-top:auto 贴住卡片下沿，
+           和真实卡片的 .stats 一样，格子被拉高时不会浮在中间 */
+        .home-skeleton-row--foot {
+            margin-top: auto;
+            gap: 14px;
+        }
+        .home-skeleton-lines {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .sk-block {
+            display: block;
+            border-radius: 6px;
+            background: var(--sk-fill);
+        }
+        /* 各块的宽高照着真实元素量：分类 11px 文字、日期 9px 小字、
+           三点按钮 20px 圆、标题 14px、摘要 10px */
+        .sk-cat { width: 44px; height: 11px; }
+        .sk-date { width: 62px; height: 9px; }
+        .sk-dot {
+            width: 20px;
+            height: 20px;
+            margin-left: auto;
             border-radius: 50%;
-            animation: homeLoadingSpin 0.8s linear infinite;
+            background: var(--sk-fill-soft);
         }
-        @keyframes homeLoadingSpin {
-            to { transform: rotate(360deg); }
+        .sk-title { width: 94%; height: 14px; border-radius: 5px; }
+        .sk-title--short { width: 56%; }
+        .sk-text { width: 100%; height: 10px; }
+        .sk-text--short { width: 74%; }
+        .sk-meta { width: 34px; height: 9px; }
+        .sk-meta--sm { width: 26px; }
+        /* 骨架对读屏软件没有意义，但「正在加载」要留给它听 */
+        .home-skeleton-status {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            margin: -1px;
+            padding: 0;
+            overflow: hidden;
+            clip: rect(0 0 0 0);
+            white-space: nowrap;
+            border: 0;
+        }
+        /* 小屏跟着卡片一起收一档内边距和圆角（对照 .task 的 600px 断点） */
+        @media (max-width: 760px) {
+            .home-skeleton-grid {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+        @media (max-width: 600px) {
+            .home-skeleton-card {
+                padding: 16px 16px 14px;
+                border-radius: 12px;
+            }
         }
         @media (prefers-reduced-motion: reduce) {
-            .home-loading-spinner {
+            /* 关掉扫光，留静态灰块——加载状态还在，只是不跑了 */
+            .home-skeleton::after {
                 animation: none;
+                opacity: 0;
+            }
+            .home-skeleton--ghost {
+                transition: none;
             }
         }
         /* 卡片入场：整块淡入，不做错开延迟。
@@ -3075,6 +3227,30 @@
             border-radius: 4px;
             font-size: 0.9em;
             font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+        }
+        /* 正文图片：之前文章都是纯文字或内嵌页，没有图片样式，
+           直接塞 <img> 会按原图尺寸撑破 860px 的正文列。
+           这里统一收进容器宽度，小图不放大（max-width 而不是 width）。 */
+        .article-content figure {
+            margin: 1.8em 0;
+        }
+        .article-content img {
+            display: block;
+            max-width: 100%;
+            height: auto;
+            margin: 1.8em auto;
+            border-radius: 10px;
+            border: 1px solid var(--color-border);
+        }
+        .article-content figure img {
+            margin: 0 0 10px;
+        }
+        .article-content figcaption {
+            font-family: var(--font-sans);
+            font-size: 0.84rem;
+            line-height: 1.6;
+            color: var(--color-text-tertiary);
+            text-align: center;
         }
         .divider-thin {
             border: none;
@@ -4358,31 +4534,46 @@
             color: #111111;
         }
         @media (hover: hover) {
-            html:not(.is-touch-input) [data-theme="dark"] .social-links a:hover {
-                background: var(--color-text-primary);
-                color: #111111;
+            /* 深色下不做「反色」。浅色主题里 hover 是深底白图标（反色强调），
+               但这套翻译到深色主题就崩了：--color-text-primary 在这里是近白
+               (#e7e9ee)，拿它当圆底，六个小圆里就冒出一个发光的大白点，
+               视线全被它拽走。改成「比常态亮一档的平涂 + 图标提白」，
+               和卡片上三点按钮的悬停是同一套语言。 */
+            html:not(.is-touch-input)[data-theme="dark"] .social-links a:hover {
+                /* 底色只提一档，主要反馈交给图标由灰转白；
+                   再加一圈极淡的白边，让圆的边界浮起来，不至于像一个没变化的洞 */
+                background: var(--card-control-bg-hover);
+                color: var(--color-text-primary);
+                border-color: rgba(255, 255, 255, 0.18);
             }
         }
         @media (hover: none) {
             [data-theme="dark"] .social-links a:active {
-                background: var(--color-text-primary);
-                color: #111111;
+                background: var(--card-control-bg-active);
+                color: var(--color-text-primary);
+                border-color: rgba(255, 255, 255, 0.24);
             }
         }
-        html.is-touch-input [data-theme="dark"] .social-links a:active {
-            background: var(--color-text-primary);
-            color: #111111;
+        /* 触屏按下的那一下同理：原来是闪一个白圆，现在是再亮半档 */
+        html.is-touch-input[data-theme="dark"] .social-links a:active {
+            background: var(--card-control-bg-active);
+            color: var(--color-text-primary);
+            border-color: rgba(255, 255, 255, 0.24);
         }
         [data-theme="dark"] .tag-pill {
             background: var(--color-surface);
         }
-        html:not(.is-touch-input) [data-theme="dark"] .tag-pill:not(.active):hover {
+        html:not(.is-touch-input)[data-theme="dark"] .tag-pill:not(.active):hover {
             border-color: var(--color-border);
         }
         [data-theme="dark"] .tag-pill.active {
             background: var(--color-text-primary);
             color: #111111;
             border-color: var(--color-text-primary);
+        }
+        /* 深色下选中标签是浅底深字，数字不能用白色 */
+        [data-theme="dark"] .tag-pill.active .tag-pill-count {
+            color: rgba(17, 17, 17, 0.5);
         }
         [data-theme="dark"] .home-tag-filter .tag-pill {
             background: transparent;
@@ -4399,12 +4590,12 @@
             background: rgba(255, 255, 255, 0.06);
             border-color: rgba(255, 255, 255, 0.12);
         }
-        html:not(.is-touch-input) [data-theme="dark"] .search-trigger:hover {
+        html:not(.is-touch-input)[data-theme="dark"] .search-trigger:hover {
             background: rgba(255, 255, 255, 0.08);
             border-color: rgba(255, 255, 255, 0.1);
             color: #e7e9ee;
         }
-        html.is-touch-input [data-theme="dark"] .search-trigger:active {
+        html.is-touch-input[data-theme="dark"] .search-trigger:active {
             background: rgba(255, 255, 255, 0.1);
             color: #e7e9ee;
         }
@@ -4416,7 +4607,7 @@
                 border-color: rgba(255, 255, 255, 0.1);
                 color: var(--color-text-secondary);
             }
-            html.is-touch-input [data-theme="dark"] .search-trigger:active {
+            html.is-touch-input[data-theme="dark"] .search-trigger:active {
                 background: rgba(255, 255, 255, 0.16);
             }
         }
@@ -4446,8 +4637,8 @@
             background: rgba(255, 255, 255, 0.1);
             color: #b6bcc6;
         }
-        html:not(.is-touch-input) [data-theme="dark"] .search-bar-clear:hover,
-        html.is-touch-input [data-theme="dark"] .search-bar-clear:active {
+        html:not(.is-touch-input)[data-theme="dark"] .search-bar-clear:hover,
+        html.is-touch-input[data-theme="dark"] .search-bar-clear:active {
             background: #e7e9ee;
             color: #111111;
         }
@@ -4455,17 +4646,17 @@
             border-color: rgba(255, 255, 255, 0.16);
             border-top-color: #e7e9ee;
         }
-        html:not(.is-touch-input) [data-theme="dark"] .search-close:hover,
-        html.is-touch-input [data-theme="dark"] .search-close:active {
+        html:not(.is-touch-input)[data-theme="dark"] .search-close:hover,
+        html.is-touch-input[data-theme="dark"] .search-close:active {
             background: rgba(255, 255, 255, 0.08);
             color: #e7e9ee;
         }
-        html:not(.is-touch-input) [data-theme="dark"] .search-back:hover,
-        html.is-touch-input [data-theme="dark"] .search-back:active {
+        html:not(.is-touch-input)[data-theme="dark"] .search-back:hover,
+        html.is-touch-input[data-theme="dark"] .search-back:active {
             background: rgba(255, 255, 255, 0.08);
             color: #e7e9ee;
         }
-        html:not(.is-touch-input) [data-theme="dark"] .search-block-action:hover,
+        html:not(.is-touch-input)[data-theme="dark"] .search-block-action:hover,
         [data-theme="dark"] .search-block-action:focus-visible {
             background: rgba(255, 255, 255, 0.08);
             color: #e7e9ee;
@@ -4474,8 +4665,8 @@
             border-color: rgba(255, 255, 255, 0.12);
             color: #b6bcc6;
         }
-        html:not(.is-touch-input) [data-theme="dark"] .search-chip:hover,
-        html.is-touch-input [data-theme="dark"] .search-chip:active {
+        html:not(.is-touch-input)[data-theme="dark"] .search-chip:hover,
+        html.is-touch-input[data-theme="dark"] .search-chip:active {
             border-color: #e7e9ee;
             background: #e7e9ee;
             color: #111111;
@@ -4485,7 +4676,7 @@
             background: rgba(255, 255, 255, 0.04);
             color: #b6bcc6;
         }
-        html:not(.is-touch-input) [data-theme="dark"] .search-quick-item:hover {
+        html:not(.is-touch-input)[data-theme="dark"] .search-quick-item:hover {
             border-color: rgba(255, 255, 255, 0.22);
             background: rgba(255, 255, 255, 0.08);
             color: #e7e9ee;
@@ -4618,7 +4809,7 @@
             background: #1e222b;
             box-shadow: none;
         }
-        html:not(.is-touch-input) [data-theme="dark"] .post-menu-item:hover,
+        html:not(.is-touch-input)[data-theme="dark"] .post-menu-item:hover,
         [data-theme="dark"] .post-menu-item:focus-visible {
             background: rgba(255, 255, 255, 0.08);
         }
@@ -4641,9 +4832,9 @@
         /* 同样只在鼠标悬停时变色，避免触屏点一下后图标颜色被粘住
            （深色模式下播放按钮是浅底，粘上浅色图标会直接看不见） */
         @media (hover: hover) {
-            html:not(.is-touch-input) [data-theme="dark"] .music-icon-btn:hover,
-            html:not(.is-touch-input) [data-theme="dark"] .music-card-toggle:hover,
-            html:not(.is-touch-input) [data-theme="dark"] .music-card-collapse:hover { color: #e7e9ee; }
+            html:not(.is-touch-input)[data-theme="dark"] .music-icon-btn:hover,
+            html:not(.is-touch-input)[data-theme="dark"] .music-card-toggle:hover,
+            html:not(.is-touch-input)[data-theme="dark"] .music-card-collapse:hover { color: #e7e9ee; }
         }
         [data-theme="dark"] .music-card-toggle {
             background: var(--color-text-primary);
@@ -4661,7 +4852,7 @@
             color: #9aa1ad;
         }
         @media (hover: hover) {
-            html:not(.is-touch-input) [data-theme="dark"] .music-volume-trigger:hover {
+            html:not(.is-touch-input)[data-theme="dark"] .music-volume-trigger:hover {
                 background: rgba(255, 255, 255, 0.12);
                 color: #e7e9ee;
             }
@@ -4688,25 +4879,26 @@
             background: rgba(248, 81, 73, 0.12);
         }
 
-        /* 主题切换按钮在深色模式下 */
+        /* 主题切换按钮在深色模式下：和同一行的社交图标走同一套悬停语言
+           （提亮一档 + 图标变白 + 极淡描边），不再是反色的白圆 */
         @media (hover: hover) {
-            html:not(.is-touch-input) [data-theme="dark"] .theme-toggle:hover {
-                background: var(--color-text-primary);
-                color: #111111;
-                border-color: var(--color-text-primary);
+            html:not(.is-touch-input)[data-theme="dark"] .theme-toggle:hover {
+                background: var(--card-control-bg-hover);
+                color: var(--color-text-primary);
+                border-color: rgba(255, 255, 255, 0.18);
             }
         }
         @media (hover: none) {
             [data-theme="dark"] .theme-toggle:active {
-                background: var(--color-text-primary);
-                color: #111111;
-                border-color: var(--color-text-primary);
+                background: var(--card-control-bg-active);
+                color: var(--color-text-primary);
+                border-color: rgba(255, 255, 255, 0.24);
             }
         }
-        html.is-touch-input [data-theme="dark"] .theme-toggle:active {
-            background: var(--color-text-primary);
-            color: #111111;
-            border-color: var(--color-text-primary);
+        html.is-touch-input[data-theme="dark"] .theme-toggle:active {
+            background: var(--card-control-bg-active);
+            color: var(--color-text-primary);
+            border-color: rgba(255, 255, 255, 0.24);
         }
 
 
@@ -5117,6 +5309,24 @@
         }
         .timeline {
             margin-top: 4px;
+        }
+        /* ===== 首页标签云 =====
+           时间线下面：篇数最多的 4 个标签，字号从第一个往后递减一点，
+           有「云」的层次但不至于跳脱。点一下跳到文章页并筛到这个标签。 */
+        .tagcloud-section {
+            margin-top: 46px;
+        }
+        .tag-cloud {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+        }
+        .tag-cloud .tag-pill {
+            cursor: pointer;
+            /* 四个标签保持同一字号，不再按名次缩放大：大小不一会显得参差，
+               而且标签越多越乱。 */
+            font-size: 0.8rem;
         }
         .tl-year + .tl-year {
             margin-top: 16px;

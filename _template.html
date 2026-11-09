@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>页面标题</title>
+
+<!-- ① 站点图标。下面的路径是「文件放根目录」的写法，
+     复制到子目录后要按层级改：project_subpage/blog/ 用 ../../favicon.svg
+     ｜ project_subpage/projects/xxx/ 用 ../../../favicon.svg -->
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+<!-- ② 主样式，只需要这一行。
+     字体、配色、深色模式、正文排版，以及图标字体
+     （fonts/icons.css 由 style.css 顶部的 @import 自动引入）都在里面。
+     不要再引任何 CDN 图标样式表，断网时图标会一起消失。
+     同样按层级改：根目录 css/style.css ｜ blog/ 用 ../../css/style.css
+     ｜ projects/xxx/ 用 ../../../css/style.css -->
+<link rel="stylesheet" href="css/style.css">
+
+<!-- ③ 页面专用样式写在这里，不要去改 style.css。
+     颜色请用 CSS 变量（--color-text-primary 等），深浅主题才会自动适配。 -->
+<style>
+  .page {
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 72px 24px 96px;
+  }
+  .page h1 {
+    margin: 0 0 20px;
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--color-text-primary);
+  }
+  .page p {
+    margin: 0 0 14px;
+    color: var(--color-text-secondary);
+    line-height: 1.9;
+  }
+  @media (max-width: 600px) {
+    .page { padding: 48px 16px 72px; }
+  }
+</style>
+</head>
+<body>
+<div class="main-container">
+    <div class="page">
+        <h1>页面标题</h1>
+        <p>正文写在这里。图标直接写 <i class="ri-moon-line" aria-hidden="true"></i> 这样的
+            <code>&lt;i class="ri-xxx"&gt;&lt;/i&gt;</code>，字体在本地，断网也能显示。</p>
+        <p>写完删掉这两段说明。最后跑一次 <code>node tools/check-icons.js</code>，
+            检查图标名有没有拼错（拼错不会报错，只会显示空白）。</p>
+    </div>
+</div>
+</body>
+</html>
