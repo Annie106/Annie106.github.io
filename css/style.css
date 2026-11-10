@@ -2776,6 +2776,7 @@
             line-height: 1.9;
         }
         .about-main,
+        .about-studio,
         .about-topics,
         .about-version {
             width: min(100% - 48px, 1040px);
@@ -2788,17 +2789,43 @@
             padding: 56px 0;
         }
         .about-copy h2,
+        .about-studio h2,
         .about-topics h2 {
             margin-bottom: 18px;
             font-size: 1.1rem;
         }
-        .about-copy p {
+        /* 正文现在有多个小标题（博客初衷 / 性格 / 业余时间），
+           只有第一个贴在上面，后面的和上一段之间要留出呼吸 */
+        .about-copy h2 ~ h2 {
+            margin-top: 30px;
+        }
+        .about-copy p,
+        .about-studio p {
             margin-bottom: 16px;
             color: var(--color-text-secondary);
             line-height: 1.9;
         }
-        .about-copy p:last-child {
+        .about-copy p:last-child,
+        .about-studio p:last-child {
             margin-bottom: 0;
+        }
+        /* about-copy 里偶尔点一下文件名（如 css/style.css），
+           正文列没有全局 code 样式，这里补一份，跟着文字走 */
+        .about-copy code {
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: var(--color-surface);
+            font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+            font-size: 0.88em;
+        }
+        /* RH 工作室的介绍从页面最上方挪到了自我介绍之后，
+           用一条分隔线跟上面隔开，宽度跟正文列对齐 */
+        .about-studio {
+            padding: 40px 0 8px;
+            border-top: 1px solid var(--color-border-light);
+        }
+        .about-studio p {
+            max-width: 720px;
         }
         .about-facts div {
             padding: 15px 0;
@@ -2891,9 +2918,13 @@
                 padding: 36px 0;
             }
             .about-main,
+            .about-studio,
             .about-topics,
             .about-version {
                 width: calc(100% - 40px);
+            }
+            .about-studio {
+                padding-top: 28px;
             }
             .posts-list {
                 grid-template-columns: 1fr;
@@ -5102,11 +5133,17 @@
             border-radius: 14px;
             background: var(--color-bg);
             box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+            /* 整张卡可点：点进去是「全部折腾」里的同一条 */
+            cursor: pointer;
             transition:
                 transform 0.2s ease,
                 box-shadow 0.2s ease,
                 border-color 0.2s ease,
                 background-color 0.2s ease;
+        }
+        .tweak-card:focus-visible {
+            outline: 2px solid var(--card-accent);
+            outline-offset: 2px;
         }
         /* 悬停：浅灰底 + 抬起，和文章卡片同一套手感 */
         @media (hover: hover) and (pointer: fine) {

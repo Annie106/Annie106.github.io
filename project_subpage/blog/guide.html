@@ -1115,7 +1115,7 @@
     &lt;li&gt;&lt;a href="#" data-nav="blog"&gt;文章&lt;/a&gt;&lt;/li&gt;
     &lt;li&gt;&lt;a href="#" data-nav="archive"&gt;归档&lt;/a&gt;&lt;/li&gt;
     &lt;li&gt;&lt;a data-nav="movie" tabindex="0" role="link"&gt;电影&lt;/a&gt;&lt;/li&gt;
-    &lt;li&gt;&lt;a href="about-rh-studio.html" data-nav="about"&gt;关于&lt;/a&gt;&lt;/li&gt;
+    &lt;li&gt;&lt;a href="index.html?view=about" data-nav="about"&gt;关于&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;</code></pre>
                 <p>每行结构都是 <code>&lt;li&gt;&lt;a ...&gt;显示的文字&lt;/a&gt;&lt;/li&gt;</code>。改文字就改中间那几个字；想删一项整行删掉；想加一项复制一整行粘在下面再改。</p>
 
@@ -1127,7 +1127,7 @@
                     <p><code>data-nav="home"</code> 这种东西是给程序认的，删了或改了，点导航就没反应。你只改标签中间的文字。</p>
                 </div>
 
-                <p>顺带说一句「关于」这一项：它指向的 <code>about-rh-studio.html</code> 其实不存在，但不影响使用——点它的时候程序会直接切到 <code>index.html</code> 内置的关于界面。想改关于页内容，搜索 <code>view-about</code>。</p>
+                <p>顺带说一句「关于」这一项：它的 <code>href</code> 写的是 <code>index.html?view=about</code>，只是给禁用 JS 或中键新开标签时兜底用的——正常点击时程序会拦下跳转，直接切到内置的关于界面，不会整页刷新。想改关于页内容，搜索 <code>view-about</code>。</p>
 
                 <!-- 6.4 功能栏 -->
                 <h3 class="guide-subtitle">
@@ -1418,35 +1418,48 @@
                 </h3>
                 <p>「关于」不是单独的网页文件，它是 <code>index.html</code> 里内置的一个界面。点导航栏的「关于」时，程序直接切过去显示，所以改它也是在 <code>index.html</code> 里改。</p>
                 <p>如果想让别人直接打开「关于」页面，可以把博客首页链接后加上 <code>?view=about</code>，例如 <code>https://你的网址/?view=about</code>。打开这个链接会直接显示关于页面，不需要在关于页面增加分享按钮；离开关于页后这个参数会自动清除。</p>
-                <p>打开 <code>index.html</code>，搜索 <code>view-about</code>，能找到这一整块。从上到下依次是这几处：</p>
+                <p>打开 <code>index.html</code>，搜索 <code>view-about</code>，能找到这一整块。整页分成「上、下两部分」：上面是 Annie 本人（博客的来由、性格、业余时间），下面才是 RH 工作室的介绍。从上到下依次是：</p>
                 <ul>
                     <li>小标签、大标题、一句话标语：搜 <code>about-eyebrow</code>、<code>about-title</code>、<code>about-tagline</code></li>
-                    <li>标题下面那段介绍：搜 <code>about-lead</code></li>
-                    <li>「关于我们」的正文段落：搜 <code>about-copy</code></li>
+                    <li>标题下面那段自我介绍：搜 <code>about-lead</code></li>
+                    <li>Annie 的正文段落（三个小标题）：搜 <code>about-copy</code></li>
                     <li>右边的信息列表：搜 <code>about-facts</code></li>
+                    <li>RH 工作室的介绍（带一条分隔线）：搜 <code>about-studio</code></li>
                     <li>最下面的内容方向标签：搜 <code>about-topics</code></li>
                 </ul>
 
                 <p>标题和标语都是普通文字，直接改标签中间的字：</p>
-                <pre><code>&lt;p class="about-eyebrow"&gt;RH STUDIO · ABOUT&lt;/p&gt;
-&lt;h1 class="about-title"&gt;RH 工作室&lt;span&gt;.&lt;/span&gt;&lt;/h1&gt;
-&lt;p class="about-tagline"&gt;一间安静写字的小小工作室 · 用博客记录生活的回响&lt;/p&gt;</code></pre>
+                <pre><code>&lt;p class="about-eyebrow"&gt;ANNIE · ABOUT&lt;/p&gt;
+&lt;h1 class="about-title"&gt;Annie&lt;span&gt;.&lt;/span&gt;&lt;/h1&gt;
+&lt;p class="about-tagline"&gt;写点东西，也折腾点东西 · 这个站是我一个人从零搭起来的&lt;/p&gt;</code></pre>
                 <p>标题里那个 <code>&lt;span&gt;.&lt;/span&gt;</code> 是跟着的小圆点，不想要就把这半截删掉。</p>
 
-                <p>「关于我们」的正文，一段一个 <code>&lt;p&gt;</code>。想加一段就复制一整行粘在下面再改字：</p>
+                <p>正文在 <code>about-copy</code> 里，一个小标题配几段 <code>&lt;p&gt;</code>。想加一段就复制一整行粘在下面再改字；想加一节就照抄一个 <code>&lt;h2&gt;</code> + 段落：</p>
                 <pre><code>&lt;section class="about-copy"&gt;
-    &lt;h2&gt;关于我们&lt;/h2&gt;
+    &lt;h2&gt;为什么会有这个博客&lt;/h2&gt;
     &lt;p&gt;第一段正文&lt;/p&gt;
     &lt;p&gt;第二段正文&lt;/p&gt;
+
+    &lt;h2&gt;我是个什么样的人&lt;/h2&gt;
+    &lt;p&gt;第一段正文&lt;/p&gt;
 &lt;/section&gt;</code></pre>
+                <p>几个 <code>&lt;h2&gt;</code> 之间的间距由样式统一控制（<code>.about-copy h2 ~ h2</code>），不用手写 <code>style</code>。</p>
 
                 <p>右边的信息列表，一项就是一个 <code>&lt;div&gt;</code>，前面 <code>&lt;dt&gt;</code> 是名目，后面 <code>&lt;dd&gt;</code> 是内容：</p>
                 <pre><code>&lt;dl class="about-facts"&gt;
-    &lt;div&gt;&lt;dt&gt;创始人 / 负责人&lt;/dt&gt;&lt;dd&gt;Annie&lt;/dd&gt;&lt;/div&gt;
-    &lt;div&gt;&lt;dt&gt;工作室性质&lt;/dt&gt;&lt;dd&gt;个人工作室 · 独立博客&lt;/dd&gt;&lt;/div&gt;
+    &lt;div&gt;&lt;dt&gt;身份&lt;/dt&gt;&lt;dd&gt;学生 · 独立博客作者&lt;/dd&gt;&lt;/div&gt;
+    &lt;div&gt;&lt;dt&gt;在玩&lt;/dt&gt;&lt;dd&gt;第五人格&lt;/dd&gt;&lt;/div&gt;
     &lt;div&gt;&lt;dt&gt;联络邮箱&lt;/dt&gt;&lt;dd&gt;&lt;a href="mailto:你的邮箱"&gt;你的邮箱&lt;/a&gt;&lt;/dd&gt;&lt;/div&gt;
 &lt;/dl&gt;</code></pre>
                 <p>邮箱那一项里，<code>href="mailto:..."</code> 后面要换成真实邮箱，这样访客点一下就能直接发信。想删一项，就把对应的整个 <code>&lt;div&gt;</code> 删掉。</p>
+
+                <p>再往下是 RH 工作室那一段，单独一个 <code>about-studio</code> 区块，跟上面 Annie 的自我介绍之间有一条分隔线（<code>border-top</code> 写在 <code>css/style.css</code> 里，别写到 HTML 行内）。它只是一组标题加段落，结构很简单：</p>
+                <pre><code>&lt;section class="about-studio"&gt;
+    &lt;h2&gt;关于 RH 工作室&lt;/h2&gt;
+    &lt;p&gt;第一段&lt;/p&gt;
+    &lt;p&gt;第二段&lt;/p&gt;
+&lt;/section&gt;</code></pre>
+                <p>如果哪天想把工作室这段挪回页面最上面，直接把这个 <code>&lt;section&gt;</code> 整块剪到 <code>about-intro</code> 前面即可，样式不用改；只是那条分隔线会跟着跑到顶部，看着有点多余，删掉 <code>.about-studio</code> 的 <code>border-top</code> 就行。</p>
 
                 <p>最下面的内容方向是一串 <code>&lt;span&gt;</code>，想加一个词就复制一个 <code>&lt;span&gt;新词&lt;/span&gt;</code> 粘进去：</p>
                 <pre><code>&lt;div class="about-topic-list"&gt;
@@ -1456,9 +1469,9 @@
                 <div class="guide-tip">
                     <div class="guide-tip-title">
                         <i class="ri-information-line"></i>
-                        导航里那个 about-rh-studio.html 不用管
+                        别改 data-nav="about"
                     </div>
-                    <p>导航栏「关于」的 <code>href</code> 写的是 <code>about-rh-studio.html</code>，这个文件其实不存在，但不影响使用——点击时程序会拦下跳转，直接切到内置的关于界面。所以不用去新建这个文件，也别改 <code>data-nav="about"</code>。</p>
+                    <p>导航栏「关于」的 <code>href</code> 是 <code>index.html?view=about</code>，正常点击时会被程序拦下、直接切到内置的关于界面，不会整页刷新。要改的是标签文字，<code>data-nav="about"</code> 不要动。</p>
                 </div>
 
                 <div class="guide-warning">

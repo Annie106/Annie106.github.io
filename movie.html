@@ -692,6 +692,9 @@ html:not(.is-touch-input) [data-theme="dark"] .contact-btn:hover{transform:scale
   opacity:0;pointer-events:none;
   transition:opacity .3s ease;
 }
+/* 公告出现时整屏吞点击：它盖住的是已经停服的播放器，让指针穿透过去
+   只会戳到下面那些没有意义的控件（点播放弹「请选择视频」之类）。
+   也正因为整屏拦截，公告永远是进门第一眼、也是唯一能操作的那一层。 */
 #serviceNotice.is-dim{opacity:1;pointer-events:auto}
 [data-theme="dark"] #serviceNotice{background:rgba(0,0,0,.55)}
 
@@ -2133,10 +2136,11 @@ html:not(.is-touch-input) [data-theme="dark"] .contact-btn:hover{transform:scale
 
   if (playlist.length) {
     nowTitle.textContent = '请选择视频';
-    /* 窄屏下一进来就顶开列表，抽屉会占满整个宽度（88vw），播放器只剩左边
-       一条黑边，看起来像页面坏了。小屏先让播放器完整露出来，
-       想看列表点左下角那个按钮；桌面宽度够，两侧能共存，保持自动展开。 */
-    if (!isMobile) setPanel(true);
+    /* 两端都自动展开片单（以前窄屏不展开，是为了让播放器完整露出来；
+       模块停服后播放器没什么可看的，片单才是要摆出来的东西）。
+       注意公告是 z-index:60 的整屏层而且吞点击，所以窄屏上片单虽然展开了，
+       实际是被公告压住的——层级就应该是这样，公告在前、片单在后。 */
+    setPanel(true);
     /* 没有加载任何片子时画面是黑的，把中央播放按钮留住，
        背后才看得出"这里原本是一个播放器"，而不是一块黑布。 */
     playIcon.classList.add('persist');

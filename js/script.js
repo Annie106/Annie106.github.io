@@ -1743,7 +1743,8 @@
                 const list = document.getElementById('tweakList');
                 if (!list) return;
                 list.innerHTML = blogTweaks.map(item => `
-                    <article class="tweak-card">
+                    <article class="tweak-card" role="button" tabindex="0"
+                             aria-label="去「全部折腾」看完整记录：${escapeHtml(item.label)}">
                         <div class="tweak-meta">
                             <time class="tweak-date" datetime="${item.iso}">${item.date}</time>
                             <span class="tweak-cat"><span class="tweak-emoji" aria-hidden="true">${item.emoji}</span>${escapeHtml(item.label)}</span>
@@ -1753,15 +1754,37 @@
             }
 
             // 「全部折腾」：切到站内的折腾视图（不占导航栏，走视图历史，
-            // 返回键能退回首页原位）
+            // 返回键能退回首页原位）。首页卡片也走这里，进列表顶部，不按索引往下滚。
+            function openTweaksView() {
+                viewScrollPositions.tweaks = 0;
+                navigateToView('tweaks');
+                window.scrollTo({ top: 0, behavior: 'instant' });
+            }
+
             (function bindTweakAll() {
                 const allLink = document.getElementById('tweakAll');
                 if (!allLink) return;
                 allLink.addEventListener('click', function(e) {
                     e.preventDefault();
-                    viewScrollPositions.tweaks = 0;
-                    navigateToView('tweaks');
-                    window.scrollTo({ top: 0, behavior: 'instant' });
+                    openTweaksView();
+                });
+            })();
+
+            (function bindTweakCards() {
+                const list = document.getElementById('tweakList');
+                if (!list) return;
+                list.addEventListener('click', function(e) {
+                    const card = e.target.closest('.tweak-card');
+                    if (!card || !list.contains(card)) return;
+                    openTweaksView();
+                });
+                // 卡片上挂了 role="button"，Enter / 空格也要能进
+                list.addEventListener('keydown', function(e) {
+                    if (e.key !== 'Enter' && e.key !== ' ') return;
+                    const card = e.target.closest('.tweak-card');
+                    if (!card) return;
+                    e.preventDefault();
+                    openTweaksView();
                 });
             })();
 
