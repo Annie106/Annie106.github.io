@@ -16,9 +16,15 @@
      不要再引任何 CDN 图标样式表，断网时图标会一起消失。
      同样按层级改：根目录 css/style.css ｜ blog/ 用 ../../css/style.css
      ｜ projects/xxx/ 用 ../../../css/style.css -->
+<!-- ③ 图标字体预加载。style.css 里 @import 了 icons.css，字体又只在那里面声明，
+     不预加载就得多等两跳才出现图标。woff2 那条必须带 crossorigin，否则会下载两次。
+     同样按层级改：子目录里要写成 ../../fonts/... -->
+<link rel="preload" href="fonts/icons.css" as="style">
+<link rel="preload" href="fonts/remixicon.woff2" as="font" type="font/woff2" crossorigin>
+
 <link rel="stylesheet" href="css/style.css">
 
-<!-- ③ 页面专用样式写在这里，不要去改 style.css。
+<!-- ④ 页面专用样式写在这里，不要去改 style.css。
      颜色请用 CSS 变量（--color-text-primary 等），深浅主题才会自动适配。 -->
 <style>
   .page {

@@ -39,6 +39,15 @@
     <link rel="preconnect" href="https://giscus.app" crossorigin>
     <link rel="preload" href="https://giscus.app/client.js" as="script" crossorigin="anonymous" fetchpriority="low">
 
+    <!-- 图标字体的两跳串行，用预加载摊平：
+         style.css 里 @import 了 icons.css，icons.css 里才声明 @font-face，
+         所以不预加载的话浏览器要「HTML → CSS → icons.css → woff2」四跳才拿到字体，
+         每一跳都是一次跨境往返。预加载让后两个从第 0 秒就开始，和 CSS 并行。
+         注意 woff2 的 preload 必须带 crossorigin，否则会和字体请求对不上、
+         变成下载两次。 -->
+    <link rel="preload" href="fonts/icons.css" as="style">
+    <link rel="preload" href="fonts/remixicon.woff2" as="font" type="font/woff2" crossorigin>
+
     <link rel="stylesheet" href="css/style.css">
 
     <!-- RSS 自动发现：装了订阅插件的浏览器会自己在地址栏亮起订阅按钮，
@@ -57,8 +66,130 @@
             } catch (e) {}
         })();
     </script>
+    <!-- ==================== 首屏加载提示（内联，故意不放进 style.css） ====================
+         它要出现的那几秒，正是 css/style.css 还在跨海下载的时候；
+         如果样式在 style.css 里，提示要么根本没样式，要么等样式到了才敢显示。
+         所以：颜色写死（CSS 变量此刻还没定义），深色靠 [data-theme] 覆盖一套
+         —— 主题属性由上面那段内联脚本在解析 body 之前就设好了。 -->
+    <style>
+        .boot-loading {
+            position: fixed;
+            /* 导航 75px + 14px，和 .site-toast 对齐；移动端在下面的媒体查询里改 */
+            top: 89px;
+            left: 50%;
+            z-index: 1200;
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            max-width: calc(100% - 32px);
+            padding: 11px 18px 11px 14px;
+            border: 1px solid rgba(17, 17, 17, 0.08);
+            border-radius: 12px;
+            background: #ffffff;
+            color: #1a1a1a;
+            font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 500;
+            line-height: 1.5;
+            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14),
+                        0 2px 6px rgba(15, 23, 42, 0.06);
+            transform: translateX(-50%);
+            transition: opacity 0.18s ease, transform 0.18s ease;
+            pointer-events: none;
+        }
+
+        [data-theme="dark"] .boot-loading {
+            background: #171a20;
+            color: #e7e9ee;
+            border-color: rgba(255, 255, 255, 0.10);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55),
+                        0 2px 6px rgba(0, 0, 0, 0.35);
+        }
+
+        /* 加载完成后由 script.js 加上，淡出即走，不阻塞任何操作 */
+        .boot-loading.is-done {
+            opacity: 0;
+            transform: translate(-50%, -8px);
+            visibility: hidden;
+        }
+
+        /* 转圈用纯 CSS 画：图标字体要等 style.css 到了才有，
+           而那时候这条提示已经该消失了，用不上图标 */
+        .boot-loading-spin {
+            flex: 0 0 18px;
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(47, 133, 90, 0.22);
+            border-top-color: #2f855a;
+            border-radius: 50%;
+            animation: bootSpin 0.8s linear infinite;
+        }
+
+        [data-theme="dark"] .boot-loading-spin {
+            border-color: rgba(104, 199, 145, 0.25);
+            border-top-color: #68c791;
+        }
+
+        @keyframes bootSpin {
+            to { transform: rotate(360deg); }
+        }
+
+        .boot-loading-text {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+
+        .boot-loading-text small {
+            font-size: 0.75rem;
+            font-weight: 400;
+            color: #6b6b6b;
+        }
+
+        [data-theme="dark"] .boot-loading-text small {
+            color: #9aa1ad;
+        }
+
+        @media (max-width: 600px) {
+            .boot-loading {
+                top: 82px;
+                padding: 10px 15px 10px 12px;
+                font-size: 0.85rem;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .boot-loading {
+                transition: none;
+            }
+
+            .boot-loading-spin {
+                animation: none;
+            }
+        }
+    </style>
 </head>
 <body>
+
+    <!-- 首屏加载提示。结构写在 HTML 里而不是由 JS 创建：
+         它要赶在 posts-data.js / script.js 下载完之前就出现在屏幕上。
+         init() 结束时由 script.js 加 .is-done，0.18s 淡出后消失。 -->
+    <div class="boot-loading" id="bootLoading" role="status" aria-live="polite">
+        <span class="boot-loading-spin" aria-hidden="true"></span>
+        <span class="boot-loading-text">
+            正在加载博客数据…
+            <small>首次加载速度较慢，请稍候</small>
+        </span>
+    </div>
+
+    <script>
+        /* 兜底：万一 script.js 没跑到头（网络断了、脚本报错），
+           这条提示不能一直赖在屏幕上。15 秒后自己收掉。 */
+        setTimeout(function () {
+            var el = document.getElementById('bootLoading');
+            if (el) el.classList.add('is-done');
+        }, 15000);
+    </script>
 
     <!-- ==================== 头部导航 ==================== -->
     <header class="site-header">
@@ -573,7 +704,7 @@
             </section>
 
             <!-- 版本号：从页脚挪到这里，收在关于页右下角 -->
-            <p class="about-version">版本 0.4.23.037</p>
+            <p class="about-version">版本 0.4.23.041</p>
         </div>
 
         <!-- ==================== 文章详情视图 ==================== -->

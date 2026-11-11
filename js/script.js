@@ -4785,7 +4785,25 @@
                 playReturnEnterAnimation();
             }
 
+            /* 首屏「正在加载博客数据…」的收尾。
+               提示条本身写在 index.html 里（那时 style.css 还没到，必须自带样式），
+               这里只负责在 init() 跑完之后把它淡出。
+               加 .is-done 后 0.18s 透明 + visibility:hidden，不用 remove：
+               元素留在原地也不占布局（position: fixed），省得再管清理。 */
+            function hideBootLoading() {
+                const el = document.getElementById('bootLoading');
+                if (!el || el.classList.contains('is-done')) return;
+                el.classList.add('is-done');
+                // 淡出之后从无障碍树里摘掉，免得读屏软件还念着「正在加载」
+                setTimeout(function () {
+                    el.setAttribute('aria-hidden', 'true');
+                }, 220);
+            }
+
             init();
+            // init() 内部无论从哪条分支返回（首页 / 文章直链 / ?view=xxx），
+            // 走到这里都说明数据已经渲染完了，提示条可以退场
+            hideBootLoading();
 
             console.log('✅ Annie 的个人博客已就绪！');
             // console.log('📝 修改文章内容：编辑 blogPosts 数组');

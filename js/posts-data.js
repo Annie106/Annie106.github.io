@@ -176,9 +176,9 @@ window.BLOG_POSTS = [{
                         <p>夕照 · 独栋别墅</p>
                         <p><a href="https://annie106.github.io/hotel" target="_blank" rel="noopener noreferrer">https://annie106.github.io/hotel</a></p>
                         <p>视频站</p>
-                        <p><a href="https://0.github.io" target="_blank" rel="noopener noreferrer">暂停服务</a></p>
+                        <p><a href="https://annie106.github.io/？" target="_blank" rel="noopener noreferrer">暂停服务</a></p>
                         <p>直链下载站</p>
-                        <p><a href="https://0.github.io" target="_blank" rel="noopener noreferrer">暂停服务</a></p>
+                        <p><a href="https://annie106.github.io/？" target="_blank" rel="noopener noreferrer">暂停服务</a></p>
                         <h2>视频无法播放时 添加联系方式 备注来意</h2>
                         <p>联系方式在首页位置，点击图标即复制</p>
                     `,
