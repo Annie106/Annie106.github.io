@@ -15,14 +15,25 @@
      1. 在沙箱里读 js/posts-data.js，取出 window.BLOG_POSTS
         （只求值，不碰 script.js 里任何渲染逻辑）
      2. 按 updated || date 倒序，取最新 MAX_ITEMS 篇
-     3. 有 content 的文章输出全文（content:encoded）；正文在独立 HTML 里的
-        （embeddedPage）输出摘要 + 原文链接 —— 那 4 篇的正文太长、还带自己的
-        样式，塞进 feed 既难看也没必要
+     3. 每篇只输出**一句话摘要**（description）+ 封面，不塞全文
+
+   为什么只给摘要：全文版 feed 有 24KB 左右，而读者在阅读器里读到的排版
+   永远不如站内（评论、图片懒加载、代码块高亮都在站点上）。摘要版让人
+   「扫一眼知道写了什么」，想读就点标题回来。体积也降到三分之一。
+   要改回全文，把 itemXml 里那段 description 换回 content:encoded，
+   并把 xmlns:content 命名空间加回 <rss>（否则 XML 非法），正文里的相对路径
+   还要补成绝对地址 —— 旧版的 cdata() / absolutize() 在 git 历史里能翻到。
 
    封面（media:thumbnail）怎么取，见 coverUrl() 的三级兜底。
 
-   ⚠️ 加了新文章、改了标题/日期之后要重跑一次，否则 feed 还是旧的。
-   AGENTS.md 的「提交前自查」和 README 里都提了这条。
+   平时不用管这个脚本：
+   推文章到 main 后，.github/workflows/feed.yml 会自动跑它、把新的 feed.xml
+   提交回来。你只改 js/posts-data.js，「写文章要动 build-feed.js」是误会 ——
+   它是打印机不是账本。
+   本地跑一次的唯一好处是能立刻看到 feed 长什么样。
+
+   输出是确定性的（幂等）：同一份 posts-data.js，在哪台机器上跑都生成逐字节
+   相同的文件。所以本地那份和仓库那份不会各说各话，也不会解冲突。
    ================================================================ */
 
 'use strict';
@@ -68,11 +79,6 @@ function escapeXml(value) {
         .replace(/'/g, '&apos;');
 }
 
-/* 正文里的 ]]&gt; 会把 CDATA 提前截断，遇到就先断开再续上 */
-function cdata(html) {
-    return '<![CDATA[' + String(html).replace(/]]>/g, ']]]]><![CDATA[>') + ']]>';
-}
-
 /* YYYY-MM-DD → RFC 822（RSS 规定的时间格式）。
    时区写死 +0800：站主在国内，日期本身就是按北京时间写的，
    写死比跟着构建机器的时区飘要稳 —— 同一份数据在哪台机器上跑结果都一样 */
@@ -84,17 +90,6 @@ function rfc822(ymd) {
     const day = Number(match[3]);
     const weekday = DAYS[new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
     return `${weekday}, ${String(day).padStart(2, '0')} ${MONTHS[month - 1]} ${year} 00:00:00 +0800`;
-}
-
-/* 正文里的相对路径在阅读器里是坏的（它不知道你的域名），
-   一律补成绝对地址。已经是 http(s) / #锚点 / mailto 这些的跳过 */
-function absolutize(html) {
-    return String(html).replace(
-        /\b(src|href)="(?!https?:|\/\/|data:|mailto:|tel:|javascript:|#)([^"]*)"/g,
-        function (whole, attr, url) {
-            return `${attr}="${SITE}${url.replace(/^\.?\//, '')}"`;
-        }
-    );
 }
 
 /* 封面：三级兜底
@@ -148,7 +143,13 @@ function itemXml(post) {
     // guid 用文章地址本身：链接不随标题改名而失效，阅读器也不会重复推送
     lines.push(`      <guid isPermaLink="true">${escapeXml(url)}</guid>`);
     if (date) lines.push(`      <pubDate>${date}</pubDate>`);
-    if (post.excerpt) lines.push(`      <description>${escapeXml(post.excerpt)}</description>`);
+    /* 摘要版：只有一句话摘要。正文留在站点上 —— 阅读器里的排版永远不如
+       站内完整（评论、图片懒加载、代码块都在那边），想读点标题回来。
+       摘要用纯文本而不是 HTML/CDATA：各家阅读器对 description 的处理不一致，
+       纯文本最不容易被渲染成「标签裸露」的样子。
+       文章没写 excerpt 时退回用标题，至少不留一个空条目。 */
+    const summary = post.excerpt || post.title || `文章 ${post.id}`;
+    lines.push(`      <description>${escapeXml(summary)}</description>`);
     (post.tags || []).forEach(function (tag) {
         lines.push(`      <category>${escapeXml(tag)}</category>`);
     });
@@ -158,13 +159,6 @@ function itemXml(post) {
     const cover = coverUrl(post);
     if (cover) lines.push(`      <media:thumbnail url="${escapeXml(cover)}"/>`);
 
-    /* 有 content 就输出全文；只有 embeddedPage 的（正文在独立页面里）
-       给一句摘要 + 原文入口，读者点一下就到站内看排版 */
-    const body = post.content
-        ? absolutize(post.content)
-        : `<p>${escapeXml(post.excerpt || '')}</p>`
-            + `<p><a href="${escapeXml(url)}">在网站上阅读全文 →</a></p>`;
-    lines.push(`      <content:encoded>${cdata(body)}</content:encoded>`);
     lines.push('    </item>');
     return lines.join('\n');
 }
@@ -175,20 +169,26 @@ function buildFeed(posts) {
         return diff !== 0 ? diff : (b.id || 0) - (a.id || 0);
     }).slice(0, MAX_ITEMS);
 
+    /* lastBuildDate 用「最新一篇文章的日期」，不用 new Date()。
+       这不是偷懒，是为了让输出**确定性**：同一份 posts-data.js 生成的文件
+       逐字节相同。否则本地跑一次、CI 再跑一次，两边的 lastBuildDate 差几秒，
+       git 里就成了两个版本互相打架，还要人工解冲突。
+       副作用是它不再等于「构建时间」——但 RSS 规范里这个字段本来就指
+       「内容最后变动的时间」，用文章日期反而更贴题。 */
+    const newest = sorted[0] || null;
+    const lastBuildDate = newest ? rfc822(sortKey(newest)) : new Date().toUTCString();
+
     const head = [
         '<?xml version="1.0" encoding="UTF-8"?>',
-        '<!-- 由 tools/build-feed.js 生成，不要手改。改文章请改 js/posts-data.js，',
-        '     然后跑一次 node tools/build-feed.js。 -->',
         '<rss version="2.0"',
         '     xmlns:atom="http://www.w3.org/2005/Atom"',
-        '     xmlns:content="http://purl.org/rss/1.0/modules/content/"',
         '     xmlns:media="http://search.yahoo.com/mrss/">',
         '  <channel>',
         `    <title>${escapeXml(CHANNEL.title)}</title>`,
         `    <link>${escapeXml(CHANNEL.link)}</link>`,
         `    <description>${escapeXml(CHANNEL.description)}</description>`,
         `    <language>${CHANNEL.language}</language>`,
-        `    <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>`,
+        `    <lastBuildDate>${lastBuildDate}</lastBuildDate>`,
         '    <generator>tools/build-feed.js</generator>',
         `    <atom:link href="${escapeXml(FEED_URL)}" rel="self" type="application/rss+xml"/>`
     ];

@@ -66,9 +66,13 @@
 
 - `feed.xml` 是**生成物**，不要手改。源头是 `js/posts-data.js`，用 `node tools/build-feed.js` 生成。
 - 线上是自动的：`.github/workflows/feed.yml` 在 push 到 `main` 且改动了 `js/posts-data.js` / `tools/build-feed.js` / 这个 workflow 时，会重跑脚本并把新的 `feed.xml` 提交回来。**所以别再手工改 feed.xml，也别删这个 workflow**。
-- 本地改完文章顺手跑一次是好习惯（能立刻看 diff、也不会让 CI 提交成为唯一来源），但不是必须。忘了跑不影响线上。
+- 本地改完文章顺手跑一次是好习惯（能立刻看 diff），但不是必须；忘了跑不影响线上。
+- 本地那份 `feed.xml` 落后于仓库是**正常状态**：它在你本地没被改过时，`git pull` 会 fast-forward 直接覆盖，不用管。
+- 但**别在本地跑完脚本又不提交** —— `feed.xml` 会变成「已修改」，`git pull` 会被 `Your local changes would be overwritten` 挡住。要么连着一起提交（输出幂等，CI 不会重复提交），要么 `git checkout -- feed.xml` 还原。
+- 脚本**不需要**跟着文章一起改：加文章只动 `js/posts-data.js`。它输出是幂等的——`lastBuildDate` 取最新文章日期而不是当前时间，同一份数据在本地和 CI 生成的文件逐字节相同，不会打架。别把它改回 `new Date()`。
 - 脚本只在沙箱里求值 `posts-data.js`（取 `window.BLOG_POSTS`），不依赖 `script.js`，所以别把文章数据挪到别处，也别改成需要运行时的写法（如 `fetch`）。
-- 字段约定：`content` 输出全文到 `content:encoded`；只有 `embeddedPage` 的只输出 `excerpt` + 原文链接。`description` 始终是最多一句摘要，别把全文塞进去。
+- 内容策略是**摘要版**：每篇只有 `excerpt` 一句话 + `media:thumbnail`，不输出 `content:encoded`，正文留在站点上。`excerpt` 为空时退回用标题，别输出空 `description`。
+- 别把 `description` 改成塞全文或塞 HTML：纯文本最兼容，各阅读器对 HTML 的处理不一致。要全文得同时加回 `xmlns:content` 命名空间。
 - 封面 `media:thumbnail` 三级兜底：`cover` 字段 → 正文首张 `<img>` → 站点封面 `share_cover.jpg`（`tools/build-feed.js` 里的 `FALLBACK_COVER`，设成 `''` 可关）。`cover` 只喂给 feed，页面上不显示。
 - 站内有 `index.html` 的 `<link rel="alternate">` 和页头社交区那个 RSS 图标两处入口，都指向 `feed.xml`，改地址要一起改。
 

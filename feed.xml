@@ -1,15 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
 <rss version="2.0"
      xmlns:atom="http://www.w3.org/2005/Atom"
-     xmlns:content="http://purl.org/rss/1.0/modules/content/"
      xmlns:media="http://search.yahoo.com/mrss/">
   <channel>
     <title>Annie · 个人博客</title>
     <link>https://annie106.github.io/</link>
     <description>思考 · 记录 · 创造 —— 记录阅读、成长和日常灵感。</description>
     <language>zh-cn</language>
-    <lastBuildDate>Wed, 11 Nov 2026 11:10:19 GMT</lastBuildDate>
+    <lastBuildDate>Mon, 09 Nov 2026 00:00:00 +0800</lastBuildDate>
     <generator>tools/build-feed.js</generator>
     <atom:link href="https://annie106.github.io/feed.xml" rel="self" type="application/rss+xml"/>
     <item>
@@ -21,27 +19,6 @@
       <category>电影</category>
       <category>随笔</category>
       <media:thumbnail url="https://picgocloud.com/m/48d2d099-aa9d-47c3-82eb-498f411a3936.png"/>
-      <content:encoded><![CDATA[
-                    <p>今天下午看到上游存储服务商的通知：服务停止运营。没有预告，也没有过渡。</p>
-                    <p>不止是电影板块，还有直链下载的模块也无法提供了。</p>
-                    <p>电影板块是建站不久就加上去的。当时的想法很简单——一个博客如果只有文字，好像少了点什么；能在这里放几部片子，朋友来了不用跳出去，坐下来就能看。于是从一个播放器、一个列表开始，后来慢慢加了封面、加了线路、加了各种出错时的提示。它算不上什么正经项目，但确实是一行一行堆出来的东西。</p>
-                    <p>现在它停了。</p>
-                    <h2>为什么说「拿不回来」</h2>
-                    <p>片子不在我这台机器上。这个博客是纯静态的，所有页面加起来也没多大，托管在 GitHub Pages；真正占空间的视频文件，全部存在上游的存储服务里。它停运，等于把仓库的门锁上了——我这边只剩下一个个指向空处的链接。</p>
-                    <p>所以不是「维护中」，也不是「换个地址就好」。是取不回来了。</p>
-                    <figure>
-                        <img src="https://picgocloud.com/m/48d2d099-aa9d-47c3-82eb-498f411a3936.png" alt="上游存储服务停止运营的通知">
-                        <figcaption>服务商发来的通知，贴在这里留个凭证。</figcaption>
-                    </figure>
-                    <h2>可惜的地方</h2>
-                    <p>可惜的不是播放量——这个站本来也没多少人看。可惜的是一个「已经做完」的东西，忽然变成了「做不了」的东西。</p>
-                    <p>播放器的加载逻辑、线路切换、验证码和地区限制的报错提示，都是照着真实的失败情况一点点改出来的。现在这些代码还在，只是永远等不到片子了。</p>
-                    <blockquote>有些东西不是被删掉的，是被抽掉了地基。</blockquote>
-                    <h2>之后</h2>
-                    <p>电影板块暂时保持现在的样子：入口还在，点进去是一张公告，不再提供播放。之前写过的、和电影有关的文章都会留着——文字还在，就不算全没了。</p>
-                    <p>重新开放的时间待定。如果之后找到稳妥的方案，我会在这里说一声。不着急，也不想随便找个替代品凑数。</p>
-                    <p>谢谢每一个点进去看过的人。</p>
-                ]]></content:encoded>
     </item>
     <item>
       <title>使用、修改和部署这个博客的操作指南</title>
@@ -53,7 +30,6 @@
       <category>指南</category>
       <category>置顶</category>
       <media:thumbnail url="https://annie106.github.io/share_cover.jpg"/>
-      <content:encoded><![CDATA[<p>从零开始构建个人博客的完整教程，包含配置、部署和进阶技巧</p><p><a href="https://annie106.github.io/index.html?article=10">在网站上阅读全文 →</a></p>]]></content:encoded>
     </item>
     <item>
       <title>我的其它网站</title>
@@ -63,16 +39,6 @@
       <description>有视频网站、直链下载站等</description>
       <category>网站</category>
       <media:thumbnail url="https://annie106.github.io/share_cover.jpg"/>
-      <content:encoded><![CDATA[
-                        <p>夕照 · 独栋别墅</p>
-                        <p><a href="https://annie106.github.io/hotel" target="_blank" rel="noopener noreferrer">https://annie106.github.io/hotel</a></p>
-                        <p>视频站</p>
-                        <p><a href="https://0.github.io" target="_blank" rel="noopener noreferrer">暂停服务</a></p>
-                        <p>直链下载站</p>
-                        <p><a href="https://0.github.io" target="_blank" rel="noopener noreferrer">暂停服务</a></p>
-                        <h2>视频无法播放时 添加联系方式 备注来意</h2>
-                        <p>联系方式在首页位置，点击图标即复制</p>
-                    ]]></content:encoded>
     </item>
     <item>
       <title>最新｜百度网盘不限速下载方法</title>
@@ -83,7 +49,6 @@
       <category>指南</category>
       <category>随笔</category>
       <media:thumbnail url="https://annie106.github.io/share_cover.jpg"/>
-      <content:encoded><![CDATA[<p>发现的新方法，赶紧用起来</p><p><a href="https://annie106.github.io/index.html?article=14">在网站上阅读全文 →</a></p>]]></content:encoded>
     </item>
     <item>
       <title>六点五十的早自习，先给我演示一下怎么到</title>
@@ -93,27 +58,6 @@
       <description>一小时的路程，六点五十之前到校。我提的是一道算术题，不是态度问题。</description>
       <category>随笔</category>
       <media:thumbnail url="https://annie106.github.io/share_cover.jpg"/>
-      <content:encoded><![CDATA[
-                    <p>先交代我的情况：我不住校，家到学校通勤一小时。学校要求早自习 6:50 之前到校。翻译一下——我最晚 5:50 就得出门，每天早上不到六点就得起，比住校的同学起得还早。</p>
-                    <p>我不是不来。我天天这么早起，图的就是赶上第一节课，一天没落下。我不服的，是「6:50 之前到」这条线本身。</p>
-                    <h2>一、一小时的路上，怎么在六点五十之前到</h2>
-                    <p>只有两种可能：把路程压缩成半小时，或者有车。</p>
-                    <p>前者，请给我演示一下怎么压；后者，这个点没有车。起得再早也变不出车来——这不是态度问题，是物理问题。</p>
-                    <h2>二、我不是本地的</h2>
-                    <p>我不是本地的。这个时间点，除了我，还能有谁到？</p>
-                    <p>本地的六点五十不能到，那可能说不过去。我要通勤一个小时，却只比本地的晚半个小时，还不行？</p>
-                    <h2>三、「班主任没有任何权力让学生早自习长期不来」</h2>
-                    <p>好，权限我尊重，谁也别越权。但边界划完之后，方案呢？</p>
-                    <p>第一节课前到校，算不算数？不算的话，6:50 到校要怎么实现？</p>
-                    <p>「那我不管」——这句话说出口，这个位置到底是干什么用的？把问题原样退回给一个根本没有解的人，问题就消失了？</p>
-                    <h2>四、我的诉求，两条，二选一</h2>
-                    <p>一、允许我在第一节课前到校，早自习记缺席，我认。</p>
-                    <p>二、学校给一个 6:50 前能到校的交通安排，哪怕只是一句「这个时段确实没车，允许你晚到」。</p>
-                    <p>这两条都不难。难的是有没有人愿意承认：这条规定，有人真的做不到。</p>
-                    <blockquote>我提的其实是一道算术题：一小时的路程，六点五十之前到，怎么办？谁答得上来谁答。答不上来，这条规定就该改。</blockquote>
-                    <h2>原内容</h2>
-                    <p><a class="gated-link" href="#">点击前往：获取原文下载方式</a></p>
-                ]]></content:encoded>
     </item>
     <item>
       <title>霸道汤圆爱上我</title>
@@ -123,30 +67,6 @@
       <description>它没有体温，却有脾气；它不会说话，却清楚我几点睡。一碗汤圆的入侵实录。</description>
       <category>随笔</category>
       <media:thumbnail url="https://annie106.github.io/share_cover.jpg"/>
-      <content:encoded><![CDATA[
-                        <p>事情是从冬至那天开始的。</p>
-                        <p>我从超市拎回一袋速冻汤圆，烧水、下锅，然后转身去回一条消息。等我想起来的时候，锅里已经浮起一颗格外圆、格外白的东西，正贴着锅沿，一动不动地等着我看它。</p>
-                        <p>“水太沸了。”它说。</p>
-                        <p>我承认我当时的第一反应是关火，第二反应才是——汤圆不会说话。</p>
-                        <h2>一、它比我有规矩</h2>
-                        <p>从那天起，我的生活被一颗汤圆接管了。</p>
-                        <p>它没有手，却知道我几点睡；它没有眼睛，却清楚我又把早饭糊弄成了一杯咖啡。</p>
-                        <p>“七点零三分，”它在我碗里说，“你已经三天没吃热的东西了。”</p>
-                        <p>“你怎么什么都知道？”</p>
-                        <p>“糯米做的，心细。”</p>
-                        <h2>二、它也会吃醋</h2>
-                        <p>冰箱里还剩半袋芝麻馅的。我随口夸了一句“还是芝麻的香”，锅里的水就莫名其妙地咕嘟了整整十分钟。</p>
-                        <p>“你凭什么喜欢它？”它沉在碗底，语气很硬，“它连皮都煮破过一次。”</p>
-                        <p>“那是你自己破的。”</p>
-                        <p>它不说话了。汤面上慢慢浮起一层很淡的、像在赌气的白汽。</p>
-                        <h2>三、后来我习惯了</h2>
-                        <p>再后来，冬至过去了，元宵也过去了。冰箱清空那天，我站在灶台前发了很久的呆，最后把水烧开，往锅里只放了一颗。</p>
-                        <p>水沸的时候，它慢吞吞地从锅底浮上来，照旧贴住锅沿。</p>
-                        <p>“水太沸了。”它说。</p>
-                        <p>“知道了。”我说。</p>
-                        <blockquote>有些陪伴没有体温，但足以让一个冬天不至于太冷。</blockquote>
-                        <p>——本文纯属虚构。如有雷同，可能是你家的汤圆也在开会。</p>
-                    ]]></content:encoded>
     </item>
     <item>
       <title>归宿里的两帧：和朋友拍的归宿照</title>
@@ -158,7 +78,6 @@
       <category>随笔</category>
       <category>社交</category>
       <media:thumbnail url="https://annie106.github.io/share_cover.jpg"/>
-      <content:encoded><![CDATA[<p>我很少在游戏里拍照，不是不喜欢，是总觉得镜头里缺点什么...直到有人愿意站在里面，陪我一起等光。</p><p><a href="https://annie106.github.io/index.html?article=11">在网站上阅读全文 →</a></p>]]></content:encoded>
     </item>
     <item>
       <title>直链下载</title>
@@ -168,7 +87,6 @@
       <description>直链下载页面</description>
       <category>直链下载</category>
       <media:thumbnail url="https://annie106.github.io/share_cover.jpg"/>
-      <content:encoded><![CDATA[<p>直链下载页面</p><p><a href="https://annie106.github.io/index.html?article=9">在网站上阅读全文 →</a></p>]]></content:encoded>
     </item>
     <item>
       <title>对朋友圈、抖音、QQ空间等互动的说明</title>
@@ -179,16 +97,6 @@
       <category>置顶</category>
       <category>社交</category>
       <media:thumbnail url="https://annie106.github.io/share_cover.jpg"/>
-      <content:encoded><![CDATA[
-                        <p>如题，本人不扩列，也不混圈</p>
-                        <p>个人仅点赞感兴趣的朋友圈，其余一律鸟都不鸟。我不知道所谓的扩列规则、各种圈子的规则，你我有好友肯定不是扩列加的</p>
-                        <p>所以，如果你对我有严格的很互动要求，可以选择屏蔽掉我</p>
-                        <h2>所以有些人你是怎么想的，希望别再让我看到因为那些什么扩列规则来阴阳我的，那种请远离我，谢谢</h2>
-                        <p>以下是AI帮我写的 嗯对</p>
-                        <p>关于互动，我也没有义务对朋友圈、抖音一直互动。看到喜欢的会点赞，感兴趣的会评论，但不代表我要给每个人的每条动态捧场。社交应该是自发的，不是任务。我只互动自己喜欢的或感兴趣的。</p>
-                        <h2>免责声明</h2>
-                        <p>本文仅针对极个别群体，通常情况下，不会是你的。如果有任何不满，可以向我提出相关意见。</p>
-                    ]]></content:encoded>
     </item>
     <item>
       <title>我也要做一个类似的个人博客</title>
@@ -198,18 +106,6 @@
       <description>此文章提供博客服务 点击查看详情和服务价格</description>
       <category>服务</category>
       <media:thumbnail url="https://annie106.github.io/share_cover.jpg"/>
-      <content:encoded><![CDATA[
-                        <p>关于价格：</p>
-	        <p>28/季 88/年</p>
-                        <h2>样式？</h2>
-                        <p>可根据需求进行编写，可以有自己的域名</p>
-                        <h2>已提供的服务</h2>
-                        <p>已为一位客户提供服务</p>
-                        <p>可以免费试用1个月 并提供9.9/季的限时福利</p>
-                        <h2>提供服务的博客地址（已征求同意）</h2>
-                        <p>https://annie106.github.io/myweb/</p>
-                        <p>https://annie106.github.io/mayuwo/</p>
-                    ]]></content:encoded>
     </item>
     <item>
       <title>字体排印的微观美学</title>
@@ -219,13 +115,6 @@
       <description>字间距、行高、字重——这些看不见的细节如何塑造阅读体验。</description>
       <category>字体排印</category>
       <media:thumbnail url="https://annie106.github.io/share_cover.jpg"/>
-      <content:encoded><![CDATA[
-                        <p>字体排印（Typography）是设计的无声语言。读者可能永远不会注意到<code>line-height: 1.7</code>和<code>1.5</code>之间的区别，但他们的眼睛会感受到。</p>
-                        <h2>行高与阅读舒适度</h2>
-                        <p>对于中文正文，行高建议在 1.6 到 1.8 之间。过密会让文字拥挤不堪，过疏则失去连贯性。这个博客正文使用约 1.85 的行高，配合纯白背景，营造呼吸感。</p>
-                        <h2>字体选择</h2>
-                        <p>无衬线字体用于标题和导航，有衬线字体（宋体/Noto Serif SC）用于正文——这种搭配在中文排版中经典而优雅。</p>
-                    ]]></content:encoded>
     </item>
     <item>
       <title>从零搭建现代个人网站指南</title>
@@ -235,14 +124,6 @@
       <description>不需要框架，用纯 HTML/CSS/JS 打造一个快速、易维护的个人博客。</description>
       <category>前端</category>
       <media:thumbnail url="https://annie106.github.io/share_cover.jpg"/>
-      <content:encoded><![CDATA[
-                        <p>很多人觉得建站必须用 React、Vue 或 Next.js。但其实，对于一个个人博客来说，<strong>纯静态方案</strong>往往是最优解。</p>
-                        <h2>为什么选择纯 HTML？</h2>
-                        <p>零依赖、加载极快、无需构建步骤。你只需要一个文本编辑器就能修改内容。部署到任何静态托管服务（如 Vercel、Netlify、GitHub Pages）都极其简单。</p>
-                        <h2>内容管理</h2>
-                        <p>像这个博客一样，把所有文章放在一个 JavaScript 数组里。修改文章就像编辑笔记一样直观。不需要 CMS，不需要数据库。</p>
-                        <p>简单，是一种高级的复杂。</p>
-                    ]]></content:encoded>
     </item>
     <item>
       <title>漫步西湖：关于水与时间的隐喻</title>
@@ -252,11 +133,6 @@
       <description>一个秋日午后的湖边漫思，关于流动、静止与创造力的关系。</description>
       <category>随笔</category>
       <media:thumbnail url="https://annie106.github.io/share_cover.jpg"/>
-      <content:encoded><![CDATA[
-                        <p>杭州的秋天来得温柔。西湖的水面在微风中泛起细密的纹理，像是时间本身的质地。</p>
-                        <p>我常在这里散步。水从不着急，它有自己的节奏。这让我想到创造力——有时候，最好的想法并不是在键盘前产生的，而是在<strong>看似无所事事</strong>的时刻悄然浮现。</p>
-                        <p>流动与静止并非对立。正如湖面，表面平静，深处却有暗流涌动。创作也是如此。</p>
-                    ]]></content:encoded>
     </item>
     <item>
       <title>我的阅读工作流（2026版）</title>
@@ -266,15 +142,6 @@
       <description>分享我如何用 Readwise + Obsidian 搭建知识内化系统，让阅读不止于浏览。</description>
       <category>阅读</category>
       <media:thumbnail url="https://annie106.github.io/share_cover.jpg"/>
-      <content:encoded><![CDATA[
-                        <p>过去一年，我调整了阅读流程，目标是<strong>减少信息囤积，增加知识内化</strong>。以下是我的完整工作流。</p>
-                        <h2>第一步：捕获</h2>
-                        <p>使用 Readwise 自动同步所有高亮和批注。无论是 Kindle、Apple Books 还是网页文章，所有标注汇聚一处。</p>
-                        <h2>第二步：回顾</h2>
-                        <p>每天早晨花 8 分钟进行间隔重复回顾。Readwise 会推送 15 条过往高亮，这是知识留存率最高的环节。</p>
-                        <h2>第三步：连接</h2>
-                        <p>将触动我的高亮导入 Obsidian，用自己的话重写一遍，并链接到已有笔记。这才是真正的"内化"。</p>
-                    ]]></content:encoded>
     </item>
     <item>
       <title>设计的本质是减法</title>
@@ -284,16 +151,6 @@
       <description>在信息过载的时代，好的设计不是增加更多元素，而是勇敢地移除一切不必要的部分。</description>
       <category>设计</category>
       <media:thumbnail url="https://annie106.github.io/share_cover.jpg"/>
-      <content:encoded><![CDATA[
-                        <p>我们生活在一个信息极度膨胀的时代。每一天，成千上万的视觉信号争夺着我们的注意力。在这样的背景下，设计的责任不再是"填满空白"，而是<strong>创造呼吸的空间</strong>。</p>
-                        <h2>少即是多</h2>
-                        <p>Dieter Rams 的经典设计原则至今仍然适用。好的设计是尽可能少的设计。当你移除所有非必要元素后，剩下的就是核心价值。</p>
-                        <blockquote>完美不在于无以复加，而在于无可删减。——圣埃克苏佩里</blockquote>
-                        <p>在实践中，这意味着每一个像素、每一行文字、每一个交互都需要经过严格的审视：它真的有必要存在吗？</p>
-                        <h2>留白的力量</h2>
-                        <p>白色空间不是"空的"，它是承载内容的容器。恰当的留白让阅读变得轻松，让重点自然浮现。在纯白背景下，这种感受尤为强烈——内容仿佛悬浮于宁静之中。</p>
-                        <p>这也是为什么这个博客选择了纯白背景。没有干扰，只有文字与你。</p>
-                    ]]></content:encoded>
     </item>
   </channel>
 </rss>

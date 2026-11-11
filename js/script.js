@@ -2259,8 +2259,14 @@
             function openLeaveConfirm(trigger, name) {
                 const els = ensureLeaveConfirm();
                 const site = name || '外部网站';
-                els.title.textContent = '即将前往 ' + site;
-                els.desc.textContent = '即将离开当前页面，前往 ' + site + '，是否继续？';
+                /* 默认文案就够用；个别按钮（比如 RSS）想说得具体一点，
+                   用 data-confirm-title / data-confirm-desc 覆盖，
+                   这样不用为每个按钮单开一套弹窗逻辑 */
+                const customTitle = trigger && trigger.getAttribute('data-confirm-title');
+                const customDesc = trigger && trigger.getAttribute('data-confirm-desc');
+                els.title.textContent = customTitle || ('即将前往 ' + site);
+                els.desc.textContent = customDesc
+                    || ('即将离开当前页面，前往 ' + site + '，是否继续？');
                 leaveConfirmTrigger = trigger || null;
                 // 上一轮如果还在淡出（快速点了取消又马上再点），
                 // 先把收尾任务和 is-closing 清掉，否则新弹窗会接着往下演

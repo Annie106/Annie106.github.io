@@ -129,7 +129,11 @@
                              以后想让别的外链也弹窗，加同一个属性即可。 -->
                         <a href="https://github.com/Annie106" target="_blank" rel="noopener noreferrer" data-confirm-leave="GitHub" title="GitHub：Annie106 (Annie_106)" aria-label="GitHub：Annie106 (Annie_106)"><i class="ri-github-fill"></i></a>
 
-                        <a href="feed.xml" target="_blank" rel="noopener" title="RSS 订阅：feed.xml" aria-label="RSS 订阅"><i class="ri-rss-line"></i></a>
+                        <!-- RSS 也走同一个确认弹窗，但文案单独写：
+                             点开只是一个原始 XML，对订阅的人没什么用，
+                             真正需要的是「地址」，所以在弹窗里把它亮出来。
+                             data-confirm-title / -desc 是可选的文案覆盖。 -->
+                        <a href="feed.xml" target="_blank" rel="noopener" data-confirm-leave="RSS 订阅源" data-confirm-title="打开 RSS 订阅源" data-confirm-desc="地址 https://annie106.github.io/feed.xml 可直接粘进阅读器订阅；继续会打开原始 XML。" title="RSS 订阅：feed.xml" aria-label="RSS 订阅"><i class="ri-rss-line"></i></a>
                         <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换主题">
                             <i class="ri-moon-line"></i>
                         </button>

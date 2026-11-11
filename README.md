@@ -105,13 +105,24 @@ python -m http.server 8000
 
 `feed.xml` 是**生成物**，别手改。文章数据在 `js/posts-data.js`，改完推到 `main` 后，`/.github/workflows/feed.yml` 会自动重新生成并提交回来（只在 `js/posts-data.js`、`tools/build-feed.js` 或这个 workflow 自身有改动时触发），不用管。
 
-想在本地先看一眼效果，就手动跑：
+**写文章永远不用碰 `tools/build-feed.js`** —— 它只是「打印机」，读 `posts-data.js` 输出 XML，一篇新文章只加在 `posts-data.js` 里就够了。
 
-```bash
-node tools/build-feed.js
-```
+本地那份 `feed.xml` 会**暂时落后**于仓库里的版本（push 之后 CI 重印才会更新），这不影响任何线上行为，也不会造成 git 冲突——你本地那份在你的提交里没被改过，下次 `git pull` 就是 fast-forward，直接覆盖成最新版。
 
-脚本按 `updated || date` 倒序取最新 20 篇：有 `content` 的输出全文，正文在独立页面里（`embeddedPage`）的只给摘要 + 原文链接。
+只有一种情况会让 pull 被挡住：**你在本地跑了脚本但没提交**，`feed.xml` 变成「已修改」，git 不敢覆盖（提示 `Your local changes would be overwritten`）。所以按需求挑一种：
+
+| 想干什么 | 怎么做 |
+| --- | --- |
+| 不想操心（推荐） | 什么都不做。push 后等 Actions，下次 `git pull` 自动带上新版 |
+| 只想本地看一眼 | `node tools/build-feed.js`，看完 `git checkout -- feed.xml` 还原 |
+| 想让本地和仓库立刻一致 | 跑完把 `feed.xml` 一起 commit。输出幂等，CI 跑完会发现没变化、跳过提交，不会多一个 commit |
+
+输出确定性（幂等）的意义：同一份文章数据，本地和 CI 生成的文件逐字节相同。所以「本地跑过一次」和「CI 生成过一次」不会是两个不同的文件，最多是新旧两版内容。
+
+脚本按 `updated || date` 倒序取最新 20 篇，**只输出摘要版**：每篇一个标题 + 一句话 `description` + 缩略图，正文留在站点上，读者点标题回来读（站内的排版、评论、图片都比阅读器完整）。
+
+- 现在 15 篇约 8.4 KB（全文版是 23.6 KB）
+- 想改回全文：把 `tools/build-feed.js` 里 `itemXml()` 的 `description` 换回 `content:encoded`，同时把 `xmlns:content` 加回 `<rss>`，否则 XML 非法
 
 列表页缩略图取 `media:thumbnail`，三级兜底：文章自己的 `cover` 字段 → 正文里第一张 `<img>` → 站点封面 `share_cover.jpg`。要给某篇单独配图，就在 `posts-data.js` 里那篇加 `cover: 'images/xxx.jpg'`（这字段只喂给 feed，页面上不显示）。
 
