@@ -65,7 +65,12 @@
             --border: rgba(236, 235, 230, 0.14);
             --accent: #85b7eb;
         }
-        * { box-sizing: border-box; }
+        /* 这个页面没有引 css/style.css，所以那条「点按高亮透明」的全局重置得自己写。
+           不写的话，手机点「回到首页 / 联系我」会在圆角按钮外面闪出一块方形的蓝底。 */
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
         body {
             margin: 0;
             min-height: 100vh;

@@ -41,6 +41,11 @@
 
     <link rel="stylesheet" href="css/style.css">
 
+    <!-- RSS 自动发现：装了订阅插件的浏览器会自己在地址栏亮起订阅按钮，
+         地址栏输入 https://annie106.github.io/feed.xml 也能直接订阅。
+         这份 feed 由 tools/build-feed.js 从 js/posts-data.js 生成，改完文章要重跑。 -->
+    <link rel="alternate" type="application/rss+xml" title="Annie · 个人博客" href="feed.xml">
+
     <!-- 深色模式：尽早设置主题，避免页面闪烁 -->
     <script>
         (function () {
@@ -118,9 +123,13 @@
                         <!-- 邮箱：点击复制邮箱 -->
                         <a href="javascript:void(0);" onclick="copyToClipboard('anniedv106@gmail.com', '邮箱地址已复制')" title="邮箱"><i class="ri-mail-line"></i></a>
 
-                        <a href="https://github.com/Annie106" target="_blank" rel="noopener noreferrer" title="GitHub：Annie106 (Annie_106)" aria-label="GitHub：Annie106 (Annie_106)"><i class="ri-github-fill"></i></a>
+                        <!-- 外链按钮：点它先弹确认（「即将前往 GitHub，是否继续」），
+                             确认后才按原来的 href / target 开新标签。
+                             data-confirm-leave 的值就是弹窗里显示的站点名，
+                             以后想让别的外链也弹窗，加同一个属性即可。 -->
+                        <a href="https://github.com/Annie106" target="_blank" rel="noopener noreferrer" data-confirm-leave="GitHub" title="GitHub：Annie106 (Annie_106)" aria-label="GitHub：Annie106 (Annie_106)"><i class="ri-github-fill"></i></a>
 
-                        <a href="#" title="RSS 订阅"><i class="ri-rss-line"></i></a>
+                        <a href="feed.xml" target="_blank" rel="noopener" title="RSS 订阅：feed.xml" aria-label="RSS 订阅"><i class="ri-rss-line"></i></a>
                         <button class="theme-toggle" id="themeToggle" aria-label="切换深色模式" title="切换主题">
                             <i class="ri-moon-line"></i>
                         </button>
@@ -336,7 +345,49 @@
                         <i class="ri-arrow-right-line" aria-hidden="true"></i>
                     </a>
                 </div>
-                <div class="tweak-list is-collapsed" id="tweakList"></div>
+                <div class="tweak-list is-collapsed" id="tweakList">
+                    <!-- 骨架：脚本还在下载解析的那几百毫秒里先占住位置。
+                         三张卡对应首页展示的三条，卡片内边距、行距照着
+                         真实 .tweak-card 摆（文本最多三行，见 .tweak-text 的 line-clamp），
+                         换成正文时高度基本不跳。 -->
+                    <div class="home-skeleton sk-tweaks" aria-hidden="true">
+                        <div class="sk-tweak-grid">
+                            <article class="sk-tweak-card">
+                                <div class="sk-tweak-head">
+                                    <span class="sk-block sk-date"></span>
+                                    <span class="sk-block sk-cat"></span>
+                                </div>
+                                <div class="home-skeleton-lines">
+                                    <span class="sk-block sk-text"></span>
+                                    <span class="sk-block sk-text"></span>
+                                    <span class="sk-block sk-text sk-text--short"></span>
+                                </div>
+                            </article>
+                            <article class="sk-tweak-card">
+                                <div class="sk-tweak-head">
+                                    <span class="sk-block sk-date"></span>
+                                    <span class="sk-block sk-cat"></span>
+                                </div>
+                                <div class="home-skeleton-lines">
+                                    <span class="sk-block sk-text"></span>
+                                    <span class="sk-block sk-text"></span>
+                                    <span class="sk-block sk-text sk-text--short"></span>
+                                </div>
+                            </article>
+                            <article class="sk-tweak-card">
+                                <div class="sk-tweak-head">
+                                    <span class="sk-block sk-date"></span>
+                                    <span class="sk-block sk-cat"></span>
+                                </div>
+                                <div class="home-skeleton-lines">
+                                    <span class="sk-block sk-text"></span>
+                                    <span class="sk-block sk-text"></span>
+                                    <span class="sk-block sk-text sk-text--short"></span>
+                                </div>
+                            </article>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <!-- ==================== 时间线 ==================== -->
@@ -350,7 +401,41 @@
                         <i class="ri-arrow-right-line" aria-hidden="true"></i>
                     </a>
                 </div>
-                <div class="timeline" id="timelineMount"></div>
+                <div class="timeline" id="timelineMount">
+                    <!-- 骨架：年标题 41、月标题 38、每篇文章 33，按真实行高摆。
+                         默认展开态是「1 个年份 + 3 个月份 + 最新月份里的文章」，
+                         这里按 3 篇摆，和真实的默认折叠状态基本等高。 -->
+                    <div class="home-skeleton sk-timeline" aria-hidden="true">
+                        <div class="sk-tl-row sk-tl-year">
+                            <span class="sk-block sk-tl-label"></span>
+                            <span class="sk-block sk-tl-side"></span>
+                        </div>
+                        <div class="sk-tl-row sk-tl-month">
+                            <span class="sk-block sk-tl-month-label"></span>
+                            <span class="sk-block sk-tl-side"></span>
+                        </div>
+                        <div class="sk-tl-row sk-tl-post">
+                            <span class="sk-block sk-tl-day"></span>
+                            <span class="sk-block sk-tl-title"></span>
+                        </div>
+                        <div class="sk-tl-row sk-tl-post">
+                            <span class="sk-block sk-tl-day"></span>
+                            <span class="sk-block sk-tl-title"></span>
+                        </div>
+                        <div class="sk-tl-row sk-tl-post">
+                            <span class="sk-block sk-tl-day"></span>
+                            <span class="sk-block sk-tl-title"></span>
+                        </div>
+                        <div class="sk-tl-row sk-tl-month">
+                            <span class="sk-block sk-tl-month-label"></span>
+                            <span class="sk-block sk-tl-side"></span>
+                        </div>
+                        <div class="sk-tl-row sk-tl-month">
+                            <span class="sk-block sk-tl-month-label"></span>
+                            <span class="sk-block sk-tl-side"></span>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <!-- ==================== 标签云 ==================== -->
@@ -360,7 +445,15 @@
                 <div class="tweak-head">
                     <h2 class="tweak-title" id="tagCloudTitle">标签云</h2>
                 </div>
-                <div class="tag-cloud" id="tagCloud"></div>
+                <div class="tag-cloud" id="tagCloud">
+                    <!-- 骨架：四个胶囊，尺寸照着 .tag-pill（72×34、圆角 20） -->
+                    <div class="home-skeleton sk-cloud" aria-hidden="true">
+                        <span class="sk-block sk-cloud-pill"></span>
+                        <span class="sk-block sk-cloud-pill"></span>
+                        <span class="sk-block sk-cloud-pill"></span>
+                        <span class="sk-block sk-cloud-pill"></span>
+                    </div>
+                </div>
             </section>
         </div>
 
@@ -440,12 +533,12 @@
                     <p>所以它算不上什么作品，更像一个一直在施工的工地。没有流量指标。写得慢，改得勤，就这样。</p>
 
                     <h2>我是个什么样的人</h2>
-                    <p>如果真的想了解我，不如去首页加上好友，来逐步了解。</p>
+                    <p>如果真的想了解我，不妨去首页加上好友，来逐步知晓。</p>
 
                     <h2>为什么名字是 Annie</h2>
                     <p>一个游戏角色的名字，我从她的身上看到了一种独立和坚韧的气质，也或许有些别样的东西。</p>
                     <p>而且，Annie 这个名字我也用了很久，用到这个博客上面再合适不过。</p>
-                    <p>总得来讲，我对这个名字...有种说不上来的喜欢。</p>
+                    <p>总得来讲，我对这个名字...也有种说不上来的喜欢。</p>
                 </section>
 
                 <dl class="about-facts">

@@ -2316,6 +2316,91 @@
             white-space: nowrap;
             border: 0;
         }
+        /* ==================== 首页其余区块的骨架 ==================== */
+        /* 复用 .home-skeleton 的底色变量、扫光和 overflow，这里只补各自的排布。
+           四块骨架（文章列表 / 折腾 / 时间线 / 标签云）用同一个 2.1s 节奏、
+           同一个方向，同时开始跑，整个首页看起来是被同一道节奏带着走。 */
+        .sk-tweak-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+        }
+        .sk-tweak-card {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 16px 18px 18px;
+            border: 1px solid var(--sk-card-border);
+            border-radius: 14px;
+            background: var(--sk-card-bg);
+        }
+        .sk-tweak-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            height: 20px;
+        }
+        /* 真实正文最多三行、行高约 23（13px × 1.75 的 line-clamp 三行），
+           三块 12px + 13 的间隔总高和它接近，换成正文时区块高度不会跳 */
+        .sk-tweak-card .home-skeleton-lines {
+            gap: 13px;
+        }
+        .sk-tweak-card .sk-text {
+            height: 12px;
+        }
+
+        /* 时间线：行高对着 .tl-year-head(41) / .tl-month-head(38) / .tl-post(33)，
+           左边留出档位缩进，和真实的层级缩进一致 */
+        .sk-timeline {
+            display: block;
+        }
+        .sk-tl-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .sk-tl-year {
+            height: 41px;
+            justify-content: space-between;
+            padding: 0 4px 0 14px;
+        }
+        .sk-tl-month {
+            height: 38px;
+            justify-content: space-between;
+            padding: 0 4px 0 44px;
+        }
+        .sk-tl-post {
+            height: 33px;
+            gap: 12px;
+            padding: 0 4px 0 62px;
+        }
+        .sk-tl-label { width: 48px; height: 13px; }
+        .sk-tl-month-label { width: 40px; height: 11px; }
+        .sk-tl-side { width: 46px; height: 9px; }
+        .sk-tl-day { width: 24px; height: 9px; flex: none; }
+        .sk-tl-title { width: 40%; height: 10px; }
+
+        /* 标签云：四个 72×34 的胶囊，和 .tag-pill 的实际尺寸一致 */
+        .sk-cloud {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            width: 100%;
+        }
+        .sk-cloud-pill {
+            width: 72px;
+            height: 34px;
+            border-radius: 20px;
+        }
+
+        @media (max-width: 860px) {
+            .sk-tweak-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (max-width: 600px) {
+            .sk-tweak-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+            .sk-tweak-card { padding: 14px 16px 16px; border-radius: 12px; }
+        }
+
         /* 小屏跟着卡片一起收一档内边距和圆角（对照 .task 的 600px 断点） */
         @media (max-width: 760px) {
             .home-skeleton-grid {
@@ -3232,6 +3317,190 @@
             .link-gate-card {
                 max-width: none;
                 padding: 18px 18px 16px;
+            }
+        }
+
+        /* ==================== 离开本站前的确认弹窗 ====================
+           首页 GitHub 这类外链按钮用（<a data-confirm-leave="GitHub">）。
+           结构同 .link-gate：叠加层 + 卡片，多了一行「取消 / 继续」。
+           配色全走变量，深色模式不需要单独覆盖一套。 */
+        .leave-confirm {
+            position: fixed;
+            inset: 0;
+            z-index: 130;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            /* 出场淡出的总时长。js/script.js 里的 LEAVE_CONFIRM_FADE_MS
+               要跟这个值一样（那边等动画走完才真正 hidden），改一处改两处。 */
+            --leave-confirm-fade: 0.18s;
+        }
+
+        .leave-confirm[hidden] {
+            display: none;
+        }
+
+        .leave-confirm-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.42);
+            animation: leaveConfirmFade 0.18s ease both;
+        }
+
+        .leave-confirm-card {
+            position: relative;
+            width: 100%;
+            max-width: 360px;
+            padding: 26px 24px 20px;
+            background: var(--color-bg);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            text-align: center;
+            animation: leaveConfirmPop 0.22s cubic-bezier(0.4, 0, 0.2, 1) both;
+        }
+
+        .leave-confirm-title {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--color-text-primary);
+        }
+
+        .leave-confirm-desc {
+            margin: 8px 0 0;
+            font-size: 0.85rem;
+            line-height: 1.7;
+            color: var(--color-text-secondary);
+        }
+
+        .leave-confirm-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 22px;
+        }
+
+        .leave-confirm-btn {
+            flex: 1;
+            padding: 10px 0;
+            border-radius: var(--radius-md);
+            font-family: inherit;
+            font-size: 0.875rem;
+            font-weight: 500;
+            line-height: 1.4;
+            cursor: pointer;
+            transition: background var(--transition-fast),
+                        color var(--transition-fast),
+                        border-color var(--transition-fast),
+                        opacity var(--transition-fast);
+        }
+
+        .leave-confirm-btn.is-ghost {
+            border: 1px solid var(--color-border);
+            background: var(--color-surface);
+            color: var(--color-text-secondary);
+        }
+
+        .leave-confirm-btn.is-primary {
+            border: 1px solid var(--color-accent);
+            background: var(--color-accent);
+            color: var(--color-bg);
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+            .leave-confirm-btn.is-ghost:hover {
+                background: var(--color-tag-bg);
+                color: var(--color-text-primary);
+            }
+
+            .leave-confirm-btn.is-primary:hover {
+                background: var(--color-accent-hover);
+                border-color: var(--color-accent-hover);
+            }
+        }
+
+        .leave-confirm-btn:active {
+            opacity: 0.86;
+        }
+
+        .leave-confirm-btn:focus-visible {
+            outline: 2px solid var(--color-accent);
+            outline-offset: 3px;
+        }
+
+        @keyframes leaveConfirmFade {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes leaveConfirmPop {
+            from {
+                opacity: 0;
+                transform: translateY(8px) scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        /* 关闭前的一场淡出：.is-closing 由 JS 在点「取消 / 继续」时加上，
+           动画播完才把浮层 hidden 掉，中间不会「啪」地一下消失。
+           时长统一读 --leave-confirm-fade，和 JS 那边的等待时间对齐。 */
+        .leave-confirm.is-closing {
+            /* 淡出这 180ms 里别再接收点击，避免连点重复触发 */
+            pointer-events: none;
+        }
+
+        .leave-confirm.is-closing .leave-confirm-backdrop {
+            animation: leaveConfirmFadeOut var(--leave-confirm-fade) ease both;
+        }
+
+        .leave-confirm.is-closing .leave-confirm-card {
+            animation: leaveConfirmOut var(--leave-confirm-fade) cubic-bezier(0.4, 0, 0.2, 1) both;
+        }
+
+        @keyframes leaveConfirmFadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+
+        /* 卡片比遮罩多一点点位移和缩放，收起来时像「退后一步」，
+           纯透明度变化会显得有点僵 */
+        @keyframes leaveConfirmOut {
+            from {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+            to {
+                opacity: 0;
+                transform: translateY(4px) scale(0.99);
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            /* 入场不做位移/缩放，直接出现 */
+            .leave-confirm-backdrop,
+            .leave-confirm-card {
+                animation: none;
+            }
+
+            /* 出场保留淡出、只换掉位移那版关键帧：
+               否则 JS 要等的这 180ms 会变成「点了取消没反应」。 */
+            .leave-confirm.is-closing .leave-confirm-backdrop,
+            .leave-confirm.is-closing .leave-confirm-card {
+                animation-name: leaveConfirmFadeOut;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .leave-confirm {
+                padding: 16px;
+            }
+
+            .leave-confirm-card {
+                max-width: none;
+                padding: 22px 18px 16px;
             }
         }
 

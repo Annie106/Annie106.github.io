@@ -1,0 +1,59 @@
+# 文章数据一变，就自动重新生成 feed.xml 并提交回来。
+#
+# 为什么需要它：feed.xml 是构建产物，但 GitHub Pages 只会静静地托管文件，
+# 不会替你跑脚本。没有这个 workflow 的话，每次改完 js/posts-data.js
+# 都得记得在本地跑一次 node tools/build-feed.js，忘了订阅者就看到旧内容。
+#
+# 触发条件故意收窄到「文章数据 / 生成脚本自身 / 这个 workflow」有改动时才跑，
+# 改样式、改文案不会白跑一次。也可以在 Actions 页面手动 Run workflow。
+name: 生成 RSS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'js/posts-data.js'
+      - 'tools/build-feed.js'
+      - '.github/workflows/feed.yml'
+  workflow_dispatch:
+
+# 要 push 回仓库，默认的只读 token 不够
+permissions:
+  contents: write
+
+# 两次推送挨得很近时排队跑，不要并发（并发会抢同一个分支，push 会失败）
+concurrency:
+  group: build-feed
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # 机器人自己提交的那次 push 不再触发，避免来回刷
+    if: github.actor != 'github-actions[bot]'
+    steps:
+      - name: 拉取仓库
+        uses: actions/checkout@v4
+
+      - name: 准备 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 生成 feed.xml
+        run: node tools/build-feed.js
+
+      - name: 有变化就提交回去
+        run: |
+          # 用 porcelain 而不是 git diff：新加的 feed.xml 还是未跟踪文件时，
+          # git diff 看不见它，会误判成「没有变化」而永远不提交
+          if [ -z "$(git status --porcelain -- feed.xml)" ]; then
+            echo "feed.xml 没有变化，跳过提交"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add feed.xml
+          # [skip ci] 会让这次提交不再触发新的 workflow（同上面的 actor 判断，双保险）
+          git commit -m "chore: 重新生成 feed.xml [skip ci]"
+          git push

@@ -2178,6 +2178,157 @@
                 linkGateEls.wrap.hidden = true;
             }
 
+            /* ============================================================
+               离开本站前的确认弹窗
+               给外链按钮加 data-confirm-leave="GitHub"，点它先问一句：
+                 「即将离开当前页面，前往 GitHub，是否继续？」
+               选「继续」才走原来那次跳转（href / target 一个字符都不改），
+               选「取消」「Esc」或点遮罩就只是关掉窗口，人留在原地。
+               浮层按需创建、用完隐藏，页面 HTML 里不占结构。
+               ============================================================ */
+            let leaveConfirmEls = null;
+            let leaveConfirmTrigger = null;
+            /* 确认放行的那一次点击。用它区分「用户自己点」和「确认后由代码触发」，
+               否则 link.click() 会再次被下面的监听拦下来，弹窗套娃 */
+            let leaveConfirmBypass = null;
+            /* 淡出动画时长（ms），和 css/style.css 的 --leave-confirm-fade 对齐 */
+            const LEAVE_CONFIRM_FADE_MS = 180;
+            let leaveConfirmHideTimer = null;
+            let leaveConfirmClosing = false;
+
+            function ensureLeaveConfirm() {
+                if (leaveConfirmEls) return leaveConfirmEls;
+                const wrap = document.createElement('div');
+                wrap.className = 'leave-confirm';
+                wrap.hidden = true;
+                wrap.innerHTML = [
+                    '<div class="leave-confirm-backdrop" data-leave-cancel></div>',
+                    '<div class="leave-confirm-card" role="dialog" aria-modal="true"',
+                    '     aria-labelledby="leaveConfirmTitle" aria-describedby="leaveConfirmDesc">',
+                    '<h2 class="leave-confirm-title" id="leaveConfirmTitle">即将前往 GitHub</h2>',
+                    '<p class="leave-confirm-desc" id="leaveConfirmDesc">即将离开当前页面，前往 GitHub，是否继续？</p>',
+                    '<div class="leave-confirm-actions">',
+                    '<button type="button" class="leave-confirm-btn is-ghost" data-leave-cancel>取消</button>',
+                    '<button type="button" class="leave-confirm-btn is-primary" data-leave-continue>继续</button>',
+                    '</div>',
+                    '</div>'
+                ].join('');
+                document.body.appendChild(wrap);
+
+                const els = {
+                    wrap: wrap,
+                    title: wrap.querySelector('#leaveConfirmTitle'),
+                    desc: wrap.querySelector('#leaveConfirmDesc'),
+                    continueBtn: wrap.querySelector('[data-leave-continue]'),
+                    cancelBtn: wrap.querySelector('[data-leave-cancel]:not(.leave-confirm-backdrop)')
+                };
+
+                wrap.addEventListener('click', function (event) {
+                    if (event.target.closest('[data-leave-continue]')) {
+                        closeLeaveConfirm(true);
+                        return;
+                    }
+                    if (event.target.closest('[data-leave-cancel]')) closeLeaveConfirm(false);
+                });
+
+                // 焦点只在这两个按钮之间转：浮层是 aria-modal，
+                // 焦点跑到背后页面上时读屏软件会念错内容（同搜索面板的处理）
+                wrap.addEventListener('keydown', function (event) {
+                    if (event.key === 'Escape') {
+                        event.preventDefault();
+                        closeLeaveConfirm(false);
+                        return;
+                    }
+                    if (event.key !== 'Tab') return;
+                    const list = [els.cancelBtn, els.continueBtn];
+                    const index = list.indexOf(document.activeElement);
+                    event.preventDefault();
+                    if (index === -1) {
+                        list[0].focus();
+                    } else if (event.shiftKey) {
+                        list[(index - 1 + list.length) % list.length].focus();
+                    } else {
+                        list[(index + 1) % list.length].focus();
+                    }
+                });
+
+                leaveConfirmEls = els;
+                return els;
+            }
+
+            function openLeaveConfirm(trigger, name) {
+                const els = ensureLeaveConfirm();
+                const site = name || '外部网站';
+                els.title.textContent = '即将前往 ' + site;
+                els.desc.textContent = '即将离开当前页面，前往 ' + site + '，是否继续？';
+                leaveConfirmTrigger = trigger || null;
+                // 上一轮如果还在淡出（快速点了取消又马上再点），
+                // 先把收尾任务和 is-closing 清掉，否则新弹窗会接着往下演
+                clearTimeout(leaveConfirmHideTimer);
+                leaveConfirmHideTimer = null;
+                leaveConfirmClosing = false;
+                els.wrap.classList.remove('is-closing');
+                els.wrap.hidden = false;
+                // 默认停在「继续」上：用户点这个按钮本来就是要过去
+                els.continueBtn.focus();
+            }
+
+            /* 关窗前先播一段淡出，动画走完才真正 hidden。
+               时长必须和 css/style.css 里 .leave-confirm 的
+               --leave-confirm-fade 保持一致，改一个记得改另一个。 */
+            function playLeaveConfirmOut() {
+                const els = leaveConfirmEls;
+                if (!els) return;
+                leaveConfirmClosing = true;
+                els.wrap.classList.add('is-closing');
+                clearTimeout(leaveConfirmHideTimer);
+                leaveConfirmHideTimer = setTimeout(function () {
+                    leaveConfirmHideTimer = null;
+                    leaveConfirmClosing = false;
+                    els.wrap.classList.remove('is-closing');
+                    els.wrap.hidden = true;
+                }, LEAVE_CONFIRM_FADE_MS);
+            }
+
+            function closeLeaveConfirm(confirmed) {
+                // 淡出过程中再点一下（比如连点取消）直接忽略，
+                // 否则会重复起动画、还会把「继续」的跳转吞掉
+                if (!leaveConfirmEls || leaveConfirmEls.wrap.hidden || leaveConfirmClosing) return;
+                const trigger = leaveConfirmTrigger;
+                leaveConfirmTrigger = null;
+
+                if (confirmed && trigger && trigger.href) {
+                    /* 继续：重放「刚才那一次点击」。href / target 都没动过，
+                       所以还是原来的跳转、还是新标签页。
+                       这里必须是同步调用（不在 Promise 里），
+                       否则部分移动浏览器会认为已经不是用户手势，把新标签页拦掉。
+                       先把跳转发出去，再让当前页的浮层淡出，两件事互不影响。 */
+                    leaveConfirmBypass = trigger;
+                    trigger.click();
+                    leaveConfirmBypass = null;
+                }
+
+                // 焦点先还给触发按钮：键盘 / 读屏用户不用等动画走完才能继续
+                if (trigger && typeof trigger.focus === 'function') {
+                    trigger.focus({ preventScroll: true });
+                }
+                playLeaveConfirmOut();
+            }
+
+            document.addEventListener('click', function (event) {
+                const link = event.target.closest('[data-confirm-leave]');
+                if (!link) return;
+                // Ctrl / Cmd / Shift / Alt / 中键：用户明确要新窗口或新标签，
+                // 交回浏览器自己处理，不拦（和文章页「问题反馈」的约定一致）
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+                if (leaveConfirmBypass === link) {
+                    leaveConfirmBypass = null;
+                    return;
+                }
+                event.preventDefault();
+                openLeaveConfirm(link, link.getAttribute('data-confirm-leave') || '');
+            });
+
             let commentsObserver = null;
             let commentsFailTimer = null;
             let commentsFrameObserver = null;

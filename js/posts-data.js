@@ -3,6 +3,10 @@
    增删改文章只改这里：加一项就是一篇新文章，几处同时生效。
    字段：id / title / date(YYYY-MM-DD) / excerpt / tags / content 等，
    具体写法看下面每一项。
+   cover（可选）：文章封面图，写相对站点的路径（如 'images/xxx.jpg'）或完整地址。
+   只给 RSS 用（tools/build-feed.js 会读它，生成 feed 里的 media:thumbnail，
+   阅读器列表页的缩略图就是它）。不写就退回正文第一张图，再没有就用站点封面。
+   页面上不显示这张图，别指望它出现在文章卡片里。
    updated（可选）：最近一次改动这篇的日期(YYYY-MM-DD)。写上之后，
    文章卡片和详情页里的日期都优先显示 updated（跟显示的日期一致），
    详情页还会在下面补一行「发布于 date」；不写、或跟 date 一样，

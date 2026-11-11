@@ -18,7 +18,10 @@ css/style.css               全部样式与响应式
 fonts/icons.css             图标字体样式（Remix Icon 本地副本，由 style.css 引入）
 fonts/remixicon.woff2       图标字体文件，约 165 KB
 _template.html              新建页面时复制这份，head 已经引对了样式
+feed.xml                    RSS 订阅源，由 tools/build-feed.js 生成，别手改
+.github/workflows/feed.yml  push 文章数据时自动重建并提交 feed.xml
 tools/check-icons.js        图标自检：CDN 残留、图标名是否存在、页面是否引了样式
+tools/build-feed.js         从 js/posts-data.js 生成 feed.xml
 AGENTS.md                   给 AI 工具的项目约定，跨工具生效
 js/posts-data.js            全部文章数据（首页与归档页共用）
 js/script.js                筛选、搜索、路由、页面状态
@@ -96,9 +99,25 @@ python -m http.server 8000
 
 访问 <http://localhost:8000>，或直接打开 `index.html`。背景音乐需用户交互后才能播放。
 
+## RSS 订阅
+
+订阅地址：<https://annie106.github.io/feed.xml>
+
+`feed.xml` 是**生成物**，别手改。文章数据在 `js/posts-data.js`，改完推到 `main` 后，`/.github/workflows/feed.yml` 会自动重新生成并提交回来（只在 `js/posts-data.js`、`tools/build-feed.js` 或这个 workflow 自身有改动时触发），不用管。
+
+想在本地先看一眼效果，就手动跑：
+
+```bash
+node tools/build-feed.js
+```
+
+脚本按 `updated || date` 倒序取最新 20 篇：有 `content` 的输出全文，正文在独立页面里（`embeddedPage`）的只给摘要 + 原文链接。
+
+列表页缩略图取 `media:thumbnail`，三级兜底：文章自己的 `cover` 字段 → 正文里第一张 `<img>` → 站点封面 `share_cover.jpg`。要给某篇单独配图，就在 `posts-data.js` 里那篇加 `cover: 'images/xxx.jpg'`（这字段只喂给 feed，页面上不显示）。
+
 ## 部署
 
-静态站，放到 GitHub Pages 或任意静态托管即可，无需后端与构建。
+静态站，放到 GitHub Pages 或任意静态托管即可，无需后端与构建。`feed.xml` 是构建产物但必须一起提交——GitHub Pages 不会帮你跑脚本，所以仓库里带了那个 workflow。
 
 ## 许可证
 
