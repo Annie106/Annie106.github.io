@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
+<!-- 由 tools/build-feed.js 生成，不要手改。改文章请改 js/posts-data.js，
+     然后跑一次 node tools/build-feed.js。 -->
 <rss version="2.0"
      xmlns:atom="http://www.w3.org/2005/Atom"
      xmlns:content="http://purl.org/rss/1.0/modules/content/"
@@ -9,7 +10,7 @@
     <link>https://annie106.github.io/</link>
     <description>思考 · 记录 · 创造 —— 记录阅读、成长和日常灵感。</description>
     <language>zh-cn</language>
-    <lastBuildDate>Wed, 11 Nov 2026 11:10:19 GMT</lastBuildDate>
+    <lastBuildDate>Wed, 11 Nov 2026 11:13:51 GMT</lastBuildDate>
     <generator>tools/build-feed.js</generator>
     <atom:link href="https://annie106.github.io/feed.xml" rel="self" type="application/rss+xml"/>
     <item>
