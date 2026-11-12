@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Annie · 获取联系</title>
+<meta name="robots" content="noindex">
+
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<link rel="preload" href="../../fonts/icons.css" as="style">
+<link rel="preload" href="../../fonts/remixicon.woff2" as="font" type="font/woff2" crossorigin>
+
+<script>
+    /* 主题必须在样式表之前定好，否则会先闪一帧浅色再切深色。
+       这一页还会被 404.html 的「获取联系」浮窗用 iframe 装起来，
+       所以除了读 localStorage，还得接住父页面 postMessage 推过来的主题。
+
+       ?embedded=1 是浮窗专用：去掉页头大标题，让它在框里看起来
+       像是框子自带的内容，而不是套了一层网页。 */
+    (function () {
+        function apply(theme) {
+            document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : 'light');
+        }
+
+        var saved = null;
+        try { saved = localStorage.getItem('annie-theme'); } catch (e) {}
+        var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        apply(saved === 'light' || saved === 'dark' ? saved : (dark ? 'dark' : 'light'));
+
+        window.addEventListener('message', function (event) {
+            var data = event.data;
+            if (data && data.type === 'annie-theme') apply(data.theme);
+        });
+
+        if (/[?&]embedded=1(?:&|$)/.test(window.location.search)) {
+            document.documentElement.classList.add('is-embedded');
+        }
+    })();
+</script>
+
+<link rel="stylesheet" href="../../css/style.css">
+
+<style>
+    /* ==================== 本页专用样式 ====================
+       只有微信和邮箱两条联系方式，颜色一律走变量，深浅色自动适配。 */
+
+    /* UA 层（画布底色、滚动条、原生控件）只认 data-theme，不跟系统偏好走。
+       以前 head 里有一行 <meta name="color-scheme" content="light dark">：
+       当系统是深色、而站内选的是浅色时，浏览器会按深色去画这个文档的画布，
+       于是浅色的内容被画在一块近黑的底上——深色的标题直接看不见。
+       那行已经删掉，这里再钉死一次（深色仍由 style.css 的
+       [data-theme="dark"] { color-scheme: dark } 接管，它的优先级更高）。 */
+    html { color-scheme: light; }
+
+    .contact-page {
+        flex: 1;
+        width: 100%;
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 56px 0 88px;
+    }
+
+    .contact-hero { margin-bottom: 32px; }
+
+    .contact-eyebrow {
+        margin: 0 0 10px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.75rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--color-text-tertiary);
+    }
+
+    .contact-title {
+        margin: 0 0 12px;
+        font-size: 1.75rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        color: var(--color-text-primary);
+    }
+
+    .contact-lead {
+        margin: 0;
+        font-size: 0.9375rem;
+        line-height: 1.9;
+        color: var(--color-text-secondary);
+    }
+
+    /* ---------- 联系方式卡片 ----------
+       两竖列：一列即时通讯（微信 / QQ），一列邮箱，各自内部再上下一张张排。
+       列宽够就并排，不够就整列落成一列（顺序不变），所以不用写断点。
+       min(300px, 100%) 是防止 320px 的老手机上单列还撑破容器。 */
+    .contact-channels {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+        gap: 12px;
+        align-items: start;
+    }
+
+    .contact-channel-group {
+        display: grid;
+        gap: 12px;
+        /* 栅格项默认 min-width: auto，也就是不许小于内容的最小宽度。
+           邮箱那一列撑到 324px 时它就把容器顶宽，窄屏（或系统放大了字号）
+           会多出几像素横向溢出 → 手机上底部冒出一条横向滚动条。
+           这一行让它允许被压缩，里面的文字靠 ellipsis 收尾 */
+        min-width: 0;
+    }
+
+    .contact-channel {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        width: 100%;
+        min-width: 0;
+        padding: 16px 18px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-lg);
+        background: var(--color-surface);
+        color: var(--color-text-primary);
+        font-family: inherit;
+        font-size: 0.9375rem;
+        /* 必须写死行高：<button> 不继承 body 的 1.7（它用 UA 的 normal），
+           <a> 会继承。微信 / QQ 是按钮、邮箱是链接，不写这一行两列卡片
+           高度会差 8px，右边那列整体比左边高一截，看着就不对称 */
+        line-height: 1.5;
+        text-align: left;
+        text-decoration: none;
+        cursor: pointer;
+        -webkit-appearance: none;
+        appearance: none;
+        transition: border-color var(--transition-fast),
+                    background var(--transition-fast),
+                    transform var(--transition-fast);
+    }
+    @media (hover: hover) and (pointer: fine) {
+        .contact-channel:hover {
+            border-color: var(--color-text-tertiary);
+            transform: translateY(-1px);
+        }
+    }
+    .contact-channel:active { transform: translateY(0); }
+    .contact-channel:focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: 3px;
+    }
+
+    .contact-channel-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: none;
+        width: 38px;
+        height: 38px;
+        border: 1px solid var(--color-border);
+        border-radius: 50%;
+        background: var(--color-bg);
+        font-size: 1.125rem;
+        color: var(--color-text-primary);
+    }
+
+    .contact-channel-body {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .contact-channel-label {
+        font-size: 0.75rem;
+        letter-spacing: 0.04em;
+        color: var(--color-text-tertiary);
+    }
+
+    .contact-channel-value {
+        font-size: 0.9375rem;
+        font-weight: 500;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .contact-channel-action {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        flex: none;
+        font-size: 0.75rem;
+        color: var(--color-text-tertiary);
+        transition: color var(--transition-fast);
+    }
+    .contact-channel:hover .contact-channel-action { color: var(--color-text-secondary); }
+    .contact-channel-action i { font-size: 0.9375rem; }
+
+    /* 复制成功时把按钮右侧文案切成「已复制」，比只弹一下提示更明确 */
+    .contact-channel.is-copied .contact-channel-action { color: var(--color-text-primary); }
+
+    /* 图标固定在左边一列，几行说明都落在右边，别让第二行掉到图标下面 */
+    .contact-note {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        margin: 16px 2px 0;
+        font-size: 0.8125rem;
+        line-height: 1.7;
+        color: var(--color-text-tertiary);
+    }
+    .contact-note > i { margin-top: 2px; font-size: 0.9375rem; }
+    .contact-note-text { min-width: 0; }
+    .contact-note-text p { margin: 0; }
+    .contact-note-text p + p { margin-top: 4px; }
+
+    /* ---------- 浮窗内（?embedded=1） ----------
+       这里不把底色设成 transparent。原本靠 404 的 --panel-bg 透上来，
+       代价是一旦这个 iframe 的画布配色和 data-theme 对不上（上面那件事），
+       透出来的就是另一套的底色，内容直接变得不可读。
+       现在自己铺 --color-bg：画布永远和内容同一套配色；
+       404 那边的 --panel-bg 取值和它完全一样（#fff / #0f1115），看起来仍然是无缝的。 */
+    html.is-embedded body {
+        /* 内容比浮窗高时，滚到头的橡皮筋不要传给背后那页 */
+        overscroll-behavior: contain;
+        /* style.css 里 body 是 min-height: 100vh；在浮窗里量「我有多少内容」
+           必须去掉这条，否则量出来的永远是 iframe 当前的高度，框就缩不回去 */
+        min-height: 0;
+    }
+    html.is-embedded .contact-page {
+        padding: 24px 0 30px;
+    }
+    html.is-embedded .contact-hero {
+        /* 浮窗自己的标题栏已经写了「获取联系」 */
+        display: none;
+    }
+
+    @media (max-width: 560px) {
+        .contact-page { padding: 40px 0 64px; }
+        .contact-title { font-size: 1.5rem; }
+        html.is-embedded .contact-page { padding: 18px 0 26px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .contact-channel:hover { transform: none; }
+    }
+</style>
+</head>
+<body>
+
+<main class="contact-page">
+    <header class="contact-hero">
+        <p class="contact-eyebrow">// Contact</p>
+        <h1 class="contact-title">获取联系</h1>
+        <p class="contact-lead">文章里的疑问、想转载、合作，或者只是想打个招呼，从下面任选一条路就行。</p>
+    </header>
+
+    <!-- 两竖列：左边即时通讯（微信 / QQ，点了复制号码），右边邮箱（点了写信）。
+         窄屏时整组落到一列，顺序还是 微信 → QQ → 邮箱 → 备用邮箱。 -->
+    <div class="contact-channels">
+        <div class="contact-channel-group">
+            <!-- 复制逻辑是「谁带 data-copy 谁就复制谁」，加一条联系方式不用改 JS -->
+            <button class="contact-channel" type="button"
+                    data-copy="sossil" data-copy-toast="微信号已复制">
+                <span class="contact-channel-icon"><i class="ri-wechat-fill" aria-hidden="true"></i></span>
+                <span class="contact-channel-body">
+                    <span class="contact-channel-label">微信</span>
+                    <span class="contact-channel-value">sossil</span>
+                </span>
+                <span class="contact-channel-action">
+                    <i class="ri-file-copy-line" aria-hidden="true"></i>
+                    <span>复制</span>
+                </span>
+            </button>
+
+            <button class="contact-channel" type="button"
+                    data-copy="3810710631" data-copy-toast="QQ 号已复制">
+                <span class="contact-channel-icon"><i class="ri-qq-fill" aria-hidden="true"></i></span>
+                <span class="contact-channel-body">
+                    <span class="contact-channel-label">QQ</span>
+                    <span class="contact-channel-value">3810710631</span>
+                </span>
+                <span class="contact-channel-action">
+                    <i class="ri-file-copy-line" aria-hidden="true"></i>
+                    <span>复制</span>
+                </span>
+            </button>
+        </div>
+
+        <div class="contact-channel-group">
+            <a class="contact-channel" href="mailto:anniedv106@gmail.com">
+                <span class="contact-channel-icon"><i class="ri-mail-fill" aria-hidden="true"></i></span>
+                <span class="contact-channel-body">
+                    <span class="contact-channel-label">邮箱</span>
+                    <span class="contact-channel-value">anniedv106@gmail.com</span>
+                </span>
+                <span class="contact-channel-action">
+                    <i class="ri-arrow-right-up-line" aria-hidden="true"></i>
+                    <span>写信</span>
+                </span>
+            </a>
+
+            <a class="contact-channel" href="mailto:anniedv106@126.com">
+                <span class="contact-channel-icon"><i class="ri-mail-send-fill" aria-hidden="true"></i></span>
+                <span class="contact-channel-body">
+                    <span class="contact-channel-label">备用邮箱</span>
+                    <span class="contact-channel-value">anniedv106@126.com</span>
+                </span>
+                <span class="contact-channel-action">
+                    <i class="ri-arrow-right-up-line" aria-hidden="true"></i>
+                    <span>写信</span>
+                </span>
+            </a>
+        </div>
+    </div>
+
+    <div class="contact-note">
+        <i class="ri-time-line" aria-hidden="true"></i>
+        <div class="contact-note-text">
+            <p>微信、QQ 一般当天回；邮箱看得慢一点，两三天没回就换个邮箱再发一次。</p>
+            <p>添加微信时，请备注来意。</p>
+        </div>
+    </div>
+</main>
+
+<script src="../../js/copyToClipboard.js"></script>
+<script>
+(function () {
+    'use strict';
+
+    /* ---------------- 点卡片复制号码 ----------------
+       微信、QQ 都是「点了就把号码复制走」。用 data-copy 标记要复制什么，
+       加一条联系方式只要多写一张卡片，不用回来改这里。 */
+    Array.prototype.forEach.call(
+        document.querySelectorAll('.contact-channel[data-copy]'),
+        function (button) {
+            var label = button.querySelector('.contact-channel-action span');
+            var timer = null;
+
+            button.addEventListener('click', function () {
+                copyToClipboard(
+                    button.getAttribute('data-copy'),
+                    button.getAttribute('data-copy-toast') || '已复制'
+                );
+                if (!label) return;
+                button.classList.add('is-copied');
+                label.textContent = '已复制';
+                window.clearTimeout(timer);
+                timer = window.setTimeout(function () {
+                    button.classList.remove('is-copied');
+                    label.textContent = '复制';
+                }, 1800);
+            });
+        }
+    );
+
+    /* ---------------- 浮窗里报高度 ----------------
+       404 那个框是「按内容收」的（max-height 才封顶），它得知道这一页有多高。
+       里面量、往上报，比在外面猜一个固定高度可靠：
+       窄屏卡片会纵向堆叠、字号也不一样，写死高度不是留白就是裁字。 */
+    var embedded = document.documentElement.classList.contains('is-embedded');
+    if (embedded && window.parent && window.parent !== window) {
+        var lastHeight = 0;
+        var reportHeight = function () {
+            var height = Math.ceil(document.documentElement.getBoundingClientRect().height);
+            if (!height || Math.abs(height - lastHeight) < 1) return;
+            lastHeight = height;
+            window.parent.postMessage({ type: 'annie-contact-height', height: height }, '*');
+        };
+
+        window.requestAnimationFrame(reportHeight);
+        window.addEventListener('load', reportHeight);
+        window.addEventListener('resize', reportHeight);
+        if (window.ResizeObserver) {
+            /* 字体到位、复制提示换行之类的高度变化也补报一次 */
+            new ResizeObserver(reportHeight).observe(document.body);
+        }
+    }
+})();
+</script>
+</body>
+</html>

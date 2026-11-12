@@ -11,6 +11,7 @@
 ```text
 index.html                  入口：首页 / 文章列表 / 文章详情 / 电影 / 关于
 movie.html                  独立视频页（列表见 VIDEO_LIST）
+404.html                    找不到页面时的提示 + 旧链接兜底；「获取联系」浮窗也在这里
 favicon.svg                 站点图标
 share_cover.jpg             分享卡片封面，1080×1080
 images/manor_photos/        归宿照图集（文章 id 11 用）
@@ -31,7 +32,7 @@ js/touch-hover.js           触屏悬停修正
 js/background-music.js      首页背景音乐
 js/copyToClipboard.js       联系方式复制
 js/image-loading.js         图片占位与清晰化
-project_subpage/blog/       站点页：guide / submission / thanks / 文章内嵌页 ...
+project_subpage/blog/       站点页：contact / guide / submission / thanks / 文章内嵌页 ...
 project_subpage/projects/   项目页：appeal-guide / download ...
 archive/                    归档，不参与显示
 ```
@@ -51,6 +52,7 @@ archive/                    归档，不参与显示
 - 独立视频页：侧边播放列表、加载动画、水印，附验证码 / 地区限制 / 解码失败等错误提示
 - 点击图标复制微信号、QQ 号、邮箱
 - 反馈表单：文章问题、Bug、功能建议、排版样式、其他
+- 「获取联系」页（`project_subpage/blog/contact.html`）：微信号 / QQ 号一键复制、主邮箱 + 备用邮箱；404 页点「获取联系」时以浮窗形式加载它，支持 Esc / 遮罩 / 右上角 × / 浏览器返回四种关闭方式
 
 ## 修改
 

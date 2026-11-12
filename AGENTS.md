@@ -73,7 +73,8 @@
 
 - 全站样式在单文件 `css/style.css`（6000+ 行，按注释分节）。改之前先搜类名，沿用已有的类名前缀（`.article-*`、`.comments-*`、`.feedback-view`、`.home-skeleton` 等）。
 - **`index.html` 里那个 `.boot-loading` 的内联 `<style>` 是有意的，不要挪进 `style.css`**：它是首屏「正在加载博客数据…」提示条，要展示的时间正是 `style.css` 还在下载的时候；颜色也因此写死、不用 CSS 变量（那时变量还没定义）。深色靠 `[data-theme="dark"]` 覆盖。
-- `.boot-loading` 的行为：默认隐藏，**加载超过 3 秒**才由元素后面那段内联计时器加上 `.is-visible`（计时器必须在页面里，不能进 `script.js` —— 真慢的时候 `script.js` 正是还没到的东西）。收起由 `script.js` 的 `hideBootLoading()` 在 `init()` 之后去掉 `.is-visible`，走 0.24s 透明度 + 0.34s 位移的过渡（和 `.site-toast` 同一套缓动）；若刚露脸就加载完，会补足 700ms 最短展示，避免闪一下。另有 15s 兜底定时器。
+- `.boot-loading` 的行为：默认隐藏，**加载超过 3 秒**才由元素后面那段内联计时器加上 `.is-visible`（计时器必须在页面里，不能进 `script.js` —— 真慢的时候 `script.js` 正是还没到的东西）。收起由 `script.js` 的 `hideBootLoading()` 在 `init()` 之后加 `.is-leaving`（`@keyframes bootOut`），380ms 后把两个类一起摘掉；若刚露脸就加载完，会补足 700ms 最短展示，避免闪一下。另有 15s 兜底定时器。
+- 进出**都用 `@keyframes`（`bootIn` / `bootOut`），不要改回 `transition`**：退场是「加一个类 + 删另一个类」，两次样式变更可能落在同一帧被合并，transition 会被整个跳过——表现就是弹窗「啪」地消失、没有淡出。`.site-toast` 重播入场时踩过同一个坑。
 - 配色一律用 CSS 变量（`--color-bg`、`--color-text-primary`、`--color-border`、`--card-accent` 等），深色模式在 `[data-theme="dark"]` 里覆盖变量，**不要写死色值**，否则深色模式下会失效。
 - 新增基于位移/透明度的动画，请一并处理 `@media (prefers-reduced-motion: reduce)`。
 
@@ -91,6 +92,21 @@
 - `js/script.js` 是 SPA 式路由核心（`index.html?article=N`、`?view=xxx`、浏览器返回键、滚动位置恢复）。这里的逻辑和历史记录强耦合，改动前先读相关注释，不要顺手重构。
 - `js/posts-data.js` / `js/tweaks-data.js` 是数据文件：可以增删条目，但不要改字段名，`script.js` 依赖它们。
 - `favicon.svg`、`share_cover.jpg` 被多个页面和分享卡片引用，改文件名要同步全站。
+
+## 「获取联系」页与 404 浮窗
+
+`project_subpage/blog/contact.html` 是一张**双形态**的页面，`404.html` 里的浮窗是它的第二个入口。改这两处前先读这一节。
+
+- 页面内容是四张联系方式卡片：**微信 `sossil`、QQ `3810710631`（这两张点了复制号码）+ 主邮箱 `anniedv106@gmail.com`、备用邮箱 `anniedv106@126.com`（这两张是 mailto）**，外加一行回复时效说明。版面是**两竖列**：左列微信 / QQ（`.contact-channel-group`），右列两个邮箱；窄屏时每列各自落下，顺序还是 微信 → QQ → 邮箱 → 备用邮箱，别再改回 2×2 那种「微信|QQ 一行、邮箱|备用 一行」。⚠️ 卡片是 `<button>`（微信/QQ）和 `<a>`（邮箱）混用的，**`.contact-channel` 上的 `line-height: 1.5` 不能删**：button 不继承 `body` 的 1.7、a 会继承，删掉两列卡片高度差 8px，右边整体比左边高一截。**`.contact-channel-group` 和 `.contact-channel` 上的 `min-width: 0` 也不能删**：栅格项默认 `min-width: auto`，邮箱那列会把容器顶宽几像素，手机底部就冒出一条横向滚动条（320px 宽实测会多出 4px）。复制走的是「谁带 `data-copy` 就复制谁、`data-copy-toast` 决定提示语」的委托写法，**加一条联系方式只要多写一张卡片，不用改 JS**。**不要再往里加表单**：2026-11-12 按用户要求删掉了原来的 web3forms 留言表单，投稿/反馈统一走站内的 `index.html?view=feedback`。
+- 独立访问 = 完整页面（带 `// Contact` 页头、“获取联系”大标题）。
+- 加 `?embedded=1` = 浮窗形态：JS 在 `<head>` 里就给 `<html>` 加上 `.is-embedded`，只做两件事——**隐藏 `.contact-hero`、收紧上下内边距**。标题由浮窗自己的标题栏给。
+- ⚠️ **这一页的 `<head>` 不要加 `<meta name="color-scheme" content="light dark">`，文档背景也不要设成 `transparent`。** 两个坑叠在一起出过一次真实的翻车：meta 让浏览器按**系统偏好**决定画布配色，而站内的深浅色是 `data-theme` 说了算，两边不一致时（系统深色 + 站内浅色）画布被涂成近黑、浅色内容直接画在深色底上，深色标题几乎看不见；再叠加透明底，连“自己的底色”都没有了。现在的写法是 `html { color-scheme: light }` 把 UA 层钉死在 `data-theme` 上（深色仍由 `style.css` 的 `[data-theme="dark"]` 接管），并让页面自己铺 `--color-bg`。404 的 `--panel-bg` 取值和它一致，所以照样无缝。
+- 404 的浮窗用 **iframe** 装它，不是把内容抄一份进 404。理由：那页要引 `css/style.css`、要带自己的复制逻辑，iframe 让两套东西互不干扰；代价是 **404 页不引 `style.css`，所以浮窗外壳里的图标一律不能用 `<i class="ri-*">`**（字体不在）。现有那个 × 是内联 SVG 画的。
+- 关闭有四条路：右上角 ×、点遮罩、Esc、浏览器返回。前三条走 `closeModal()`，最后一条靠打开时 `pushState` 撑的记录 + `popstate`。**别删那个 `pushState`**——否则手机上按返回键会直接离开 404 页，而不是关浮窗。
+- **框的高度按内容收，不是写死的**：`contact.html` 在浮窗形态下把 `document.documentElement` 的高度用 `postMessage({ type: 'annie-contact-height' })` 报给父页，父页写进 `iframe.style.height`；`.contact-panel` 只有 `max-height` 封顶。所以浮窗里 `body` 的 `min-height: 0` 不能删——留着 `style.css` 的 `100vh` 就永远量出「和 iframe 一样高」，框缩不回去。**也别给 `.contact-frame` 加 `opacity` 淡入**：起始帧卡住时整个框就是一片空白，现在用的是 `visibility` 一步切到位（实测见过卡帧）。
+- 主题：`contact.html` 自己读 `localStorage` 的 `annie-theme`，同时接受父页面 `postMessage({ type: 'annie-theme' })`，两处都在 `<head>` 里。
+- **浮窗底色用 `--panel-bg`（白 / `#0f1115`），不是 404 自己的 `--card`**：框里那页用的是 `style.css` 的变量，底色要是跟 `--card`（深色 `#1e1e23`）对齐，卡片会比背景更暗，观感是反的。
+- 404 里那个 `<a href="/project_subpage/blog/contact.html">` **必须是站点根路径**：404.html 会被 GitHub Pages 兜到任意路径（`/foo/bar`）上渲染，相对地址会跟着假路径走成 `/foo/project_subpage/...`，又是一次 404。只有 `file://` 预览才在 JS 里退回相对地址。
 
 ## 订阅源（feed.xml）
 

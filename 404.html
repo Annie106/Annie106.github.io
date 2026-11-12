@@ -66,7 +66,7 @@
             --accent: #85b7eb;
         }
         /* 这个页面没有引 css/style.css，所以那条「点按高亮透明」的全局重置得自己写。
-           不写的话，手机点「回到首页 / 联系我」会在圆角按钮外面闪出一块方形的蓝底。 */
+           不写的话，手机点「回到首页 / 获取联系」会在圆角按钮外面闪出一块方形的蓝底。 */
         * {
             box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
@@ -74,10 +74,14 @@
         body {
             margin: 0;
             min-height: 100vh;
+            min-height: 100dvh;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 24px;
+            /* 内容整体上移到视线落点（约视口高度的 1/3），不再死板地居中。
+               用不对称内边距实现：底部留白远大于顶部，flex 居中算出来的中心就整体上浮。
+               短屏时内容居中也不会被裁掉，比写死 padding-top 稳。 */
+            padding: 24px 24px clamp(72px, 26vh, 260px);
             background: var(--bg);
             color: var(--text);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
@@ -114,6 +118,197 @@
         }
         [data-theme="dark"] a.btn.primary { color: #10151c; }
         a.btn.primary:hover { opacity: .88; }
+
+        /* ==================== 「获取联系」浮窗 ====================
+           内容是 project_subpage/blog/contact.html，装在一个 iframe 里。
+           用 iframe 而不是把表单抄进来：那一页自己引了 css/style.css、
+           也带着自己的表单逻辑，隔着框子互不干扰，直接访问那个地址
+           也还是一张完整的页面。
+           本页没有引 style.css，所以这里的颜色全部用上面那套
+           --bg / --card / --text / --muted / --border / --accent。 */
+        .contact-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 60;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            /* 浮窗底色不走本页的 --card，而是跟站内页面的一致（白 / #0f1115）：
+               框里那页是透明底，卡片、输入框用的都是 css/style.css 的变量，
+               底色对不上就会出现「卡片比背景还暗」这种反过来的观感 */
+            --panel-bg: #ffffff;
+        }
+        html[data-theme="dark"] .contact-modal { --panel-bg: #0f1115; }
+        /* display 会盖掉 [hidden] 的默认样式，必须显式收回来 */
+        .contact-modal[hidden] { display: none; }
+
+        .contact-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(24, 24, 22, 0.44);
+            -webkit-backdrop-filter: blur(3px);
+            backdrop-filter: blur(3px);
+            animation: contactFade .24s ease both;
+        }
+
+        .contact-panel {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            width: min(880px, 100%);
+            /* 高度按内容走（框里那页把自身高度 postMessage 过来），
+               上限才是 780 / 视口。写死高度的话内容一少就剩一大块空白 */
+            max-height: min(780px, 100%);
+            overflow: hidden;
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            box-shadow: 0 32px 80px rgba(0, 0, 0, .26);
+            outline: none;
+            animation: contactRise .28s cubic-bezier(.32, .72, 0, 1) both;
+        }
+
+        .contact-panel-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex: none;
+            padding: 13px 14px 13px 22px;
+            border-bottom: 1px solid var(--border);
+        }
+        .contact-panel-head h2 {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 500;
+            letter-spacing: .01em;
+        }
+
+        /* 关闭按钮用内联 SVG 画叉，不用图标字体：
+           这个页面没引 css/style.css，图标字体不在。 */
+        .contact-panel-close {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: none;
+            width: 32px;
+            height: 32px;
+            border: 1px solid transparent;
+            border-radius: 50%;
+            background: transparent;
+            color: var(--muted);
+            cursor: pointer;
+            transition: background .2s ease, color .2s ease;
+        }
+        .contact-panel-close svg {
+            width: 15px;
+            height: 15px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+        }
+        @media (hover: hover) and (pointer: fine) {
+            .contact-panel-close:hover {
+                background: rgba(0, 0, 0, .06);
+                color: var(--text);
+            }
+        }
+        /* 注意这里不能写成 html [data-theme="dark"] —— 中间空格会变成
+           「html 的后代」，而 data-theme 就在 html 自己身上，永远不匹配 */
+        @media (hover: hover) and (pointer: fine) {
+            html[data-theme="dark"] .contact-panel-close:hover {
+                background: rgba(255, 255, 255, .1);
+            }
+        }
+        .contact-panel-close:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        .contact-panel-body {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+            /* 框里那页会把自己的高度报上来，正常情况下这里不会滚；
+               只有「内容高过 max-height」时才由这一层接住多余的滚动，
+               免得出现「外层滚一点、内层滚一点」的双滚动条。
+               overflow-x 显式收成 hidden：只写 overflow-y 会让 x 轴也变成 auto，
+               里面但凡多出 1px 宽度，底部就会冒一条横向滚动条 */
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
+        .contact-frame {
+            display: block;
+            width: 100%;
+            /* 真实高度由 iframe 里那页 postMessage 上来，这个值只是量到之前的占位 */
+            height: 420px;
+            border: 0;
+            background: transparent;
+            /* 这里刻意不做淡入：iframe 上的 opacity 动画一旦卡在起始帧
+               （reduced-motion、合成器掉帧、某些内嵌浏览器都见过），
+               整个框就是一片空白。用 visibility 一步切到位，不出意外。 */
+            visibility: hidden;
+        }
+        .contact-frame.is-ready { visibility: visible; }
+
+        .contact-loading {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+        .contact-loading[hidden] { display: none; }
+        .contact-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border);
+            border-top-color: var(--muted);
+            border-radius: 50%;
+            animation: contactSpin .8s linear infinite;
+        }
+
+        /* 关闭是「加一个类」，用 @keyframes 而不是 transition：
+           同一帧里两次样式变更会被合并，transition 会被整条跳过 */
+        .contact-modal.is-closing .contact-backdrop { animation: contactFadeOut .2s ease both; }
+        .contact-modal.is-closing .contact-panel { animation: contactFall .2s ease both; }
+
+        @keyframes contactFade { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes contactFadeOut { from { opacity: 1; } to { opacity: 0; } }
+        @keyframes contactRise {
+            from { opacity: 0; transform: translateY(14px) scale(.985); }
+            to { opacity: 1; transform: none; }
+        }
+        @keyframes contactFall {
+            from { opacity: 1; transform: none; }
+            to { opacity: 0; transform: translateY(10px) scale(.99); }
+        }
+        @keyframes contactSpin { to { transform: rotate(360deg); } }
+
+        /* 浮窗打开时背后不许滚 */
+        body.is-contact-open { overflow: hidden; }
+
+        @media (max-width: 640px) {
+            /* 窄屏不再铺满屏幕：内容只有两张卡片，铺满会剩一大片空白。
+               留一圈边距做成一浮起的卡片，高过视口时 max-height 会兜住。 */
+            .contact-modal { padding: 12px; }
+            .contact-panel { width: 100%; }
+            .contact-panel-head { padding: 11px 11px 11px 18px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .contact-backdrop,
+            .contact-panel,
+            .contact-modal.is-closing .contact-backdrop,
+            .contact-modal.is-closing .contact-panel { animation: none; }
+        }
     </style>
 </head>
 <body>
@@ -123,8 +318,183 @@
         <p>链接可能拼错了，或者内容已经搬家。<br>博客地址现在就是 annie106.github.io。</p>
         <div class="actions">
             <a class="btn primary" href="/">回到首页</a>
-            <a class="btn" href="mailto:anniedv106@gmail.com">联系我</a>
+            <!-- 有 JS 时点它是开浮窗（href 被 preventDefault 拦下）；
+                 没 JS 就老老实实跳到那一页。href 必须是站点根路径：
+                 这个 404 可能是在 /foo/bar 上被兜出来的，相对地址会解析错。 -->
+            <a class="btn" href="/project_subpage/blog/contact.html" id="contactOpen"
+               aria-haspopup="dialog">获取联系</a>
         </div>
     </div>
+
+    <!-- ==================== 「获取联系」浮窗 ====================
+         里面的 contact.html 走 ?embedded=1：去掉页头大标题、铺透明底，
+         看起来像是这个框子自带的内容。iframe 首次打开时才插入，
+         免得 404 页什么都没干就先把那页的样式表拉一遍。 -->
+    <div class="contact-modal" id="contactModal" hidden>
+        <div class="contact-backdrop" data-contact-close></div>
+        <div class="contact-panel" role="dialog" aria-modal="true"
+             aria-labelledby="contactModalTitle" tabindex="-1">
+            <div class="contact-panel-head">
+                <h2 id="contactModalTitle">获取联系</h2>
+                <button class="contact-panel-close" id="contactModalClose" type="button" aria-label="关闭">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M6 6 L18 18 M18 6 L6 18"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="contact-panel-body" id="contactPanelBody">
+                <div class="contact-loading" id="contactLoading">
+                    <span class="contact-spinner" aria-hidden="true"></span>
+                    <span>正在打开…</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            var trigger = document.getElementById('contactOpen');
+            var modal = document.getElementById('contactModal');
+            if (!trigger || !modal) return;
+
+            var panel = modal.querySelector('.contact-panel');
+            var closeBtn = document.getElementById('contactModalClose');
+            var bodyBox = document.getElementById('contactPanelBody');
+            var loading = document.getElementById('contactLoading');
+
+            /* 404.html 是被 GitHub Pages 兜到任意路径上渲染的，
+               相对地址会跟着那个假路径走，所以统一用站点根路径；
+               只有本地 file:// 预览才退回相对地址。 */
+            var CONTACT_PATH = 'project_subpage/blog/contact.html';
+            var ROOT = window.location.protocol === 'file:' ? '' : '/';
+
+            var frame = null;
+            var isOpen = false;
+            var pushedState = false;
+            var lastFocus = null;
+
+            trigger.setAttribute('href', ROOT + CONTACT_PATH);
+
+            function mountFrame() {
+                if (frame) return;
+                frame = document.createElement('iframe');
+                frame.className = 'contact-frame';
+                frame.title = '获取联系';
+                frame.src = ROOT + CONTACT_PATH + '?embedded=1';
+                frame.addEventListener('load', function () {
+                    loading.hidden = true;
+                    /* 框里那页量完高度会先发一条 postMessage（在它的 load 里），
+                       等它把高度换上来再露脸，避免先按 420 的占位高度闪一下 */
+                    window.setTimeout(function () {
+                        frame.classList.add('is-ready');
+                    }, 60);
+                    /* 把当前主题推给框里的页面，免得深浅色对不上 */
+                    try {
+                        frame.contentWindow.postMessage({
+                            type: 'annie-theme',
+                            theme: document.documentElement.getAttribute('data-theme')
+                        }, '*');
+                    } catch (e) {}
+                });
+                bodyBox.appendChild(frame);
+            }
+
+            /* 框里那页把自己有多高报上来，外面按这个高度收框。
+               上限由 .contact-panel 的 max-height 管，这里只挡掉离谱的值 */
+            window.addEventListener('message', function (event) {
+                var data = event.data;
+                if (!data || data.type !== 'annie-contact-height' || !frame) return;
+                var height = parseInt(data.height, 10);
+                if (!height || height < 0) return;
+                frame.style.height = Math.min(height, 1200) + 'px';
+            });
+
+            function focusables() {
+                var nodes = panel.querySelectorAll('button, iframe, a[href], input, textarea, select, [tabindex]:not([tabindex="-1"])');
+                return Array.prototype.filter.call(nodes, function (el) {
+                    return !el.disabled && el.offsetParent !== null;
+                });
+            }
+
+            /* Tab 不许跑到浮窗背后的 404 页上 */
+            function onKeydown(event) {
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    closeModal();
+                    return;
+                }
+                if (event.key !== 'Tab') return;
+                var list = focusables();
+                if (!list.length) return;
+                var first = list[0];
+                var last = list[list.length - 1];
+                if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault();
+                    last.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault();
+                    first.focus();
+                }
+            }
+
+            function openModal() {
+                if (isOpen) return;
+                isOpen = true;
+                lastFocus = document.activeElement;
+                mountFrame();
+                modal.hidden = false;
+                document.body.classList.add('is-contact-open');
+                /* 撑一条历史记录：手机按返回键先关浮窗，而不是直接离开 404 页 */
+                try {
+                    window.history.pushState({ contactModal: true }, '');
+                    pushedState = true;
+                } catch (e) {
+                    pushedState = false;
+                }
+                closeBtn.focus({ preventScroll: true });
+                document.addEventListener('keydown', onKeydown, true);
+            }
+
+            function closeModal(fromPopState) {
+                if (!isOpen) return;
+                isOpen = false;
+                document.removeEventListener('keydown', onKeydown, true);
+                document.body.classList.remove('is-contact-open');
+
+                var needBack = pushedState && !fromPopState;
+                pushedState = false;
+
+                modal.classList.add('is-closing');
+                window.setTimeout(function () {
+                    modal.classList.remove('is-closing');
+                    modal.hidden = true;
+                }, 220);
+
+                if (lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true });
+                lastFocus = null;
+
+                /* 关闭按钮走的是 history.back()，随后 popstate 会再进来一次，
+                   那时 isOpen 已经是 false，直接 return，不会重复关 */
+                if (needBack) window.history.back();
+            }
+
+            trigger.addEventListener('click', function (event) {
+                /* 用修饰键点、或者中键：交还给浏览器，让它照常开新标签 */
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+                event.preventDefault();
+                openModal();
+            });
+
+            closeBtn.addEventListener('click', function () { closeModal(); });
+
+            modal.addEventListener('click', function (event) {
+                if (event.target.hasAttribute('data-contact-close')) closeModal();
+            });
+
+            window.addEventListener('popstate', function () {
+                if (isOpen) closeModal(true);
+            });
+        })();
+    </script>
 </body>
 </html>

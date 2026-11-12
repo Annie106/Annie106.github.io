@@ -94,12 +94,11 @@
             box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14),
                         0 2px 6px rgba(15, 23, 42, 0.06);
             transform: translate(-50%, -14px) scale(0.96);
-            /* 退场：和 .site-toast 同一套缓动（透明度 0.24s、位移 0.34s）。
-               visibility 延迟到位移走完才切，否则元素立刻不可见、淡出看不见 */
-            transition: opacity 0.24s cubic-bezier(0.22, 1, 0.36, 1),
-                        transform 0.34s cubic-bezier(0.22, 1, 0.36, 1),
-                        visibility 0s linear 0.34s;
-            /* 默认是隐藏态：加载 3 秒内完成的话，这条提示根本不会露脸 */
+            /* 进出都用 @keyframes，不用 transition：
+               退场是「先加一个类、再删另一个类」，两次样式变更可能落在同一帧里
+               被浏览器合并，transition 就整个被跳过（表现是「啪」地消失）。
+               站内 .site-toast 早就踩过这个坑，所以它重播入场也用动画。
+               这里连进场一起用动画，行为更可预期。 */
             opacity: 0;
             visibility: hidden;
             pointer-events: none;
@@ -115,14 +114,43 @@
 
         /* 出现态。由页面里那段内联脚本在 3 秒后才加上，
            所以「加载很快」的时候用户根本不会看到它。
-           进场延迟归零，让 visibility 立刻生效、再播透明度和位移。 */
+           opacity / transform 同时写成静态值：减少动效（prefers-reduced-motion）
+           时动画被关掉，元素也要能以最终样子留在屏幕上。 */
         .boot-loading.is-visible {
-            opacity: 1;
             visibility: visible;
+            opacity: 1;
             transform: translate(-50%, 0) scale(1);
-            transition: opacity 0.24s cubic-bezier(0.22, 1, 0.36, 1),
-                        transform 0.34s cubic-bezier(0.22, 1, 0.36, 1),
-                        visibility 0s;
+            animation: bootIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+
+        /* 退场：加上这个类就播一段淡出上移，播完由 JS 把两个类都摘掉。
+           用 animation 而不是 transition，原因见上面基础样式里的注释。 */
+        .boot-loading.is-leaving {
+            visibility: visible;
+            opacity: 0;
+            animation: bootOut 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+
+        @keyframes bootIn {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -14px) scale(0.96);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, 0) scale(1);
+            }
+        }
+
+        @keyframes bootOut {
+            from {
+                opacity: 1;
+                transform: translate(-50%, 0) scale(1);
+            }
+            to {
+                opacity: 0;
+                transform: translate(-50%, -14px) scale(0.96);
+            }
         }
 
         /* 转圈用纯 CSS 画：图标字体要等 style.css 到了才有，
@@ -171,8 +199,12 @@
         }
 
         @media (prefers-reduced-motion: reduce) {
-            .boot-loading {
-                transition: none;
+            /* 关掉动画，但静态的 opacity / visibility 还在，
+               所以是「直接出现、直接消失」，不会变成永远看不见 */
+            .boot-loading,
+            .boot-loading.is-visible,
+            .boot-loading.is-leaving {
+                animation: none;
             }
 
             .boot-loading-spin {
@@ -215,7 +247,13 @@
             /* 兜底：script.js 万一没跑到头（断网、语法错），
                别让提示条赖在屏幕上不走。15 秒自己淡出。 */
             setTimeout(function () {
-                el.classList.remove('is-visible');
+                if (el.getAttribute('data-done')) return;
+                el.classList.add('is-leaving');
+                setTimeout(function () {
+                    el.classList.remove('is-visible');
+                    el.classList.remove('is-leaving');
+                    el.setAttribute('aria-hidden', 'true');
+                }, 380);
             }, 15000);
         })();
     </script>
@@ -733,7 +771,7 @@
             </section>
 
             <!-- 版本号：从页脚挪到这里，收在关于页右下角 -->
-            <p class="about-version">版本 0.4.23.045</p>
+            <p class="about-version">版本 0.4.23.052</p>
         </div>
 
         <!-- ==================== 文章详情视图 ==================== -->

@@ -4809,11 +4809,18 @@
                 const wait = played > 0 && played < MIN_VISIBLE ? MIN_VISIBLE - played : 0;
 
                 setTimeout(function () {
-                    el.classList.remove('is-visible');
-                    // 等位移走完（0.34s）再从无障碍树里摘掉，免得读屏软件还念着「正在加载」
+                    /* 退场：加 .is-leaving 播一段 @keyframes 淡出，
+                       播完再把两个类都摘掉（元素回到默认隐藏态）。
+                       这里不用「删 .is-visible 靠 transition 过渡」——
+                       两次样式变更可能被合并进同一帧，transition 会被跳过，
+                       表现就是弹窗「啪」地没影了。 */
+                    el.classList.add('is-leaving');
                     setTimeout(function () {
+                        el.classList.remove('is-visible');
+                        el.classList.remove('is-leaving');
+                        // 等动画走完再从无障碍树里摘掉，免得读屏软件还念着「正在加载」
                         el.setAttribute('aria-hidden', 'true');
-                    }, 360);
+                    }, 380);
                 }, wait);
             }
 
