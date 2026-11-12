@@ -93,8 +93,15 @@
             line-height: 1.5;
             box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14),
                         0 2px 6px rgba(15, 23, 42, 0.06);
-            transform: translateX(-50%);
-            transition: opacity 0.18s ease, transform 0.18s ease;
+            transform: translate(-50%, -14px) scale(0.96);
+            /* 退场：和 .site-toast 同一套缓动（透明度 0.24s、位移 0.34s）。
+               visibility 延迟到位移走完才切，否则元素立刻不可见、淡出看不见 */
+            transition: opacity 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+                        transform 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+                        visibility 0s linear 0.34s;
+            /* 默认是隐藏态：加载 3 秒内完成的话，这条提示根本不会露脸 */
+            opacity: 0;
+            visibility: hidden;
             pointer-events: none;
         }
 
@@ -106,11 +113,16 @@
                         0 2px 6px rgba(0, 0, 0, 0.35);
         }
 
-        /* 加载完成后由 script.js 加上，淡出即走，不阻塞任何操作 */
-        .boot-loading.is-done {
-            opacity: 0;
-            transform: translate(-50%, -8px);
-            visibility: hidden;
+        /* 出现态。由页面里那段内联脚本在 3 秒后才加上，
+           所以「加载很快」的时候用户根本不会看到它。
+           进场延迟归零，让 visibility 立刻生效、再播透明度和位移。 */
+        .boot-loading.is-visible {
+            opacity: 1;
+            visibility: visible;
+            transform: translate(-50%, 0) scale(1);
+            transition: opacity 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+                        transform 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+                        visibility 0s;
         }
 
         /* 转圈用纯 CSS 画：图标字体要等 style.css 到了才有，
@@ -172,8 +184,11 @@
 <body>
 
     <!-- 首屏加载提示。结构写在 HTML 里而不是由 JS 创建：
-         它要赶在 posts-data.js / script.js 下载完之前就出现在屏幕上。
-         init() 结束时由 script.js 加 .is-done，0.18s 淡出后消失。 -->
+         它要赶在 posts-data.js / script.js 下载完之前就出现。
+         默认是隐藏的（CSS 里 opacity:0 + visibility:hidden），
+         下面这段内联脚本等到第 3 秒才把它放出来 ——
+         加载快的时候用户全程看不到这条提示。
+         收起由 script.js 的 hideBootLoading() 负责（去掉 .is-visible 触发淡出）。 -->
     <div class="boot-loading" id="bootLoading" role="status" aria-live="polite">
         <span class="boot-loading-spin" aria-hidden="true"></span>
         <span class="boot-loading-text">
@@ -183,12 +198,26 @@
     </div>
 
     <script>
-        /* 兜底：万一 script.js 没跑到头（网络断了、脚本报错），
-           这条提示不能一直赖在屏幕上。15 秒后自己收掉。 */
-        setTimeout(function () {
+        (function () {
             var el = document.getElementById('bootLoading');
-            if (el) el.classList.add('is-done');
-        }, 15000);
+            if (!el) return;
+
+            /* 3 秒后才露脸：这是「慢」而不是「卡」，用户不需要在正常速度下被打扰。
+               注意这个计时器必须写在页面里、不能放进 script.js ——
+               真慢的时候，script.js 正是那个还没下载完的东西。 */
+            setTimeout(function () {
+                // 已经加载完了就别再弹出来（script.js 会打这个标记）
+                if (el.getAttribute('data-done')) return;
+                el.setAttribute('data-shown-at', String(Date.now()));
+                el.classList.add('is-visible');
+            }, 3000);
+
+            /* 兜底：script.js 万一没跑到头（断网、语法错），
+               别让提示条赖在屏幕上不走。15 秒自己淡出。 */
+            setTimeout(function () {
+                el.classList.remove('is-visible');
+            }, 15000);
+        })();
     </script>
 
     <!-- ==================== 头部导航 ==================== -->
@@ -704,7 +733,7 @@
             </section>
 
             <!-- 版本号：从页脚挪到这里，收在关于页右下角 -->
-            <p class="about-version">版本 0.4.23.041</p>
+            <p class="about-version">版本 0.4.23.045</p>
         </div>
 
         <!-- ==================== 文章详情视图 ==================== -->

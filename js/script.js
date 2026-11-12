@@ -4787,17 +4787,34 @@
 
             /* 首屏「正在加载博客数据…」的收尾。
                提示条本身写在 index.html 里（那时 style.css 还没到，必须自带样式），
-               这里只负责在 init() 跑完之后把它淡出。
-               加 .is-done 后 0.18s 透明 + visibility:hidden，不用 remove：
-               元素留在原地也不占布局（position: fixed），省得再管清理。 */
+               并且要加载超过 3 秒才会露脸；这里只负责把它收掉。
+               收尾方式参考 .site-toast：去掉 .is-visible 触发透明度 + 位移的过渡。 */
             function hideBootLoading() {
                 const el = document.getElementById('bootLoading');
-                if (!el || el.classList.contains('is-done')) return;
-                el.classList.add('is-done');
-                // 淡出之后从无障碍树里摘掉，免得读屏软件还念着「正在加载」
-                setTimeout(function () {
+                if (!el || el.getAttribute('data-done')) return;
+                // 打标记，让页面里那个 3 秒计时器别再把它放出来
+                el.setAttribute('data-done', '1');
+
+                // 压根没露过脸（3 秒内就加载完了）：什么都不用做
+                if (!el.classList.contains('is-visible')) {
                     el.setAttribute('aria-hidden', 'true');
-                }, 220);
+                    return;
+                }
+
+                /* 刚好在 3 秒出头加载完时，提示可能只露脸一百毫秒 ——
+                   那样「闪一下就没了」比不显示还怪。补足最短展示时间再淡出。 */
+                const shownAt = Number(el.getAttribute('data-shown-at') || 0);
+                const played = shownAt ? Date.now() - shownAt : 0;
+                const MIN_VISIBLE = 700;
+                const wait = played > 0 && played < MIN_VISIBLE ? MIN_VISIBLE - played : 0;
+
+                setTimeout(function () {
+                    el.classList.remove('is-visible');
+                    // 等位移走完（0.34s）再从无障碍树里摘掉，免得读屏软件还念着「正在加载」
+                    setTimeout(function () {
+                        el.setAttribute('aria-hidden', 'true');
+                    }, 360);
+                }, wait);
             }
 
             init();
