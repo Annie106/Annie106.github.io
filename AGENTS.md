@@ -4,6 +4,8 @@
 人看的速查是 `README.md`，完整教程是站内「使用指南」`project_subpage/blog/guide.html`。
 **动手前先读完这一页，尤其是「图标」和「新建页面」两节。**
 
+> **这里是跨工具唯一的约定来源。** 换一个 AI 工具时，它读不到上一个工具留下的会话记忆（例如 WorkBuddy 的 `.workbuddy/memory/`，那是工具私有目录，别的 agent 不会去读）。所以凡是「以后换谁来写代码也得知道」的内容——选型决策、踩过的坑、不许改的地方、升级流程——都必须落到本文件，只写进某个工具的私有记忆等于没写。
+
 ## 这个站是什么
 
 纯静态博客：原生 HTML + CSS + JavaScript，**没有构建步骤、没有 npm 依赖、没有后端**，直接跑在 GitHub Pages 上。
@@ -28,7 +30,24 @@
   node tools/check-icons.js
   ```
 
-- 不要手动编辑 `fonts/icons.css`。升级字体版本时整体替换 `icons.css` 与 `remixicon.woff2`，再跑一次上面的校验。
+- 不要手动编辑 `fonts/icons.css`（它是生成物）。
+
+### 版本状态：刻意停在 4.3.0，不要主动升级
+
+2026-11-12 核查过，结论是先不升：
+
+- 上游最新是 **4.9.1**，比本地多 338 个图标，woff2 从 162 KB 涨到 185 KB。
+- 但 4.3.0 **没有任何功能缺口**：全站用到的 93 个图标都在，`check-icons.js` 三项全绿。
+- 4.9.1 只移除了一个 `ri-font-sans`，全站无引用，改名风险为零。
+- 所以这**不是"版本太旧待升级"**，是评估后的选择。除非用户明确要求，或者确实要用某个 4.3.0 里没有的图标（比如 AI 相关的 `ri-ai-*`、`ri-openai-*`、`ri-anthropic-*`），否则别动它。
+
+要升级时按这个流程，**五步一步都不能漏**：
+
+1. 取 `remixicon@<版本>` 的 `fonts/remixicon.css` 与 `fonts/remixicon.woff2`。
+2. 用上游 css 覆盖 `fonts/icons.css`，但**只保留 woff2 一个 `@font-face`** —— 上游还引了 eot/woff/ttf/svg，本地没这些文件，留着只会在控制台刷一串 404。
+3. 改 `fonts/icons.css` 顶部的版本注释（版本号 + 上游发布日期 + 来源链接）。
+4. 同步版本号/体积表述到 `AGENTS.md`（本节 + 上面两行）、`README.md`、`project_subpage/blog/guide.html`（目录树里那行 `remixicon.woff2 ← 约 165 KB`）。
+5. 跑 `node tools/check-icons.js`，必须全绿。有图标名报错说明新版本删了或改了这个图标，先改页面再提交。
 
 ## 新建 HTML 页面
 
@@ -53,9 +72,19 @@
 ## 改样式
 
 - 全站样式在单文件 `css/style.css`（6000+ 行，按注释分节）。改之前先搜类名，沿用已有的类名前缀（`.article-*`、`.comments-*`、`.feedback-view`、`.home-skeleton` 等）。
-- **`index.html` 里那个 `.boot-loading` 的内联 `<style>` 是有意的，不要挪进 `style.css`**：它是首屏「正在加载博客数据…」提示条，要展示的时间正是 `style.css` 还在下载的时候；颜色也因此写死、不用 CSS 变量（那时变量还没定义）。深色靠 `[data-theme="dark"]` 覆盖。收起由 `script.js` 的 `hideBootLoading()` 在 `init()` 之后触发，另有 15s 兜底定时器。
+- **`index.html` 里那个 `.boot-loading` 的内联 `<style>` 是有意的，不要挪进 `style.css`**：它是首屏「正在加载博客数据…」提示条，要展示的时间正是 `style.css` 还在下载的时候；颜色也因此写死、不用 CSS 变量（那时变量还没定义）。深色靠 `[data-theme="dark"]` 覆盖。
+- `.boot-loading` 的行为：默认隐藏，**加载超过 3 秒**才由元素后面那段内联计时器加上 `.is-visible`（计时器必须在页面里，不能进 `script.js` —— 真慢的时候 `script.js` 正是还没到的东西）。收起由 `script.js` 的 `hideBootLoading()` 在 `init()` 之后去掉 `.is-visible`，走 0.24s 透明度 + 0.34s 位移的过渡（和 `.site-toast` 同一套缓动）；若刚露脸就加载完，会补足 700ms 最短展示，避免闪一下。另有 15s 兜底定时器。
 - 配色一律用 CSS 变量（`--color-bg`、`--color-text-primary`、`--color-border`、`--card-accent` 等），深色模式在 `[data-theme="dark"]` 里覆盖变量，**不要写死色值**，否则深色模式下会失效。
 - 新增基于位移/透明度的动画，请一并处理 `@media (prefers-reduced-motion: reduce)`。
+
+### 滚动条：只在 html 上声明一次，不要写 `::-webkit-scrollbar`
+
+- 两个变量管颜色（定义在 `:root`，深色在 `[data-theme="dark"]` 里覆盖）：`--scrollbar-thumb`（常态）/ `--scrollbar-thumb-hover`（鼠标进入滚动区）。都用 `rgba` 不用实色——滑块会压在纯白正文、浅灰代码块、半透明卡片上，实色在深色模式下会透出一块死板的长条。
+- `css/style.css`「滚动条」一节里有 `html { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent }`，**新写的滚动区不用再声明任何样式**，自动就是「透明轨道 + 半透明细滑块」。
+- ⚠️ 这两个属性都是**继承属性**，会一路传到所有滚动容器。也正因如此，**不要再写 `::-webkit-scrollbar` 那套**：只要祖先上是非 `auto` 的值，Chrome 就会忽略该元素的 webkit 伪元素，写了是死代码。想改宽度就改 `scrollbar-width`，想改颜色就改变量。
+- 需要「鼠标进入就提亮」的容器，在 `.search-body:hover` 那条规则后面按同样格式追加类名即可（`scrollbar-color: var(--scrollbar-thumb-hover) transparent`），别写成 `*:hover`——那会让整棵树重算继承值。
+- 别再给滚动条写 `background: var(--color-border)`：`#2a2e37` 压在 `#0f1115` 上几乎看不见，深色下等于没有滑块。这正是这次要修的 bug。
+- `[data-theme="dark"]` 上还声明了 `color-scheme: dark`，让原生控件（输入框、下拉、日期面板、复选框）和浏览器自带滚动条一起切到深色渲染。新增控件如果写了显式颜色，照旧用变量即可，不用管它。
 
 ## 别乱动的地方
 

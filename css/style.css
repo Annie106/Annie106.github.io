@@ -26,6 +26,13 @@
             --color-tag-text: #555555;
             --color-divider: #eeeeee;
 
+            /* 滚动条滑块。用 rgba 而不是实色：滑块会压在纯白正文、
+               浅灰代码块、半透明卡片上，实色会在深色底透出一块死板的长条。
+               两档分别对应「常态 / 鼠标进入滚动区」——滚动没法用伪类感知，
+               更细的状态变化交给浏览器自己的原生动效。 */
+            --scrollbar-thumb: rgba(26, 26, 26, 0.22);
+            --scrollbar-thumb-hover: rgba(26, 26, 26, 0.38);
+
             /* 文章卡片里「主标签」那一处唯一的彩色强调。
                只在卡片内、只有十几像素宽的一小段字，
                不参与导航、按钮和筛选条，所以不会破坏全站的黑白基调 */
@@ -1053,6 +1060,30 @@
             animation: searchSpin 0.8s linear infinite;
         }
 
+        /* ---------- 滚动条 ---------- */
+        /* 全站统一成「细、透明轨道、半透明滑块」。之前只有搜索面板单独写过颜色，
+           其余滚动区（使用指南的目录侧栏、电影页片单、长表格、代码块）全走浏览器默认，
+           深色模式下就会冒出一条白色轨道压在 #0f1115 上，非常跳。
+
+           ⚠️ scrollbar-width 和 scrollbar-color 都是**继承属性**，写在 html 上
+           会一路传到所有滚动容器，所以全站只需声明这一次，不必逐个容器补。
+           也正因为继承：只要祖先上是非 auto 的值，Chrome 就会忽略该元素的
+           ::-webkit-scrollbar 伪元素——所以这里**不要**再写一套 webkit 规则，
+           写了也不会生效，只会让人以为它在管事。滑块颜色的深浅切换
+           全部由 --scrollbar-thumb 这套变量在深色块里覆盖完成。 */
+        html {
+            scrollbar-width: thin;
+            scrollbar-color: var(--scrollbar-thumb) transparent;
+        }
+        /* 鼠标进入某个滚动区时把滑块提亮一档，给一点「知道你在滚」的反馈。
+           只能逐个容器点名，不能写成 *:hover —— 那会让整棵树都重算继承值。 */
+        .search-body:hover,
+        .guide-toc-list:hover,
+        .guide-content pre:hover,
+        .guide-table-wrap:hover {
+            scrollbar-color: var(--scrollbar-thumb-hover) transparent;
+        }
+
         /* ---------- 滚动区 ---------- */
         .search-body {
             flex: 1 1 auto;
@@ -1064,17 +1095,7 @@
             overflow-y: auto;
             overscroll-behavior: contain;
             -webkit-overflow-scrolling: touch;
-            scrollbar-width: thin;
-            scrollbar-color: var(--color-border) transparent;
-        }
-        .search-body::-webkit-scrollbar {
-            width: 8px;
-        }
-        .search-body::-webkit-scrollbar-thumb {
-            border: 2px solid transparent;
-            border-radius: 999px;
-            background-clip: padding-box;
-            background-color: var(--color-border);
+            /* 滚动条样式从 html 继承，这里不用再声明（见「滚动条」一节） */
         }
 
         /* ---------- 空白态（推荐 / 历史 / 标签 / 快捷入口） ---------- */
@@ -4747,6 +4768,16 @@
             --color-tag-bg: #23262d;
             --color-tag-text: #b3b9c2;
             --color-divider: #22252c;
+
+            /* 深色下的滑块走「比底色亮一档的白」而不是反色：
+               纯白条压在 #0f1115 上会像一道发光的高光，
+               这里最高一档也只到 40% 白，拖动时才有实感 */
+            --scrollbar-thumb: rgba(255, 255, 255, 0.20);
+            --scrollbar-thumb-hover: rgba(255, 255, 255, 0.34);
+
+            /* 让浏览器把原生控件（滚动条、输入框、下拉、日期面板）
+               也切到深色渲染，省得逐个去补默认样式 */
+            color-scheme: dark;
 
             /* 深色底上把强调色提亮、降饱和，避免玫瑰色在暗背景里发脏 */
             --card-accent: #d98fa2;

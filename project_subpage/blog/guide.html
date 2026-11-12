@@ -533,22 +533,12 @@
                 font-size: 0.95em;
             }
 
-            /* 让横向滚动条在移动端也能看出「这里可以滑」 */
-            .guide-content pre::-webkit-scrollbar,
-            .guide-table-wrap::-webkit-scrollbar {
-                height: 6px;
-            }
-
-            .guide-content pre::-webkit-scrollbar-thumb,
-            .guide-table-wrap::-webkit-scrollbar-thumb {
-                background: var(--color-border);
-                border-radius: 3px;
-            }
-
-            .guide-content pre::-webkit-scrollbar-track,
-            .guide-table-wrap::-webkit-scrollbar-track {
-                background: transparent;
-            }
+            /* 代码块和表格的横向滚动条不再单独上色：
+               scrollbar-width / scrollbar-color 从 html 继承（见 style.css
+               的「滚动条」一节），深色下自动是浅白细条。
+               这里以前用 ::-webkit-scrollbar 写过 6px 高、--color-border 色，
+               但 Chrome 一旦读到继承来的 scrollbar-color 就会忽略这些伪元素，
+               留着只会让人误以为它在生效。 */
 
             /* 窄屏下取消固定最小宽度，让表格自适应换行。
                保留 min-width 的话表格会超出屏幕，右侧内容被裁掉，
@@ -629,7 +619,10 @@
             min-height: 0;
             overflow-y: auto;
             overscroll-behavior: contain;
-            scrollbar-width: thin;
+            /* 侧栏只有 200px 宽，滚动条样式同样从 html 继承（细条 + 半透明滑块），
+               hover 提亮那条规则在 style.css 的「滚动条」一节里统一写。
+               以前这里只写了 scrollbar-width: thin 却没有任何颜色，
+               Chrome 就按系统浅色主题画出一条白轨道，深色下非常跳。 */
             padding: 8px 0;
         }
         .guide-toc-indicator {
