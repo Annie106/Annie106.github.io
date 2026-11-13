@@ -329,6 +329,27 @@
                 }
             }
 
+            /* 地址栏里不留 index.html。
+               GitHub Pages 访问 /index.html 会照常返回页面、不会 301 到根路径，
+               所以从站外链接、404 兜底、子页面跳回首页时地址栏会一直挂着这个文件名；
+               而 syncUrlWithView 只改 query、原样保留 pathname，它就跟着一路走下去。
+               这里在启动时把它收敛成目录形式（/index.html → /），
+               ?article= / ?view= 等参数一个不动，history.state 也照旧，
+               前进后退的落点不受影响。
+               只在 http(s) 下做：file:// 下把 index.html 换成目录，
+               浏览器会去列目录而不是渲染页面，本地预览反而打不开。 */
+            function normalizeHomeUrl() {
+                if (location.protocol === 'file:') return;
+                if (!/\/index\.html$/i.test(location.pathname)) return;
+                try {
+                    history.replaceState(
+                        history.state,
+                        '',
+                        location.pathname.replace(/index\.html$/i, '') + location.search + location.hash
+                    );
+                } catch (e) {}
+            }
+
             // 把地址栏同步成当前状态：打开文章写入 ?article=id，返回时清掉。
             // 用 replaceState 而不是 pushState，避免污染历史记录
             //（文章的前进/后退由已有的 history.state 机制负责）。
@@ -3981,7 +4002,9 @@
             }
 
             /* 反馈页自己的地址。留着它给「在新标签页打开」和右键复制用，
-               站内点击则走 openFeedback（不重新加载页面）。 */
+               站内点击则走 openFeedback（不重新加载页面）。
+               只用查询串、不带文件名：新标签打开时落在当前 pathname 上，
+               配合启动时的 normalizeHomeUrl，地址栏里就不会出现 index.html。 */
             function buildFeedbackUrl(id, title) {
                 const params = new URLSearchParams();
                 params.set(VIEW_PARAM, 'feedback');
@@ -3989,7 +4012,7 @@
                     params.set(FEEDBACK_ARTICLE_PARAM, String(id));
                 }
                 if (title) params.set(FEEDBACK_TITLE_PARAM, title);
-                return 'index.html?' + params.toString();
+                return '?' + params.toString();
             }
 
             function openFeedback(post) {
@@ -4746,6 +4769,8 @@
 
             // ==================== 初始化 ====================
             function init() {
+                // 先把地址栏里的 /index.html 收敛掉，后面的路由和分享链接都基于干净的路径
+                normalizeHomeUrl();
                 const savedState = readViewState();
                 restoreTagsFromSnapshot(savedState);
                 renderTagPills('tagFilterHome');

@@ -41,7 +41,7 @@
                     var legacyTitle = old.get('title');
                     if (legacyArticle) next.set(view === 'feedback' ? 'fa' : 'ca', legacyArticle);
                     if (legacyTitle) next.set(view === 'feedback' ? 'ft' : 'ct', legacyTitle);
-                    window.location.replace('/index.html?' + next.toString());
+                    window.location.replace('/?' + next.toString());
                     return;
                 }
             } catch (e) {}

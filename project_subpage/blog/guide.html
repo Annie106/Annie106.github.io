@@ -966,6 +966,19 @@
 ├── favicon.svg              ← 浏览器标签页上的小图标
 ├── share_cover.jpg          ← 分享给微信/QQ 时的封面缩略图
 ├── README.md                ← 说明书，不影响网页
+├── AGENTS.md                ← 给 AI 助手看的项目约定，不影响网页
+├── .gitignore               ← 让 Git 忽略 dist/ 等产物
+│
+├── tools/                   ← 构建与检查脚本（不会发布到线上）
+│   ├── build-site.js        ← 生成发布产物 dist/，白名单决定哪些文件上线
+│   ├── build-feed.js        ← 从文章数据生成 feed.xml
+│   └── check-icons.js       ← 检查图标名写错、CDN 残留
+│
+├── .github/workflows/       ← GitHub 自动化（不会发布到线上）
+│   ├── deploy.yml           ← 推送后自动构建并发布到 Pages
+│   └── feed.yml             ← 文章数据变化时重建 feed.xml
+│
+├── dist/                    ← 发布产物，由 build-site.js 生成，不提交
 │
 ├── images/                  ← 图片都放这里
 │   └── manor_photos/        ← 第五人格归宿照（manor_01.jpg / manor_02.jpg）
@@ -1246,7 +1259,7 @@
 };</code></pre>
                 <p>前面的 <code>10</code> 是文章 id。没配过的文章会自动显示「复制文章链接」「查看评论」「问题反馈」三个默认项。</p>
                 <p>菜单项支持三种类型：<code>link</code>（打开指定网址或页面）、<code>article</code>（打开站内文章详情）、<code>externalPage</code>（打开这篇文章自己配置的独立页面）。想加一项就照上面的格式复制一行。</p>
-                <p>反馈表单是站内视图 <code>index.html?view=feedback</code>（和「全部折腾」同一套，不单独占一个页面）：表单结构在 <code>index.html</code> 的 <code>#view-feedback</code> 里，样式在 <code>css/style.css</code> 的「问题反馈视图」一节，校验和提交逻辑在 <code>js/script.js</code> 的「问题反馈 / 提交成功」一节。反馈类型包括「文章问题」「Bug 反馈」「功能建议」「排版样式」和「其他」。<code>project_subpage/blog/feedback.html</code> 现在只是个跳转桩，旧链接跟过来会自动落到新地址。</p>
+                <p>反馈表单是站内视图 <code>/?view=feedback</code>（和「全部折腾」同一套，不单独占一个页面）：表单结构在 <code>index.html</code> 的 <code>#view-feedback</code> 里，样式在 <code>css/style.css</code> 的「问题反馈视图」一节，校验和提交逻辑在 <code>js/script.js</code> 的「问题反馈 / 提交成功」一节。反馈类型包括「文章问题」「Bug 反馈」「功能建议」「排版样式」和「其他」。<code>project_subpage/blog/feedback.html</code> 现在只是个跳转桩，旧链接跟过来会自动落到新地址。</p>
 
                 <!-- 6.7 分享文章 -->
                 <h3 class="guide-subtitle">
@@ -1748,11 +1761,104 @@ git push</code></pre>
                     <i class="ri-rocket-2-line"></i>
                     开启 Pages，拿到网址
                 </h3>
-                <p>文件传上去了但还不能访问。最后一步：进你的仓库页面，点上面的 <strong>Settings</strong>，左边菜单里找到 <strong>Pages</strong>。把 <strong>Source</strong> 从 None 改成 <strong>Deploy from a branch</strong>，<strong>Branch</strong> 选 <strong>main</strong>，右边文件夹保持 <strong>/ (root)</strong>，点 <strong>Save</strong>。</p>
-                <p>等一两分钟刷新这个页面，顶上会冒出一个绿色提示，里面就是你的网址。个人主页仓库名为 <code>用户名.github.io</code> 时：</p>
-                <pre><code>https://你的用户名.github.io/仓库名/</code></pre>
-                <p>比如用户名 <code>xiaoming</code>、仓库名 <code>myblog</code>，项目站网址是 <code>https://xiaoming.github.io/myblog/</code>；如果仓库名是 <code>xiaoming.github.io</code>，个人主页网址则是 <code>https://xiaoming.github.io/</code>。</p>
-                <p>以后更新内容：本地改好 → 传上去 → 等一两分钟 → 刷新网站，改动就生效了。</p>
+                <p>文件传上去了但还不能访问。进仓库页面，点 <strong>Settings</strong>，左边菜单找到 <strong>Pages</strong>。这里要选 <strong>Source</strong>（发布来源），有两种选法：</p>
+
+                <div class="guide-table-wrap">
+                    <table class="guide-table">
+                        <thead>
+                            <tr>
+                                <th>Source 选什么</th>
+                                <th>会发生什么</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>GitHub Actions</strong><br>（本仓库用的）</td>
+                                <td>推送后由 <code>.github/workflows/deploy.yml</code> 跑 <code>tools/build-site.js</code>，只把 <code>dist/</code> 里的文件发出去。上线内容由白名单决定，<code>AGENTS.md</code>、<code>tools/</code> 这些开发文件天然不在网上。</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Deploy from a branch</strong><br>（老方式）</td>
+                                <td>直接把仓库根目录发出去，靠 <code>_config.yml</code> 的 exclude 挡住开发文件。能用，但构建过程是个黑盒，配错了整站直接 404。</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p>选 <strong>GitHub Actions</strong>：Source 下拉里选它并保存。然后去仓库顶部的 <strong>Actions</strong> 标签，左侧选「部署站点」，右边点 <strong>Run workflow</strong> 手动跑一次 —— 第一次必须手动触发，因为推代码的那会儿这个工作流还没生效。等它变成绿色，回到 Settings → Pages 就能看到网址。</p>
+
+                <p>个人主页仓库名为 <code>用户名.github.io</code> 时，网址是：</p>
+                <pre><code>https://你的用户名.github.io/</code></pre>
+                <p>普通项目仓库会带上仓库名，比如用户名 <code>xiaoming</code>、仓库名 <code>myblog</code>，网址是 <code>https://xiaoming.github.io/myblog/</code>。</p>
+                <p>以后更新内容：本地改好 → 推送 → Actions 自动重新构建 → 一两分钟后刷新网站就生效，不用再手动跑。</p>
+
+                <h3 class="guide-subtitle">
+                    <i class="ri-terminal-line"></i>
+                    本地看「真正会上线的那一份」
+                </h3>
+                <p>线上跑的是 <code>dist/</code> 里的内容，不是仓库根目录。想确认发布后的样子，或者排查「本地好好的、线上却不对」，先构建一次：</p>
+                <pre><code>node tools/build-site.js</code></pre>
+                <p>它会生成 <code>dist/</code> 文件夹，再用静态服务器指向这个文件夹预览即可（Live Server 右键选 <code>dist/index.html</code>）。这一步要装 Node.js，没装不影响写博客 —— 推送后 GitHub 会替你构建。</p>
+
+                <div class="guide-warning">
+                    <div class="guide-warning-title">
+                        <i class="ri-error-warning-line"></i>
+                        加了新页面却访问不到？
+                    </div>
+                    <p>多半是漏加白名单了。<code>tools/build-site.js</code> 顶部有两张清单决定哪些文件会发布：放在 <code>project_subpage/</code>、<code>images/</code> 这些已列目录里会自动带上；放在<strong>仓库根目录</strong>的新文件，或者根目录新建的文件夹，才需要手动加。忘了加不会悄悄漏掉 —— 构建会直接报错并点名那个文件。</p>
+                </div>
+
+                <h3 class="guide-subtitle">
+                    <i class="ri-eye-off-line"></i>
+                    反过来：有页面不想让人看到怎么办
+                </h3>
+                <p>先说结论：<strong>静态站没有访问控制</strong>。只要文件进了 <code>dist/</code>，知道地址的人就能直接打开 —— 没有密码、没有权限，也没有「隐藏页面」这种东西。所以唯一可靠的办法是让它<strong>根本不进产物</strong>。</p>
+                <p>做法很简单，<strong>文件名前加一个下划线</strong>：</p>
+                <pre><code>project_subpage/blog/_draft.html     ← 不进产物，线上访问是 404
+project_subpage/blog/draft.html      ← 会被发布，谁拿到地址都能看
+project_subpage/blog/notes.md        ← .md 一律不发布，笔记放心放</code></pre>
+                <p>以 <code>_</code> 或 <code>.</code> 开头的文件和文件夹会自动跳过，<code>.md</code> / <code>.markdown</code> 也不会复制。这类文件既不会被发出去，也<strong>不会触发「漏发」报错</strong> —— 脚本知道它们本来就不该上线。不用改任何配置。</p>
+
+                <div class="guide-warning">
+                    <div class="guide-warning-title">
+                        <i class="ri-error-warning-line"></i>
+                        「不发布」不等于「保密」
+                    </div>
+                    <p>加下划线只是让线上地址打不开。文件还在仓库里，而仓库是公开的 —— 去 GitHub 上一样能读到全文。真要保密，只能不把它放进这个仓库（放本地或私有仓库）。同理，别把密码、密钥、私人照片放进任何会被提交的位置。</p>
+                </div>
+
+                <h3 class="guide-subtitle">
+                    <i class="ri-flask-line"></i>
+                    可选：亲手验证检查是怎么起作用的
+                </h3>
+                <p>各跑一次，比读十遍说明管用。为了不把测试文件留在仓库里（忘了删会被提交上去），整套实验都在<strong>临时目录里的副本</strong>上做，跑完直接删掉，工作区一点不变。</p>
+                <pre><code># 1. 复制一份到博客文件夹外面（同级目录），工作区一点不动
+SITE=$(basename "$PWD")
+cd ..
+TMP=site-test-tmp
+rm -rf "$TMP"                    # 万一上次没删干净，先清掉
+cp -r "$SITE" "$TMP"
+rm -rf "$TMP/dist" "$TMP/.git" "$TMP/.workbuddy"
+cd "$TMP"
+
+# 2. 正常构建：应该成功，输出 30 个文件
+node tools/build-site.js
+
+# 3. 造一次「根级新页面但没加白名单」
+echo '&lt;title&gt;demo&lt;/title&gt;' &gt; about.html
+node tools/build-site.js
+#    预期：退出码 1，报错点名 about.html（第三道检查）
+
+# 4. 删掉它，再造一次「清单指向空气」
+rm about.html
+rm movie.html
+node tools/build-site.js
+#    预期：报错说 movie.html 在仓库里找不到（第一道检查）
+
+# 5. 收拾：回到上一级，删掉整个副本
+cd ..
+rm -rf "$TMP"</code></pre>
+                <p>两次都报错才是正常的 —— 它们证明「漏发页面」和「清单写错」都不会被悄悄放过。第 4 步要先删 <code>about.html</code>，否则会先被第三道检查拦下，看不到第一道的报错。</p>
+                <p>这三道检查的分工：<strong>第一道</strong>看「清单列了但文件不在」，<strong>第二道</strong>看「产物缺关键文件」（<code>index.html</code>、<code>css/style.css</code> 这些，不依赖清单），<strong>第三道</strong>反过来扫仓库所有 <code>.html</code>，看有没有页面没进产物。三者盲区不重叠，少一道就会有漏网的情况。</p>
 
                 <div class="guide-warning">
                     <div class="guide-warning-title">
@@ -1823,6 +1929,14 @@ git push</code></pre>
                                 <td><code>js/image-loading.js</code></td>
                                 <td>网页不会坏，但文章图片会直接硬加载：没有模糊占位，加载时页面会跳一下，高速/慢速链接的自动切换也失效。</td>
                             </tr>
+                            <tr>
+                                <td><code>tools/build-site.js</code></td>
+                                <td>网页不会立刻坏，但下次推送时 Actions 构建不了，站点停在旧版本 —— 你明明改了东西却看不到变化。</td>
+                            </tr>
+                            <tr>
+                                <td><code>.github/workflows/deploy.yml</code></td>
+                                <td>网页不会坏，但推送后不再自动发布，线上一直是旧内容。这种「以为更新了、其实没更新」最难自己发现。</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -1831,7 +1945,7 @@ git push</code></pre>
                     <i class="ri-checkbox-circle-line"></i>
                     删了也没事的
                 </h3>
-                <p><code>archive/music-player.js</code> 是旧版播放器，页面根本没加载它。<code>README.md</code> 是纯文字说明，不参与网页显示。</p>
+                <p><code>archive/music-player.js</code> 是旧版播放器，页面根本没加载它。<code>README.md</code> 和 <code>AGENTS.md</code> 是纯文字说明，不参与网页显示。<code>_config.yml</code> 是以前用 Jekyll 发布时的配置，改成 Actions 之后它不再起作用，留着只是为了万一要切回老方式。</p>
 
                 <h3 class="guide-subtitle">
                     <i class="ri-alert-line"></i>

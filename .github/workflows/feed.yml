@@ -54,6 +54,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add feed.xml
-          # [skip ci] 会让这次提交不再触发新的 workflow（同上面的 actor 判断，双保险）
-          git commit -m "chore: 重新生成 feed.xml [skip ci]"
+          # 这里**故意不加** [skip ci]。
+          # 加了会连「部署站点」workflow 一起跳过：以前的分支发布只认分支内容，
+          # 提交一上去 Pages 就重建；现在走 Actions，部署要靠 push 事件触发，
+          # 带 [skip ci] 的话新 feed.xml 要等下一次正常 push 才会真的上线。
+          # 防自激仍然有效 —— 上面那句 `if: github.actor != 'github-actions[bot]'`
+          # 保证这次机器人提交不会再跑一遍本 workflow。
+          git commit -m "chore: 重新生成 feed.xml"
           git push

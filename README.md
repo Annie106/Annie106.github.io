@@ -2,7 +2,7 @@
 
 > 由 AI 辅助构建
 
-原生 HTML + CSS + JavaScript 的静态博客，无依赖、无构建。
+原生 HTML + CSS + JavaScript 的静态博客，无 npm 依赖。构建只有一步：按白名单把要发布的文件复制到 `dist/`。
 
 完整配置教程在站内「使用指南」文章（`project_subpage/blog/guide.html`），本文件只做速查。让 AI 改这个仓库之前，先让它读 `AGENTS.md`。
 
@@ -21,8 +21,11 @@ fonts/remixicon.woff2       图标字体文件，约 165 KB
 _template.html              新建页面时复制这份，head 已经引对了样式
 feed.xml                    RSS 订阅源，由 tools/build-feed.js 生成，别手改
 .github/workflows/feed.yml  push 文章数据时自动重建并提交 feed.xml
+.github/workflows/deploy.yml 跑构建并把 dist/ 发布到 GitHub Pages
 tools/check-icons.js        图标自检：CDN 残留、图标名是否存在、页面是否引了样式
 tools/build-feed.js         从 js/posts-data.js 生成 feed.xml
+tools/build-site.js         按白名单生成发布产物 dist/（构建入口）
+dist/                       发布产物，已 gitignore，由 build-site.js 生成
 AGENTS.md                   给 AI 工具的项目约定，跨工具生效
 js/posts-data.js            全部文章数据（首页与归档页共用）
 js/script.js                筛选、搜索、路由、页面状态
@@ -33,7 +36,7 @@ js/background-music.js      首页背景音乐
 js/copyToClipboard.js       联系方式复制
 js/image-loading.js         图片占位与清晰化
 project_subpage/blog/       站点页：contact / guide / submission / thanks / 文章内嵌页 ...
-project_subpage/projects/   项目页：appeal-guide / download ...
+project_subpage/projects/   项目页：appeal-guide ...
 archive/                    归档，不参与显示
 ```
 
@@ -44,8 +47,8 @@ archive/                    归档，不参与显示
 - 全站搜索（<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd> 或 <kbd>/</kbd>）：搜标题、摘要、标签、正文；多关键词按「与」匹配，命中高亮，空状态给最近搜索与标签入口
 - 文章卡片「⋯」菜单支持三类：站内文章、独立页面（`externalPage`）、自定义链接（`link`）
 - 文章可内嵌独立 HTML（`embeddedPage`），自动调高并跟随主题
-- 每篇公开文章使用 Giscus 展示 GitHub Discussions 评论；博客启动时会低优先级预载 Giscus 脚本和连接，打开文章时再加载对应讨论；文章卡片的「查看评论」切到站内评论视图（`index.html?view=comments`），讨论串按文章 ID 区分；仓库需启用 Discussions 并安装 Giscus App
-- 分享链接形如 `index.html?article=<id>`；微信内改为复制链接 + 右上角引导，其它端走系统分享
+- 每篇公开文章使用 Giscus 展示 GitHub Discussions 评论；博客启动时会低优先级预载 Giscus 脚本和连接，打开文章时再加载对应讨论；文章卡片的「查看评论」切到站内评论视图（`/?view=comments`），讨论串按文章 ID 区分；仓库需启用 Discussions 并安装 Giscus App
+- 分享链接形如 `/?article=<id>`；微信内改为复制链接 + 右上角引导，其它端走系统分享。地址栏不留 `index.html`（启动时自动收敛成根路径）
 - `isPublic: false` 关闭单篇正文，改为 `true` 恢复
 - 页面状态记忆：离开文章、切标签、关页后返回，恢复视图与滚动位置
 - 正文链接加 `class="gated-link"` 后点击弹出「链接已停止访问」提示
@@ -88,7 +91,7 @@ node tools/check-icons.js
 几个注意点：
 
 - 分享封面必须写绝对地址，如 `https://annie106.github.io/share_cover.jpg`；相对路径抓不到，带 Referer 鉴权的 CDN 也抓不到。
-- 全站共用一个 `index.html?article=N` 页面，微信不执行 JS，所以所有文章共用同一张封面。
+- 全站共用一个 `/?article=N` 地址，微信不执行 JS，所以所有文章共用同一张封面。
 - 改文章 `id` 会让已分享的链接失效。
 - 首页标签在 `js/script.js` 的 `renderTagPills` 里，目前是「置顶 / 社交 / 随笔」。
 - 移动或重命名子页面后，同步 `embeddedPage` 与 `articleMenus` 的路径。
@@ -132,7 +135,18 @@ python -m http.server 8000
 
 ## 部署
 
-静态站，放到 GitHub Pages 或任意静态托管即可，无需后端与构建。`feed.xml` 是构建产物但必须一起提交——GitHub Pages 不会帮你跑脚本，所以仓库里带了那个 workflow。
+自己构建，GitHub 只负责托管。
+
+```bash
+node tools/build-site.js    # 生成 dist/，白名单在脚本顶部
+```
+
+- 该发布的文件由 `tools/build-site.js` 的白名单决定，开发文件（`AGENTS.md`、`README.md`、`tools/`、`_config.yml`）不会进入产物 —— 线上访问它们是 404。
+- 新页面放在 `project_subpage/` 或 `archive/` 里会自动带上；放在根目录或新建根级目录才要加白名单。**忘了加不会静默放过**：脚本会比对仓库里的 `.html` 和产物，发现有源码没产物的页面就报错退出。
+- push 到 main 后 `.github/workflows/deploy.yml` 自动构建并发布 `dist/`。
+- ⚠️ 仓库设置的 Pages → Source 必须是「GitHub Actions」。改成网页上那一步只能人工做；如果源还是分支发布，站点会由旧的 Jekyll 流程提供，新产物不会生效。
+- `dist/` 是产物、已 gitignore，不要提交。
+- `feed.xml` 是构建产物但必须提交（Pages 不会替你跑脚本），由 `.github/workflows/feed.yml` 在文章数据变化时自动重建。
 
 ## 许可证
 

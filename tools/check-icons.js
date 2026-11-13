@@ -13,7 +13,9 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const SKIP_DIRS = new Set(['.git', '.workbuddy', 'node_modules', 'images']);
+/* dist 是 build-site.js 的产物，里面是被复制的副本。扫它只会让统计翻倍、
+   把同一个问题报两遍，所以直接跳过 —— 自检的对象始终是源码。 */
+const SKIP_DIRS = new Set(['.git', '.workbuddy', 'node_modules', 'images', 'dist']);
 const SKIP_FILES = new Set(['package-lock.json']);
 
 // 文档里的示意写法，不是真图标名
@@ -25,7 +27,7 @@ const warns = [];
 /* ---------- 1. 收集本地字体里存在的图标名 ---------- */
 const iconsCssPath = path.join(ROOT, 'fonts', 'icons.css');
 if (!fs.existsSync(iconsCssPath)) {
-    console.error('✗ 找不到 fonts/icons.css —— 图标字体缺失，先按 AGENTS.md 恢复本地副本');
+    console.error('[X] 找不到 fonts/icons.css —— 图标字体缺失，先按 AGENTS.md 恢复本地副本');
     process.exit(1);
 }
 const iconsCss = fs.readFileSync(iconsCssPath, 'utf8');
@@ -98,7 +100,7 @@ for (const { name, where } of missing) {
 }
 
 /* ---------- 4. 输出 ---------- */
-const ok = (msg) => console.log(`✓ ${msg}`);
+const ok = (msg) => console.log(`[OK] ${msg}`);
 console.log(`\n图标自检 · 本地字体共 ${available.size} 个图标\n`);
 
 if (errors.length === 0) {
@@ -109,6 +111,6 @@ if (errors.length === 0) {
     process.exit(0);
 }
 
-for (const e of errors) console.log(`✗ ${e}`);
+for (const e of errors) console.log(`[X] ${e}`);
 console.log(`\n共 ${errors.length} 个问题。图标名请对照 https://remixicon.com 核对（注意 -line / -fill 后缀）。\n`);
 process.exit(1);

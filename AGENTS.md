@@ -8,10 +8,10 @@
 
 ## 这个站是什么
 
-纯静态博客：原生 HTML + CSS + JavaScript，**没有构建步骤、没有 npm 依赖、没有后端**，直接跑在 GitHub Pages 上。
+纯静态博客：原生 HTML + CSS + JavaScript，**没有 npm 依赖、没有后端**，托管在 GitHub Pages 上。
 
-- 不要引入打包器、框架、TypeScript、CSS 预处理器或任何 npm 运行依赖。
-- 不要新增构建产物目录。仓库里能直接打开的文件就是线上文件。
+- 不要引入打包器、框架、TypeScript、CSS 预处理器或任何 npm 运行依赖。唯一的构建步骤是 `tools/build-site.js`，它只做一件事：按白名单把要发布的文件**复制**到 `dist/`。不要把它扩展成打包器（不编译、不转译、不哈希、不压缩）。
+- `dist/` 是产物目录，已在 `.gitignore` 里；页面源码仍然是「能直接打开就能看」的原样文件，产物只是同一批文件的副本。见「构建与部署」一节。
 - 所有路径都是相对路径（用户站部署在根路径，但本地也可能用 file:// 打开）。
 
 ## 图标：只用本地字体，禁止 CDN
@@ -80,7 +80,7 @@
 - 进出**都用 `@keyframes`（`bootIn` / `bootOut`），不要改回 `transition`**：退场是「加一个类 + 删另一个类」，两次样式变更可能落在同一帧被合并，transition 会被整个跳过——表现就是弹窗「啪」地消失、没有淡出。`.site-toast` 重播入场时踩过同一个坑。
 - 配色一律用 CSS 变量（`--color-bg`、`--color-text-primary`、`--color-border`、`--card-accent` 等），深色模式在 `[data-theme="dark"]` 里覆盖变量，**不要写死色值**，否则深色模式下会失效。
 - 新增基于位移/透明度的动画，请一并处理 `@media (prefers-reduced-motion: reduce)`。
-- ⚠️ **站内视图（`index.html?view=xxx`）激活时挂的类是 `.active-view`，文章详情才是 `.active`。** 想按「当前在哪个视图」写规则，选择器必须是 `#view-comments.active-view ~ .site-footer` 这种；写成 `.active` 不会报错，只会**静默不生效**（2026-11-13 踩过一次，靠无头 Chrome 量 `getBoundingClientRect` 才发现）。
+- ⚠️ **站内视图（`?view=xxx`）激活时挂的类是 `.active-view`，文章详情才是 `.active`。** 想按「当前在哪个视图」写规则，选择器必须是 `#view-comments.active-view ~ .site-footer` 这种；写成 `.active` 不会报错，只会**静默不生效**（2026-11-13 踩过一次，靠无头 Chrome 量 `getBoundingClientRect` 才发现）。
 - 「评论视图」（`?view=comments`）的底栏 `.comments-view-bottombar` 有两处特调，别顺手删：① 行里的 `.back-link` 要把自带的 24px `margin-bottom` 清 0，否则行盒被撑高 24px、文字顶到行首而按钮仍居中；② 视自身 `padding-bottom: 0`，底部间距由 `#view-comments.active-view ~ .site-footer { margin-top: 20px }` 统一给，保证分割线到这一行、这一行到页脚分割线**都是 20px**。
 
 ### 滚动条：只在 html 上声明一次，不要写 `::-webkit-scrollbar`
@@ -92,23 +92,51 @@
 - 别再给滚动条写 `background: var(--color-border)`：`#2a2e37` 压在 `#0f1115` 上几乎看不见，深色下等于没有滑块。这正是这次要修的 bug。
 - `[data-theme="dark"]` 上还声明了 `color-scheme: dark`，让原生控件（输入框、下拉、日期面板、复选框）和浏览器自带滚动条一起切到深色渲染。新增控件如果写了显式颜色，照旧用变量即可，不用管它。
 
+## 地址栏里不留 index.html
+
+用户明确要求主页地址就是 `https://annie106.github.io/`，不要出现 `/index.html`。2026-11-13 落地。
+
+- `script.js` 的 `normalizeHomeUrl()` 在 `init()` 第一行执行：把 `/index.html` 收敛成 `/`，`?article=` / `?view=` 等参数一个不动，`history.state` 也照旧。所以从站外链接、404 兜底、子页面跳回来，落地瞬间地址栏就是干净的。
+- ⚠️ **`file://` 下这个函数直接 return，别"顺手"删掉这个判断**：本地把 `index.html` 换成目录，浏览器会去列目录而不是渲染页面，预览反而打不开。
+- 新生成的 URL 一律用**查询串形式**（`?article=N`、`?view=xxx`），让 pathname 保持当前值：
+  - `buildFeedbackUrl()` 返回 `'?' + params`，不拼 `index.html`
+  - `tools/build-feed.js` 的 `articleUrl()` 返回 `https://annie106.github.io/?article=N`
+  - `404.html` 的兜底跳转写 `/?`，不是 `/index.html?`
+- 页面里现存的 `href="index.html?view=xxx"` **可以保留**：SPA 会拦下点击（不产生导航），真有整页跳转也会被 `normalizeHomeUrl` 收敛。但新建页面时优先写查询串，别主动加文件名。
+- `syncUrlWithView()` 只改 query、**原样保留 pathname** —— 所以入口的 pathname 决定了之后所有地址栏形态。别把它改成拼接死路径。
+- 验证手法：起本地 http server，用临时页 iframe 读 `contentWindow.location` 对比 `pathname + search`。**每个用例必须用独立的 `--user-data-dir`**，否则 `sessionStorage` 里的「上次所在视图」会污染下一个用例 —— 表现是 `/` 被改写成 `/?view=about`，看着像 bug，其实是视图记忆（`readViewState`）。
+
 ## 别乱动的地方
 
-- `js/script.js` 是 SPA 式路由核心（`index.html?article=N`、`?view=xxx`、浏览器返回键、滚动位置恢复）。这里的逻辑和历史记录强耦合，改动前先读相关注释，不要顺手重构。
+- `js/script.js` 是 SPA 式路由核心（`/?article=N`、`?view=xxx`、浏览器返回键、滚动位置恢复）。这里的逻辑和历史记录强耦合，改动前先读相关注释，不要顺手重构。
 - `js/posts-data.js` / `js/tweaks-data.js` 是数据文件：可以增删条目，但不要改字段名，`script.js` 依赖它们。
 - `favicon.svg`、`share_cover.jpg` 被多个页面和分享卡片引用，改文件名要同步全站。
-- **`_config.yml` 不是站点配置，是用来把开发文件挡在发布产物外面的。** 这个仓库没有 `.nojekyll`，所以 GitHub Pages 走 Jekyll 构建；`exclude` 里的 `README.md` / `AGENTS.md` / `check-icons.bat` / `tools` 不进 `_site`，访问它们就是 404。**这是纯静态站唯一能让「仓库里确实存在」的文件返回 404 的办法** —— Pages 没有服务端，写不了 `.htaccess`，也没有中间件能拦。
-  - ⚠️ **别加 `.nojekyll`**。一加 Jekyll 就不跑了，`exclude` 立刻失效，那几个文件重新暴露。
-  - ⚠️ **别把 `favicon.svg` 或 `share_cover.jpg` 写进 exclude**。前者是每个页面的 `rel="icon"`，后者是 `og:image`（微信 / QQ 分享卡片靠它）；排掉就是全站标签页没图标、分享出去一张空白图。
-  - `.workbuddy/`、`.github/`、`_template.html` 是点 / 下划线开头，Jekyll 默认就忽略，不用重复写。
-  - 这个文件写错会让构建失败、**整站变 404**，所以只放 `exclude`，别往里加别的配置。
-  - 另外要清楚它挡的是「路过的人顺手点一下」，**不是安全措施**：源码本来就在公开的 GitHub 仓库里，想看的人直接去仓库就能读到。
+- **发布走自建构建，不再让 Pages 跑 Jekyll。** 详见下面「构建与部署」一节。
+
+## 构建与部署：自己生成产物，GitHub 只负责托管
+
+2026-11-13 之前是「Pages 直接吃仓库根目录 + 用 `_config.yml` 的 `exclude` 挡开发文件」。现在改成自己构建。
+
+- **`tools/build-site.js` 是唯一的发布入口。** 它按**白名单**把该发布的文件复制到 `dist/`，开发文件一个都进不去。用白名单而不是黑名单：漏发一个页面会立刻 404、当场发现；误发一个开发文件（`AGENTS.md`、`tools/`）往往没人察觉。
+  - 白名单在脚本顶部：`PUBLISH_FILES`（根级文件）+ `PUBLISH_DIRS`（目录）。新页面只要落在 `project_subpage/`、`archive/` 这些已列目录里就**自动带上，不用改脚本**；只有新增**根级文件**（`robots.txt`、`sitemap.xml`、根目录的 `about.html`）或**根级新目录**（`assets/`）才需要加。
+  - **不想发布的内容，用下划线前缀。** 以 `_` 或 `.` 开头的文件和目录一律不进产物（`_draft.html`、`_notes/`、`.env`），`.md` / `.markdown` 也不进。这一条比改脚本重要：白名单里的目录是**整份递归复制**的，放在 `project_subpage/blog/` 下的任何文件都会被发出去 —— 包括草稿页和笔记，而 orphans 检查拦不住它们（在产物里确实存在）。静态站没有访问控制，进了 `dist/` 就等于公开，所以只能在「不发出去」这一层解决。
+  - **漏加会被拦下来。** 脚本会扫仓库里所有 `.html` 和产物逐一比对，发现「有源码、没进产物」的页面就直接报错退出并点名文件 —— 因为这种漏发在构建时不会暴露，只会在线上变成 404，是最难自己发现的一类问题。确实不该上线的页面优先用下划线前缀；不以下划线命名的例外写进脚本顶部的 `IGNORE_HTML`（目前只有 `_template.html`，其实已被 `_` 规则覆盖，留作示例）。
+  - 脚本末尾还有一组 `MUST_HAVE` 校验，产物缺关键文件同样直接报错退出，不会发出一份残站。
+- **`.github/workflows/deploy.yml`** 在 push 到 main 时执行构建，再用 `upload-pages-artifact` + `deploy-pages` 发布 `dist/`。**Pages 的 Source 必须设成「GitHub Actions」**（Settings → Pages），否则部署步骤会失败 —— 这一步只能人工在网页上改，代码改不了。
+  - 推荐的切换顺序：① 先 push 代码（此时 Source 还是分支发布，站点照常由 Jekyll 提供，只是 Actions 部署那步会失败）→ ② 去 Settings 把 Source 改成「GitHub Actions」→ ③ 在 Actions 页面手动 Run 一次「部署站点」。反过来先改 Source 会出现一段「还没有任何产物」的 404 空窗。
+- **`dist/` 进 `.gitignore`，不要提交。** 它是产物不是源码。本地想看线上效果：`node tools/build-site.js`，然后起静态服务器指向 `dist/`。
+- ⚠️ **这台机器上 `fs.cpSync` 和 `fs.rmSync` 都不要用。**
+  - `cpSync`：Windows + Node 22.22 下会让 node 进程直接崩掉 —— **没有任何报错、退出码 127、stdout 全空**，只复制了前面几个文件，排查极费时间。
+  - `rmSync`：被工具链 shim 成「移到回收站」，回收站操作偶尔抛 `Some operations were aborted`，整个构建失败，而报错内容和站点毫无关系，极易误判成脚本逻辑错。
+  - 所以 `build-site.js` 里是手写递归复制 + 逐项 `unlinkSync` / `rmdirSync` 清空。别"优化"回这两个 API。
+- `_config.yml` 是分支发布时代的遗留，现在**不起作用**（Pages 不再跑 Jekyll，也不会看它的 exclude）。留着只是万一要切回分支发布时还有个兜底；确认 Actions 部署稳定后可以删。
+- 注意这是「构建规则由你定、执行交给 CI」，不是「本地整站打包上传」。GitHub Pages 没有手动上传产物的入口，只有分支发布或 Actions 发布两条路。如果哪天要求构建也完全在本地完成，做法是本地生成 `dist/` 再推到 `gh-pages` 分支、Source 选那个分支 —— 但那样容易漏跑脚本导致线上是旧内容，除非明确要求，别改。
 
 ## 「获取联系」页与 404 浮窗
 
 `project_subpage/blog/contact.html` 是一张**双形态**的页面，`404.html` 里的浮窗是它的第二个入口。改这两处前先读这一节。
 
-- 页面内容是四张联系方式卡片：**微信 `sossil`、QQ `3810710631`（这两张点了复制号码）+ 主邮箱 `anniedv106@gmail.com`、备用邮箱 `anniedv106@126.com`（这两张是 mailto）**，外加一行回复时效说明。版面是**两竖列**：左列微信 / QQ（`.contact-channel-group`），右列两个邮箱；窄屏时每列各自落下，顺序还是 微信 → QQ → 邮箱 → 备用邮箱，别再改回 2×2 那种「微信|QQ 一行、邮箱|备用 一行」。⚠️ 卡片是 `<button>`（微信/QQ）和 `<a>`（邮箱）混用的，**`.contact-channel` 上的 `line-height: 1.5` 不能删**：button 不继承 `body` 的 1.7、a 会继承，删掉两列卡片高度差 8px，右边整体比左边高一截。**`.contact-channel-group` 和 `.contact-channel` 上的 `min-width: 0` 也不能删**：栅格项默认 `min-width: auto`，邮箱那列会把容器顶宽几像素，手机底部就冒出一条横向滚动条（320px 宽实测会多出 4px）。复制走的是「谁带 `data-copy` 就复制谁、`data-copy-toast` 决定提示语」的委托写法，**加一条联系方式只要多写一张卡片，不用改 JS**。**不要再往里加表单**：2026-11-12 按用户要求删掉了原来的 web3forms 留言表单，投稿/反馈统一走站内的 `index.html?view=feedback`。
+- 页面内容是四张联系方式卡片：**微信 `sossil`、QQ `3810710631`（这两张点了复制号码）+ 主邮箱 `anniedv106@gmail.com`、备用邮箱 `anniedv106@126.com`（这两张是 mailto）**，外加一行回复时效说明。版面是**两竖列**：左列微信 / QQ（`.contact-channel-group`），右列两个邮箱；窄屏时每列各自落下，顺序还是 微信 → QQ → 邮箱 → 备用邮箱，别再改回 2×2 那种「微信|QQ 一行、邮箱|备用 一行」。⚠️ 卡片是 `<button>`（微信/QQ）和 `<a>`（邮箱）混用的，**`.contact-channel` 上的 `line-height: 1.5` 不能删**：button 不继承 `body` 的 1.7、a 会继承，删掉两列卡片高度差 8px，右边整体比左边高一截。**`.contact-channel-group` 和 `.contact-channel` 上的 `min-width: 0` 也不能删**：栅格项默认 `min-width: auto`，邮箱那列会把容器顶宽几像素，手机底部就冒出一条横向滚动条（320px 宽实测会多出 4px）。复制走的是「谁带 `data-copy` 就复制谁、`data-copy-toast` 决定提示语」的委托写法，**加一条联系方式只要多写一张卡片，不用改 JS**。**不要再往里加表单**：2026-11-12 按用户要求删掉了原来的 web3forms 留言表单，投稿/反馈统一走站内的 `/?view=feedback`。
 - 独立访问 = 完整页面（带 `// Contact` 页头、“获取联系”大标题）。
 - 加 `?embedded=1` = 浮窗形态：JS 在 `<head>` 里就给 `<html>` 加上 `.is-embedded`，只做两件事——**隐藏 `.contact-hero`、收紧上下内边距**。标题由浮窗自己的标题栏给。
 - ⚠️ **这一页的 `<head>` 不要加 `<meta name="color-scheme" content="light dark">`，文档背景也不要设成 `transparent`。** 两个坑叠在一起出过一次真实的翻车：meta 让浏览器按**系统偏好**决定画布配色，而站内的深浅色是 `data-theme` 说了算，两边不一致时（系统深色 + 站内浅色）画布被涂成近黑、浅色内容直接画在深色底上，深色标题几乎看不见；再叠加透明底，连“自己的底色”都没有了。现在的写法是 `html { color-scheme: light }` 把 UA 层钉死在 `data-theme` 上（深色仍由 `style.css` 的 `[data-theme="dark"]` 接管），并让页面自己铺 `--color-bg`。404 的 `--panel-bg` 取值和它一致，所以照样无缝。

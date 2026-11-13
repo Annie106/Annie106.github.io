@@ -46,8 +46,10 @@ const ROOT = path.resolve(__dirname, '..');
 const POSTS_FILE = path.join(ROOT, 'js', 'posts-data.js');
 const OUTPUT_FILE = path.join(ROOT, 'feed.xml');
 
-/* 站点根地址。文章链接是 index.html?article=N 这种查询串形式，
-   feed 里的 guid / link 都要拼成绝对地址，阅读器才能点开 */
+/* 站点根地址。文章链接是根路径 + 查询串（/?article=N）这种形式，
+   feed 里的 guid / link 都要拼成绝对地址，阅读器才能点开。
+   不要拼成 index.html?article=N：地址栏会一直挂着文件名，
+   站点启动时虽然会收敛成 /，但订阅链接本身干净一点更好。 */
 const SITE = 'https://annie106.github.io/';
 const FEED_URL = SITE + 'feed.xml';
 
@@ -129,7 +131,7 @@ function sortKey(post) {
 }
 
 function articleUrl(post) {
-    return `${SITE}index.html?article=${post.id}`;
+    return `${SITE}?article=${post.id}`;
 }
 
 function itemXml(post) {
@@ -203,7 +205,7 @@ function main() {
 
     const count = Math.min(posts.length, MAX_ITEMS);
     const size = (Buffer.byteLength(xml, 'utf8') / 1024).toFixed(1);
-    console.log(`✓ feed.xml 已生成：${count} 篇，${size} KB`);
+    console.log(`[OK] feed.xml 已生成：${count} 篇，${size} KB`);
     console.log(`  订阅地址 ${FEED_URL}`);
     console.log(`  最新一篇 ${sortKey(posts.slice().sort(function (a, b) { return sortKey(b).localeCompare(sortKey(a)); })[0])}`);
 

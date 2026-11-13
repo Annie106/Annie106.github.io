@@ -1,0 +1,63 @@
+# 自己构建、再交给 GitHub 托管。
+#
+# 和以前「Pages 直接吃仓库根目录 + Jekyll exclude」的区别：
+#   以前 —— GitHub 跑一趟 Jekyll，靠 _config.yml 的 exclude 把开发文件挡在产物外
+#   现在 —— 本地/CI 用 tools/build-site.js 生成 dist/，只有 dist/ 会被发出去，
+#            GitHub 不参与任何构建决策，只负责托管静态文件
+#
+# ⚠️ 首次使用前必须在仓库里改一次设置：
+#    Settings → Pages → Build and deployment → Source 选「GitHub Actions」
+#    这一步没法由代码完成（需要仓库 admin 权限）。
+#    没改之前，这个 workflow 的 deploy-pages 会失败，但站点仍由旧的分支发布流程
+#    继续提供，不会挂掉。
+name: 部署站点
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Pages 部署需要这三个权限；contents: read 就够，因为我们只读源码
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一时间只跑一个部署。不取消进行中的那个 —— 中途取消会留下半个产物
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取仓库
+        uses: actions/checkout@v4
+
+      - name: 准备 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 生成发布产物 dist/
+        run: node tools/build-site.js
+
+      - name: 配置 Pages
+        uses: actions/configure-pages@v5
+
+      - name: 上传产物
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 部署到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
