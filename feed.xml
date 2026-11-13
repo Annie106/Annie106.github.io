@@ -7,9 +7,18 @@
     <link>https://annie106.github.io/</link>
     <description>思考 · 记录 · 创造 —— 记录阅读、成长和日常灵感。</description>
     <language>zh-cn</language>
-    <lastBuildDate>Mon, 09 Nov 2026 00:00:00 +0800</lastBuildDate>
+    <lastBuildDate>Fri, 13 Nov 2026 00:00:00 +0800</lastBuildDate>
     <generator>tools/build-feed.js</generator>
     <atom:link href="https://annie106.github.io/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>心有波澜：在喧嚣的人世间，找回被生活点燃的自己</title>
+      <link>https://annie106.github.io/index.html?article=16</link>
+      <guid isPermaLink="true">https://annie106.github.io/index.html?article=16</guid>
+      <pubDate>Fri, 13 Nov 2026 00:00:00 +0800</pubDate>
+      <description>绝望不是放声痛哭，而是对什么都提不起兴趣。让人真正老去的，是心里再也掀不起波澜。</description>
+      <category>随笔</category>
+      <media:thumbnail url="https://annie106.github.io/share_cover.jpg"/>
+    </item>
     <item>
       <title>电影板块停了，这次是真的</title>
       <link>https://annie106.github.io/index.html?article=15</link>
@@ -77,15 +86,6 @@
       <category>第五人格</category>
       <category>随笔</category>
       <category>社交</category>
-      <media:thumbnail url="https://annie106.github.io/share_cover.jpg"/>
-    </item>
-    <item>
-      <title>直链下载</title>
-      <link>https://annie106.github.io/index.html?article=9</link>
-      <guid isPermaLink="true">https://annie106.github.io/index.html?article=9</guid>
-      <pubDate>Wed, 07 Oct 2026 00:00:00 +0800</pubDate>
-      <description>直链下载页面</description>
-      <category>直链下载</category>
       <media:thumbnail url="https://annie106.github.io/share_cover.jpg"/>
     </item>
     <item>

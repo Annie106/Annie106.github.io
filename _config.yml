@@ -1,0 +1,27 @@
+# GitHub Pages 走 Jekyll 构建（仓库里没有 .nojekyll）。
+# 被 exclude 的文件不会进入构建产物，访问它们就直接落到 404.html ——
+# 这是纯静态站唯一能让「仓库里确实存在」的文件返回 404 的办法：
+# Pages 没有服务端，写不了 .htaccess，也没有中间件可以拦。
+#
+# 三个注意：
+# 1. 自定义 exclude 会**替换** Jekyll 的默认排除列表，所以下面把常见的
+#    那几个（Gemfile / node_modules / vendor）也一并列上。
+# 2. **别把页面真正要用的资源排除掉**：favicon.svg 是每个页面的 rel=icon，
+#    share_cover.jpg 是 og:image（微信 / QQ 分享卡片靠它）。这两个必须留在
+#    产物里，否则全站标签页没图标、分享出去是空白图。
+# 3. 改完要 push 才生效，GitHub Pages 会重跑一次 Jekyll，大约一分钟。
+#    写错会导致构建失败、整站不可用，所以这个文件尽量别加别的东西。
+#
+# 顺带说明：以下这些不需要写进来，Jekyll 本来就忽略
+#   .workbuddy/  .github/   点开头的文件和目录
+#   _template.html          下划线开头的文件（实测直接访问已经是 404）
+
+exclude:
+  - README.md
+  - AGENTS.md
+  - check-icons.bat
+  - tools
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor

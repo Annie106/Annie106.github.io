@@ -8,7 +8,9 @@
         /* ==================== CSS 变量 & 全局重置 ==================== */
         :root {
             --max-width: 1080px;
-            --font-sans: 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
+            /* 中文优先挑字形更圆、UI 感更强的：苹方 → 鸿蒙 → 小米 → Noto → 雅黑。
+               后三个在 Windows 上一般没装，会落到雅黑；装了就用，不需要额外声明。 */
+            --font-sans: 'PingFang SC', 'HarmonyOS Sans SC', 'MiSans', 'Noto Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
             --font-serif: 'Noto Serif SC', 'Songti SC', 'STSong', 'SimSun', serif;
 
             /* 纯白背景下的灰度体系 */
@@ -3175,7 +3177,13 @@
             display: none;
         }
         .article-content {
-            font-family: var(--font-serif);
+            /* 这里原本是 var(--font-serif)。问题是下面只有 p 和 h2 单独覆盖成了
+               无衬线，ul / ol / li / blockquote 全跟着继承 serif，而 --font-serif
+               的前三顺位（Noto Serif SC / Songti SC / STSong）在 Windows 上都没有，
+               于是掉到最后那个 SimSun —— 宋体。表现就是正文是雅黑、一进列表和引用
+               就变成又细又虚的宋体，小字号下锯齿尤其重。基础字体改成 sans 之后
+               所有未显式声明的子元素都统一了。 */
+            font-family: var(--font-sans);
             font-size: 1.05rem;
             line-height: 1.78;
             letter-spacing: -0.01em;
@@ -3261,6 +3269,25 @@
             font-family: var(--font-sans);
             margin: 0 0 0.8em;
             font-weight: 400;
+        }
+
+        /* 列表以前没有专门规则，字体靠继承（就是上面注释里那个宋体问题）。
+           这里只补间距：下边距跟段落对齐，项与项之间留一点缝不挤成一坨，
+           圆点用次一级的颜色，别跟正文抢注意力。 */
+        .article-content ul,
+        .article-content ol {
+            margin: 0 0 0.8em;
+            padding-left: 1.35em;
+        }
+        .article-content li {
+            margin: 0 0 0.45em;
+            padding-left: 0.25em;
+        }
+        .article-content li:last-child {
+            margin-bottom: 0;
+        }
+        .article-content li::marker {
+            color: var(--color-text-tertiary);
         }
 
         /* 需要密码后跳转外部链接的文章：密码弹窗 */
@@ -3543,7 +3570,9 @@
             padding-left: 18px;
             color: var(--color-text-secondary);
             margin: 1.6em 0;
-            font-style: italic;
+            /* 不用 italic：中文没有真正的斜体，浏览器是把字形整体斜着拉出来的，
+               笔画会发糊、末端发虚，和正文字重也对不上。靠左边线 + 次级颜色区分就够了。 */
+            font-style: normal;
         }
         .article-content code {
             background: var(--color-surface);
@@ -5884,9 +5913,13 @@
         #view-archive {
             padding-top: 26px;
         }
+        /* 归档页原来用的是 --card-accent（#b45f74 玫瑰紫），但那个变量是
+           留给「文章卡片里主标签」那一处彩色强调的（见 :root 的注释），
+           归档页跟着用就等于破了全站黑白基调。这里统一走灰阶：
+           eyebrow 和圆环都用 tertiary，浅色 #999 / 深色 #6d7480，两套主题都成立。 */
         .archive-eyebrow {
             margin-bottom: 18px;
-            color: var(--card-accent);
+            color: var(--color-text-tertiary);
             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
             font-size: 0.72rem;
             font-weight: 500;
@@ -5936,7 +5969,10 @@
             top: 5px;
             width: 15px;
             height: 15px;
-            border: 1.5px solid var(--card-accent);
+            /* 原来是 --card-accent（玫瑰紫），和 eyebrow 一起改成灰阶。
+               用 tertiary 而不是 --color-border：后者 #eaeaea 太淡，
+               这个空心圆是每年那一段的视觉锚点，太淡就等于没有 */
+            border: 1.5px solid var(--color-text-tertiary);
             border-radius: 50%;
             background: var(--color-bg);
         }
@@ -6510,7 +6546,11 @@
            两边一样宽，从文章切过来才不会觉得评论「变窄了」。 */
         .comments-view {
             padding-top: 26px;
-            padding-bottom: 56px;
+            /* 底部留白不在这里给：这一段的下限是页脚的分割线，间距由下面
+               `#view-comments.active ~ .site-footer` 统一给，好让底栏上下
+               两边的留白严格相等。写死 padding-bottom 会和页脚自己的
+               margin-top 叠在一起，就是「上面 20、下面 104」那种失衡。 */
+            padding-bottom: 0;
         }
         .comments-view .comments-view-head {
             max-width: 860px;
@@ -6525,6 +6565,20 @@
             margin: 32px 0 0;
             padding-top: 20px;
             border-top: 1px solid var(--color-border-light);
+        }
+        /* 「返回」自带 24px 下边距（文章页正文里要那个距离），留在这一行里就会
+           把行盒撑高 24px：文字被顶到行首、按钮却按行居中，底栏下面还多出
+           一段看不见的空隙。这里必须清掉，行盒高度才回到按钮的 39.44。 */
+        .comments-view .comments-view-bottombar .back-link {
+            margin-bottom: 0;
+        }
+        /* 底栏上下留白必须相等：上面是分割线 + 20px，下面到页脚分割线也 20px。
+           页脚默认 margin-top 是 48（别的视图要那么大），这里单独收窄；
+           视自身 padding-bottom 已为 0，两个数不会叠加。
+           注意视图激活时挂的类是 .active-view（文章详情才是 .active），
+           写成 .active 会静默不生效。 */
+        #view-comments.active-view ~ .site-footer {
+            margin-top: 20px;
         }
 
         /* ==================== 反馈提交成功视图 ==================== */

@@ -67,16 +67,21 @@
   | `project_subpage/blog/` | `../../css/style.css` | `../../favicon.svg` |
   | `project_subpage/projects/xxx/` | `../../../css/style.css` | `../../../favicon.svg` |
 
-- 每个页面都要有 `<link rel="icon" type="image/svg+xml" href="<层级>/favicon.svg">`。
+- 每个页面都要有 `<link rel="icon" type="image/svg+xml" href="<层级>/favicon.svg">`。**`404.html` 是唯一的例外**：它会被 GitHub Pages 兜到任意路径（`/foo/bar`）上渲染，相对写法会解析成 `/foo/bar/favicon.svg` 又 404 一次，所以必须用站点根路径 `/favicon.svg`（和它里面那个「获取联系」链接同一个道理），本地 `file://` 预览则靠页内脚本退回相对地址。2026-11-13 之前这一页整个漏了 favicon，标签页一直没图标。
 
 ## 改样式
 
 - 全站样式在单文件 `css/style.css`（6000+ 行，按注释分节）。改之前先搜类名，沿用已有的类名前缀（`.article-*`、`.comments-*`、`.feedback-view`、`.home-skeleton` 等）。
+- **文章正文的基础字体必须是 `--font-sans`，别让里面任何子元素继承到 `--font-serif`。** `.article-content` 原来写的是 `var(--font-serif)`，而只有 `p` 和 `h2` 单独覆盖成了无衬线，于是 `ul / ol / li / blockquote` 全跟着落进 `SimSun` —— `--font-serif` 的前三顺位（Noto Serif SC / Songti SC / STSong）在 Windows 上都没有。表现就是正文是雅黑、一进列表和引用突然变成又细又虚的宋体，小字号下锯齿特别重。2026-11-13 已把基础字体改成 sans 修掉。**注意这是「基础值错了、靠个别元素打补丁」造成的**，以后加 `table`、`dl`、`figure` 之类的新块级元素，基础值对了才自动没问题；要是哪天把基础字体改回 serif，这些新元素会一起变宋体。
+- 同理，**`blockquote` 不要写 `font-style: italic`**：中文没有真正的斜体，浏览器是把整个字形斜着拉出来的，笔画会发糊、末端发虚，和正文字重也对不上。靠左边线 + `--color-text-secondary` 区分就够了（已改成 `normal`）。
+- 字体栈 `--font-sans` 的顺序是 `PingFang SC → HarmonyOS Sans SC → MiSans → Noto Sans SC → Microsoft YaHei`，前面几个字形更圆润，但 Windows 默认只会有雅黑。**这是「装了就用、没装就回落」，不是引入 web 字体** —— 中文 web font 动辄几 MB，纯静态站不现实，也别为了「圆一点」去引 CDN 字体。
 - **`index.html` 里那个 `.boot-loading` 的内联 `<style>` 是有意的，不要挪进 `style.css`**：它是首屏「正在加载博客数据…」提示条，要展示的时间正是 `style.css` 还在下载的时候；颜色也因此写死、不用 CSS 变量（那时变量还没定义）。深色靠 `[data-theme="dark"]` 覆盖。
 - `.boot-loading` 的行为：默认隐藏，**加载超过 3 秒**才由元素后面那段内联计时器加上 `.is-visible`（计时器必须在页面里，不能进 `script.js` —— 真慢的时候 `script.js` 正是还没到的东西）。收起由 `script.js` 的 `hideBootLoading()` 在 `init()` 之后加 `.is-leaving`（`@keyframes bootOut`），380ms 后把两个类一起摘掉；若刚露脸就加载完，会补足 700ms 最短展示，避免闪一下。另有 15s 兜底定时器。
 - 进出**都用 `@keyframes`（`bootIn` / `bootOut`），不要改回 `transition`**：退场是「加一个类 + 删另一个类」，两次样式变更可能落在同一帧被合并，transition 会被整个跳过——表现就是弹窗「啪」地消失、没有淡出。`.site-toast` 重播入场时踩过同一个坑。
 - 配色一律用 CSS 变量（`--color-bg`、`--color-text-primary`、`--color-border`、`--card-accent` 等），深色模式在 `[data-theme="dark"]` 里覆盖变量，**不要写死色值**，否则深色模式下会失效。
 - 新增基于位移/透明度的动画，请一并处理 `@media (prefers-reduced-motion: reduce)`。
+- ⚠️ **站内视图（`index.html?view=xxx`）激活时挂的类是 `.active-view`，文章详情才是 `.active`。** 想按「当前在哪个视图」写规则，选择器必须是 `#view-comments.active-view ~ .site-footer` 这种；写成 `.active` 不会报错，只会**静默不生效**（2026-11-13 踩过一次，靠无头 Chrome 量 `getBoundingClientRect` 才发现）。
+- 「评论视图」（`?view=comments`）的底栏 `.comments-view-bottombar` 有两处特调，别顺手删：① 行里的 `.back-link` 要把自带的 24px `margin-bottom` 清 0，否则行盒被撑高 24px、文字顶到行首而按钮仍居中；② 视自身 `padding-bottom: 0`，底部间距由 `#view-comments.active-view ~ .site-footer { margin-top: 20px }` 统一给，保证分割线到这一行、这一行到页脚分割线**都是 20px**。
 
 ### 滚动条：只在 html 上声明一次，不要写 `::-webkit-scrollbar`
 
@@ -92,6 +97,12 @@
 - `js/script.js` 是 SPA 式路由核心（`index.html?article=N`、`?view=xxx`、浏览器返回键、滚动位置恢复）。这里的逻辑和历史记录强耦合，改动前先读相关注释，不要顺手重构。
 - `js/posts-data.js` / `js/tweaks-data.js` 是数据文件：可以增删条目，但不要改字段名，`script.js` 依赖它们。
 - `favicon.svg`、`share_cover.jpg` 被多个页面和分享卡片引用，改文件名要同步全站。
+- **`_config.yml` 不是站点配置，是用来把开发文件挡在发布产物外面的。** 这个仓库没有 `.nojekyll`，所以 GitHub Pages 走 Jekyll 构建；`exclude` 里的 `README.md` / `AGENTS.md` / `check-icons.bat` / `tools` 不进 `_site`，访问它们就是 404。**这是纯静态站唯一能让「仓库里确实存在」的文件返回 404 的办法** —— Pages 没有服务端，写不了 `.htaccess`，也没有中间件能拦。
+  - ⚠️ **别加 `.nojekyll`**。一加 Jekyll 就不跑了，`exclude` 立刻失效，那几个文件重新暴露。
+  - ⚠️ **别把 `favicon.svg` 或 `share_cover.jpg` 写进 exclude**。前者是每个页面的 `rel="icon"`，后者是 `og:image`（微信 / QQ 分享卡片靠它）；排掉就是全站标签页没图标、分享出去一张空白图。
+  - `.workbuddy/`、`.github/`、`_template.html` 是点 / 下划线开头，Jekyll 默认就忽略，不用重复写。
+  - 这个文件写错会让构建失败、**整站变 404**，所以只放 `exclude`，别往里加别的配置。
+  - 另外要清楚它挡的是「路过的人顺手点一下」，**不是安全措施**：源码本来就在公开的 GitHub 仓库里，想看的人直接去仓库就能读到。
 
 ## 「获取联系」页与 404 浮窗
 
@@ -106,7 +117,14 @@
 - **框的高度按内容收，不是写死的**：`contact.html` 在浮窗形态下把 `document.documentElement` 的高度用 `postMessage({ type: 'annie-contact-height' })` 报给父页，父页写进 `iframe.style.height`；`.contact-panel` 只有 `max-height` 封顶。所以浮窗里 `body` 的 `min-height: 0` 不能删——留着 `style.css` 的 `100vh` 就永远量出「和 iframe 一样高」，框缩不回去。**也别给 `.contact-frame` 加 `opacity` 淡入**：起始帧卡住时整个框就是一片空白，现在用的是 `visibility` 一步切到位（实测见过卡帧）。
 - 主题：`contact.html` 自己读 `localStorage` 的 `annie-theme`，同时接受父页面 `postMessage({ type: 'annie-theme' })`，两处都在 `<head>` 里。
 - **浮窗底色用 `--panel-bg`（白 / `#0f1115`），不是 404 自己的 `--card`**：框里那页用的是 `style.css` 的变量，底色要是跟 `--card`（深色 `#1e1e23`）对齐，卡片会比背景更暗，观感是反的。
+- **加载态是骨架，不是转圈**（2026-11-13 换的）。`.contact-loading` 里铺了一层形状照 `contact.html` 抄来的骨架：两列四卡（卡高 77、图标圈 38、gap 12）+ 底部两行说明条，光带 1.4s 一轮。四个要点：
+  1. **数值是照 `contact.html` 抄的，改那页布局必须同步这里**，否则加载完会跳一下。`.contact-frame` 的占位高度也跟着骨架走（桌面 272 / 窄屏 450），**别改回写死的 420** —— 两列真实内容只有 283 高，420 会让面板加载完突然矮一大截。
+  2. **骨架是 `position: absolute`，高度靠 iframe 撑着**。没有 iframe 时会塌成 0 高（调试时把 `hidden` 去掉单独看骨架就会遇到），这不是样式没生效。
+  3. **撤骨架和加 `is-ready` 必须在同一帧**（都放进 `load` 后那 60ms 的 setTimeout）。拆成两步会有 60ms 白屏；以前转圈时看不出来，换成一整块骨架就很显眼。
+  4. 扫光只扫在卡片这一层（`::after` 盖过内部的圈和横条），底色比面板深一档才有对比度；深色下光带只给 `rgba(255,255,255,.07)`，再高就是一块刺眼的亮斑。
 - 404 里那个 `<a href="/project_subpage/blog/contact.html">` **必须是站点根路径**：404.html 会被 GitHub Pages 兜到任意路径（`/foo/bar`）上渲染，相对地址会跟着假路径走成 `/foo/project_subpage/...`，又是一次 404。只有 `file://` 预览才在 JS 里退回相对地址。
+- **这一页的图标是内联 SVG，刻意不用图标字体**（2026-11-13 改）。统一写成 `<svg class="ci" viewBox="0 0 24 24">`，`.ci` 给 `fill: currentColor` + `width/height: 1em`，颜色和尺寸自动跟随所在位置的 `color` / `font-size`，和原来 `<i class="ri-*">` 的表现一致。**别改回 `<i class="ri-*">`，也别在 `<head>` 里加回 `remixicon.woff2` 的 preload**。原因：web 字体在 Chrome 里会拖住窗口的 `load` 事件，而浮窗正是等 iframe 的 `load` 才露脸——本地把 woff2 延迟 2 秒，`DOMContentLoaded` 34ms、`loadEventEnd` 却是 2035ms，用户盯着转圈的全是那个 165 KB 字体。改完这页传输量 243 KB → 80 KB。⚠️ preload 是无条件下载的，当初改完 SVG 后发现字体还在被请求，就是漏了删那条 preload，别再装回去。加图标时从 `remixicon@4.3.0/icons/<分类>/<名字>.svg` 抄 `<path d="...">`：`wechat-fill` / `qq-fill` 在 `Logos/`、`mail-fill` / `mail-send-fill` 在 `Business/`、`file-copy-line` 在 `Document/`、`arrow-right-up-line` 在 `Arrows/`、`time-line` 在 `System/`。
+- **404 页 `load` 之后会预热这四个文件**（`PREFETCH` 数组，逐个列是因为 prefetch 不递归）。实测本地每响应延迟 200ms 模拟跨境 RTT：预热后 iframe 子资源 213ms → 5ms，整体 447ms → 234ms。⚠️ **只有子资源能命中，iframe 的 HTML 文档那一次请求复用不了缓存**——`prefetch`、`prefetch as="document"`、`fetch()` 三种都试过，结果一样，别指望点了是 0 等待。以后这一页新增外链脚本 / 样式，记得同步往上加，少一个就多一次往返。`navigator.connection.saveData` 为真时跳过预取。
 
 ## 订阅源（feed.xml）
 

@@ -998,9 +998,7 @@
 │   │   ├── contact.html     ← 「获取联系」页（404 页的浮窗装的就是它）
 │   │   └── building.html    ← 未完成项目提示页
 │   └── projects/            ← 你自己的项目页
-│       ├── appeal-guide/
-│       │   └── index.html   ← 你自己的项目
-│       └── download/
+│       └── appeal-guide/
 │           └── index.html   ← 你自己的项目
 │
 └── archive/                 ← 归档，不参与网页显示
@@ -1095,7 +1093,7 @@
                 </h3>
                 <p>所有 HTML 页面都引用根目录的 <code>favicon.svg</code>。根目录页面搜索 <code>rel="icon"</code>，引用路径是：</p>
                 <pre><code>&lt;link rel="icon" type="image/svg+xml" href="favicon.svg"&gt;</code></pre>
-                <p>子目录页面也要加同样的标签，但 <code>href</code> 要按页面所在目录写相对路径。例如 <code>project_subpage/blog/</code> 下的页面用 <code>../../favicon.svg</code>，<code>project_subpage/projects/download/</code> 下的页面用 <code>../../../favicon.svg</code>。新建或移动 HTML 页面时检查一下路径，避免图标 404。</p>
+                <p>子目录页面也要加同样的标签，但 <code>href</code> 要按页面所在目录写相对路径。例如 <code>project_subpage/blog/</code> 下的页面用 <code>../../favicon.svg</code>，<code>project_subpage/projects/appeal-guide/</code> 下的页面用 <code>../../../favicon.svg</code>。新建或移动 HTML 页面时检查一下路径，避免图标 404。</p>
                 <p>想换图标时，直接替换根目录的 <code>favicon.svg</code>，所有引用它的页面都会一起更新。</p>
 
                 <!-- 6.3 导航栏 -->
@@ -1306,7 +1304,7 @@
                 <pre><code>&lt;img src="../../images/manor_photos/manor_01.jpg"
      alt="第五人格归宿花房，两个角色站在绣球花与白色玩偶之间"
      width="1728" height="1079"&gt;</code></pre>
-                <p>路径规则：<strong>页面在哪个文件夹，往上数几层才到根目录，就写几个 <code>../</code></strong>。<code>project_subpage/blog/</code> 是两层，所以是 <code>../../images/...</code>；<code>project_subpage/projects/download/</code> 是三层，就是 <code>../../../images/...</code>。图片名和文件夹名<strong>区分大小写</strong>，线上 <code>Images/</code> 和 <code>images/</code> 是两个不同的东西。</p>
+                <p>路径规则：<strong>页面在哪个文件夹，往上数几层才到根目录，就写几个 <code>../</code></strong>。<code>project_subpage/blog/</code> 是两层，所以是 <code>../../images/...</code>；<code>project_subpage/projects/appeal-guide/</code> 是三层，就是 <code>../../../images/...</code>。图片名和文件夹名<strong>区分大小写</strong>，线上 <code>Images/</code> 和 <code>images/</code> 是两个不同的东西。</p>
 
                 <div class="guide-tip">
                     <div class="guide-tip-title">

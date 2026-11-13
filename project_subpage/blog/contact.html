@@ -8,7 +8,9 @@
 
 <link rel="icon" type="image/svg+xml" href="../../favicon.svg">
 <link rel="preload" href="../../fonts/icons.css" as="style">
-<link rel="preload" href="../../fonts/remixicon.woff2" as="font" type="font/woff2" crossorigin>
+<!-- 这里原本还有一条 remixicon.woff2 的 preload。图标改成内联 SVG 后
+     这一页不再需要字体，但 preload 是无条件下载的 —— 留着就会继续拉
+     那 165 KB，并且重新把 load 事件拖慢。删掉，别再往这里加回来。 -->
 
 <script>
     /* 主题必须在样式表之前定好，否则会先闪一帧浅色再切深色。
@@ -84,6 +86,23 @@
         font-size: 0.9375rem;
         line-height: 1.9;
         color: var(--color-text-secondary);
+    }
+
+    /* ---------- 图标：内联 SVG，刻意不用图标字体 ----------
+       全站图标走 fonts/remixicon.woff2（165 KB），但这页只有 7 个图标。
+       更要紧的是：web 字体在 Chrome 里会拖住窗口的 load 事件，
+       而 404.html 的浮窗正是等 iframe 的 load 才露脸——
+       实测把字体延迟 2 秒，DOMContentLoaded 34ms、load 却是 2035ms，
+       也就是用户盯着转圈的全是那个字体。改成内联 SVG 后 load 不再等它。
+       fill 用 currentColor、尺寸用 1em，跟随所在位置的 font-size 和颜色，
+       和原来 <i class="ri-*"> 的表现一致。新增图标时从
+       remixicon@4.3.0/icons/<分类>/<名字>.svg 取 <path> 照抄即可。 */
+    .ci {
+        display: block;
+        width: 1em;
+        height: 1em;
+        flex: none;
+        fill: currentColor;
     }
 
     /* ---------- 联系方式卡片 ----------
@@ -191,7 +210,9 @@
         transition: color var(--transition-fast);
     }
     .contact-channel:hover .contact-channel-action { color: var(--color-text-secondary); }
-    .contact-channel-action i { font-size: 0.9375rem; }
+    /* 这一行的字号是 0.75rem（文案 12px），图标原来单独放大到 0.9375rem，
+       换成 SVG 后不能再用 em 继承，直接给 15px */
+    .contact-channel-action .ci { width: 15px; height: 15px; }
 
     /* 复制成功时把按钮右侧文案切成「已复制」，比只弹一下提示更明确 */
     .contact-channel.is-copied .contact-channel-action { color: var(--color-text-primary); }
@@ -206,7 +227,7 @@
         line-height: 1.7;
         color: var(--color-text-tertiary);
     }
-    .contact-note > i { margin-top: 2px; font-size: 0.9375rem; }
+    .contact-note > .ci { margin-top: 2px; width: 15px; height: 15px; }
     .contact-note-text { min-width: 0; }
     .contact-note-text p { margin: 0; }
     .contact-note-text p + p { margin-top: 4px; }
@@ -259,26 +280,26 @@
             <!-- 复制逻辑是「谁带 data-copy 谁就复制谁」，加一条联系方式不用改 JS -->
             <button class="contact-channel" type="button"
                     data-copy="sossil" data-copy-toast="微信号已复制">
-                <span class="contact-channel-icon"><i class="ri-wechat-fill" aria-hidden="true"></i></span>
+                <span class="contact-channel-icon"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.5753 13.7114C19.0742 13.7114 19.4733 13.2873 19.4733 12.8134C19.4733 12.3145 19.0742 11.9155 18.5753 11.9155C18.0765 11.9155 17.6774 12.3145 17.6774 12.8134C17.6774 13.3123 18.0765 13.7114 18.5753 13.7114ZM14.1497 13.7114C14.6485 13.7114 15.0476 13.2873 15.0476 12.8134C15.0476 12.3145 14.6485 11.9155 14.1497 11.9155C13.6508 11.9155 13.2517 12.3145 13.2517 12.8134C13.2517 13.3123 13.6508 13.7114 14.1497 13.7114ZM20.717 18.7516C20.5942 18.8253 20.5205 18.9482 20.5451 19.1202C20.5451 19.1693 20.5451 19.2185 20.5696 19.2676C20.6679 19.6854 20.8643 20.349 20.8643 20.3736C20.8643 20.4473 20.8889 20.4964 20.8889 20.5456C20.8889 20.6685 20.7907 20.7668 20.6679 20.7668C20.6187 20.7668 20.5942 20.7422 20.5451 20.7176L19.0961 19.882C18.9978 19.8329 18.875 19.7837 18.7522 19.7837C18.6786 19.7837 18.6049 19.7837 18.5558 19.8083C17.8681 20.0049 17.1559 20.1032 16.3946 20.1032C12.7352 20.1032 9.78815 17.6456 9.78815 14.5983C9.78815 11.5509 12.7352 9.09329 16.3946 9.09329C20.0539 9.09329 23.001 11.5509 23.001 14.5983C23.001 16.2448 22.1168 17.7439 20.717 18.7516ZM16.6737 8.09757C16.581 8.09473 16.488 8.09329 16.3946 8.09329C12.2199 8.09329 8.78815 10.9536 8.78815 14.5983C8.78815 15.1519 8.86733 15.6874 9.01626 16.1975H8.92711C8.04096 16.1975 7.15481 16.0503 6.3425 15.8296C6.26866 15.805 6.19481 15.805 6.12097 15.805C5.97327 15.805 5.82558 15.8541 5.7025 15.9277L3.95482 16.9334C3.90559 16.958 3.85635 16.9825 3.80712 16.9825C3.65943 16.9825 3.53636 16.8599 3.53636 16.7127C3.53636 16.6391 3.56097 16.59 3.58559 16.5164C3.6102 16.4919 3.83174 15.6824 3.95482 15.1918C3.95482 15.1427 3.97943 15.0691 3.97943 15.0201C3.97943 14.8238 3.88097 14.6766 3.75789 14.5785C2.05944 13.3765 1.00098 11.5858 1.00098 9.59876C1.00098 5.94369 4.5702 3 8.95173 3C12.7157 3 15.8802 5.16856 16.6737 8.09757ZM11.5199 8.51604C12.0927 8.51604 12.5462 8.03871 12.5462 7.4898C12.5462 6.91701 12.0927 6.46356 11.5199 6.46356C10.9471 6.46356 10.4937 6.91701 10.4937 7.4898C10.4937 8.06258 10.9471 8.51604 11.5199 8.51604ZM6.26045 8.51604C6.83324 8.51604 7.28669 8.03871 7.28669 7.4898C7.28669 6.91701 6.83324 6.46356 6.26045 6.46356C5.68767 6.46356 5.23421 6.91701 5.23421 7.4898C5.23421 8.06258 5.68767 8.51604 6.26045 8.51604Z"/></svg></span>
                 <span class="contact-channel-body">
                     <span class="contact-channel-label">微信</span>
                     <span class="contact-channel-value">sossil</span>
                 </span>
                 <span class="contact-channel-action">
-                    <i class="ri-file-copy-line" aria-hidden="true"></i>
+                    <svg class="ci" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.9998 6V3C6.9998 2.44772 7.44752 2 7.9998 2H19.9998C20.5521 2 20.9998 2.44772 20.9998 3V17C20.9998 17.5523 20.5521 18 19.9998 18H16.9998V20.9991C16.9998 21.5519 16.5499 22 15.993 22H4.00666C3.45059 22 3 21.5554 3 20.9991L3.0026 7.00087C3.0027 6.44811 3.45264 6 4.00942 6H6.9998ZM5.00242 8L5.00019 20H14.9998V8H5.00242ZM8.9998 6H16.9998V16H18.9998V4H8.9998V6Z"/></svg>
                     <span>复制</span>
                 </span>
             </button>
 
             <button class="contact-channel" type="button"
                     data-copy="3810710631" data-copy-toast="QQ 号已复制">
-                <span class="contact-channel-icon"><i class="ri-qq-fill" aria-hidden="true"></i></span>
+                <span class="contact-channel-icon"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19.9139 14.529C19.7336 13.955 19.4877 13.2856 19.2385 12.643L18.3288 10.3969C18.3295 10.371 18.3408 9.92858 18.3408 9.70053C18.3408 5.8599 16.5082 2.00037 12.0009 2C7.49403 2.00037 5.66113 5.8599 5.66113 9.70053C5.66113 9.92858 5.67237 10.371 5.67312 10.3969L4.76379 12.643C4.51453 13.2856 4.26827 13.955 4.08798 14.529C3.2285 17.2657 3.507 18.3982 3.71915 18.4238C4.17419 18.4779 5.49021 16.3635 5.49021 16.3635C5.49021 17.5879 6.12741 19.1858 7.5064 20.3398C6.99064 20.4971 6.35868 20.7388 5.95237 21.0355C5.58729 21.3025 5.63302 21.5743 5.69861 21.6841C5.9876 22.1661 10.6542 21.9918 12.0017 21.8417C13.3488 21.9918 18.0158 22.1661 18.3044 21.6841C18.3704 21.5743 18.4157 21.3025 18.0507 21.0355C17.6443 20.7388 17.012 20.4971 16.4959 20.3395C17.8745 19.1858 18.5117 17.5879 18.5117 16.3635C18.5117 16.3635 19.8281 18.4779 20.2831 18.4238C20.4949 18.3982 20.7734 17.2657 19.9139 14.529Z"/></svg></span>
                 <span class="contact-channel-body">
                     <span class="contact-channel-label">QQ</span>
                     <span class="contact-channel-value">3810710631</span>
                 </span>
                 <span class="contact-channel-action">
-                    <i class="ri-file-copy-line" aria-hidden="true"></i>
+                    <svg class="ci" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.9998 6V3C6.9998 2.44772 7.44752 2 7.9998 2H19.9998C20.5521 2 20.9998 2.44772 20.9998 3V17C20.9998 17.5523 20.5521 18 19.9998 18H16.9998V20.9991C16.9998 21.5519 16.5499 22 15.993 22H4.00666C3.45059 22 3 21.5554 3 20.9991L3.0026 7.00087C3.0027 6.44811 3.45264 6 4.00942 6H6.9998ZM5.00242 8L5.00019 20H14.9998V8H5.00242ZM8.9998 6H16.9998V16H18.9998V4H8.9998V6Z"/></svg>
                     <span>复制</span>
                 </span>
             </button>
@@ -286,25 +307,25 @@
 
         <div class="contact-channel-group">
             <a class="contact-channel" href="mailto:anniedv106@gmail.com">
-                <span class="contact-channel-icon"><i class="ri-mail-fill" aria-hidden="true"></i></span>
+                <span class="contact-channel-icon"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 3H21C21.5523 3 22 3.44772 22 4V20C22 20.5523 21.5523 21 21 21H3C2.44772 21 2 20.5523 2 20V4C2 3.44772 2.44772 3 3 3ZM12.0606 11.6829L5.64722 6.2377L4.35278 7.7623L12.0731 14.3171L19.6544 7.75616L18.3456 6.24384L12.0606 11.6829Z"/></svg></span>
                 <span class="contact-channel-body">
                     <span class="contact-channel-label">邮箱</span>
                     <span class="contact-channel-value">anniedv106@gmail.com</span>
                 </span>
                 <span class="contact-channel-action">
-                    <i class="ri-arrow-right-up-line" aria-hidden="true"></i>
+                    <svg class="ci" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M16.0037 9.41421L7.39712 18.0208L5.98291 16.6066L14.5895 8H7.00373V6H18.0037V17H16.0037V9.41421Z"/></svg>
                     <span>写信</span>
                 </span>
             </a>
 
             <a class="contact-channel" href="mailto:anniedv106@126.com">
-                <span class="contact-channel-icon"><i class="ri-mail-send-fill" aria-hidden="true"></i></span>
+                <span class="contact-channel-icon"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2 5.5V3.9934C2 3.44476 2.45531 3 2.9918 3H21.0082C21.556 3 22 3.44495 22 3.9934V20.0066C22 20.5552 21.5447 21 21.0082 21H2.9918C2.44405 21 2 20.5551 2 20.0066V19H20V7.3L12 14.5L2 5.5ZM0 10H5V12H0V10ZM0 15H8V17H0V15Z"/></svg></span>
                 <span class="contact-channel-body">
                     <span class="contact-channel-label">备用邮箱</span>
                     <span class="contact-channel-value">anniedv106@126.com</span>
                 </span>
                 <span class="contact-channel-action">
-                    <i class="ri-arrow-right-up-line" aria-hidden="true"></i>
+                    <svg class="ci" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M16.0037 9.41421L7.39712 18.0208L5.98291 16.6066L14.5895 8H7.00373V6H18.0037V17H16.0037V9.41421Z"/></svg>
                     <span>写信</span>
                 </span>
             </a>
@@ -312,7 +333,7 @@
     </div>
 
     <div class="contact-note">
-        <i class="ri-time-line" aria-hidden="true"></i>
+        <svg class="ci" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C22 17.5228 17.5228 22 12 22ZM12 20C16.4183 20 20 16.4183 20 12C20 7.58172 16.4183 4 12 4C7.58172 4 4 7.58172 4 12C4 16.4183 7.58172 20 12 20ZM13 12H17V14H11V7H13V12Z"/></svg>
         <div class="contact-note-text">
             <p>微信、QQ 一般当天回；邮箱看得慢一点，两三天没回就换个邮箱再发一次。</p>
             <p>添加微信时，请备注来意。</p>

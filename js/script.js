@@ -2053,7 +2053,7 @@
                     const rows = byYear.get(year).map(item => `
                         <li class="archive-item">
                             <time class="archive-date" datetime="${item.date}">${item.year}年${item.month}月${item.day}日</time>
-                            <a class="archive-link" href="index.html?article=${item.id}">${escapeHtml(item.title)}</a>
+                            <a class="archive-link" href="index.html?article=${item.id}" data-archive-article="${item.id}">${escapeHtml(item.title)}</a>
                         </li>`).join('');
                     return `
                         <section class="archive-year">
@@ -4654,8 +4654,11 @@
                 const post = state && blogPosts.find(item => item.id === state.annieArticleId);
                 if (post && (!post.externalPage || post.embeddedPage || !isArticlePublic(post))) {
                     articleHistoryEntryActive = true;
+                    /* 白名单决定「前进 / 后退回到这篇文章」时该退回哪个视图。
+                       必须含 archive：从归档点进文章后，先返回、再前进回文章，
+                       这里不认 archive 就会被兜底成 home，再按返回就跑到首页去了。 */
                     articleReturnView = typeof state.annieReturnView === 'string'
-                        && ['home', 'blog', 'movie', 'about'].includes(state.annieReturnView)
+                        && ['home', 'blog', 'archive', 'movie', 'about'].includes(state.annieReturnView)
                         ? state.annieReturnView
                         : 'home';
                     articleReturnScroll = typeof state.annieReturnScroll === 'number'
@@ -4693,6 +4696,23 @@
                     applyReturnScroll();
                     window.requestAnimationFrame(applyReturnScroll);
                 });
+            });
+
+            /* 归档里的文章链接走站内导航，不要整页重载。
+               href 保留着（禁用 JS 时还能用，也是给爬虫看的真实地址），
+               有 JS 就拦下来交给 openArticle —— 关键就在这一步：
+               整页重载会绕开我们的历史记录，返回时只能回到 ?view=archive
+               重新加载一遍，归档页的滚动位置也就丢了。
+               加了 data-archive-article 的链接，点它等于「在这个视图里打开文章」，
+               openArticle 会把当前这条记录改写成归档快照（含 scrollY），
+               返回时由 popstate 还回去，页面内返回和浏览器返回走的是同一条路。 */
+            document.addEventListener('click', function(e) {
+                const link = e.target.closest('[data-archive-article]');
+                if (!link) return;
+                // Ctrl / Cmd / Shift / Alt / 中键：交给浏览器开新标签
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                e.preventDefault();
+                openArticle(Number(link.getAttribute('data-archive-article')));
             });
 
             document.addEventListener('click', function(e) {

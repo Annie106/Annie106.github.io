@@ -6,6 +6,12 @@
     <title>Annie · 页面走丢了</title>
     <meta name="robots" content="noindex">
 
+    <!-- 图标必须是站点根路径，不能像别的页面那样写相对地址：
+         这一页会被 GitHub Pages 兜到任意路径（/foo/bar）上渲染，
+         相对写法会解析成 /foo/bar/favicon.svg，又是一次 404。
+         本地 file:// 预览时根路径指到盘符根，所以下面那段脚本会把它改回相对地址。 -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" id="faviconLink">
+
     <!-- 站点已从 /annie106/ 迁到根目录。
          GitHub Pages 不支持服务端重定向，所以历史链接只能靠这里兜。
          命中 /annie106/xxx 时，把前缀剥掉原地替换，查询串和锚点一起带走。 -->
@@ -44,6 +50,14 @@
                 var t = localStorage.getItem('annie-theme');
                 var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
                 document.documentElement.setAttribute('data-theme', (t === 'light' || t === 'dark') ? t : (dark ? 'dark' : 'light'));
+            } catch (e) {}
+
+            /* head 里的 favicon 用的是站点根路径（这页会被兜到任意路径渲染），
+               本地 file:// 打开时根路径会指到盘符根，退回到相对地址。 */
+            try {
+                if (window.location.protocol === 'file:') {
+                    document.getElementById('faviconLink').href = 'favicon.svg';
+                }
             } catch (e) {}
         })();
     </script>
@@ -138,8 +152,20 @@
                框里那页是透明底，卡片、输入框用的都是 css/style.css 的变量，
                底色对不上就会出现「卡片比背景还暗」这种反过来的观感 */
             --panel-bg: #ffffff;
+            /* 加载骨架的底色：比面板白再深一档，扫光走的是更亮的白。
+               底色不能太接近纯白，否则和真卡片分不出来、光带也没有对比度。
+               深色模式下这两个反转（见下面），扫光只给一点点白，
+               不然在 #0f1115 上会闪出一块刺眼的亮斑 */
+            --sk-base: #ececf2;
+            --sk-base-strong: #e1e1ea;
+            --sk-shine: rgba(255, 255, 255, 1);
         }
-        html[data-theme="dark"] .contact-modal { --panel-bg: #0f1115; }
+        html[data-theme="dark"] .contact-modal {
+            --panel-bg: #0f1115;
+            --sk-base: #1c212a;
+            --sk-base-strong: #262c36;
+            --sk-shine: rgba(255, 255, 255, 0.07);
+        }
         /* display 会盖掉 [hidden] 的默认样式，必须显式收回来 */
         .contact-modal[hidden] { display: none; }
 
@@ -243,8 +269,11 @@
         .contact-frame {
             display: block;
             width: 100%;
-            /* 真实高度由 iframe 里那页 postMessage 上来，这个值只是量到之前的占位 */
-            height: 420px;
+            /* 真实高度由 iframe 里那页 postMessage 上来，这个值只是量到之前的占位。
+               它跟着上面的骨架高度走（桌面两列 272、窄屏单列 450），
+               加载完换成真实高度时几乎不跳。
+               原来写死 420：两列内容其实只有 283，加载完会突然矮掉一大截。 */
+            height: 272px;
             border: 0;
             background: transparent;
             /* 这里刻意不做淡入：iframe 上的 opacity 动画一旦卡在起始帧
@@ -254,25 +283,101 @@
         }
         .contact-frame.is-ready { visibility: visible; }
 
+        /* ==================== 加载骨架 ====================
+           等 iframe 的那几百毫秒里铺一层骨架，形状对齐 contact.html 的真实内容：
+           两列四张卡 + 底部两行说明。下面这些数值是照那边抄过来的，
+           **改那页的布局时这里要跟着改**，否则加载完会跳一下：
+             卡片 padding 16px 18px、圆角 14px、高 77px；图标圈 38px
+             两组之间、组内卡片之间都是 gap: 12px
+             网格 minmax(min(300px,100%), 1fr)；页面 max-width 720px、padding 24px 0 30px
+           卡片内部只画「圆形图标 + 两行文字条」，光带扫过去时最像真内容。
+           不用转圈了：骨架本身就是「内容正在长出来」的信号。 */
         .contact-loading {
             position: absolute;
             inset: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            font-size: 13px;
-            color: var(--muted);
+            overflow: hidden;
         }
         .contact-loading[hidden] { display: none; }
-        .contact-spinner {
-            width: 20px;
-            height: 20px;
-            border: 2px solid var(--border);
-            border-top-color: var(--muted);
+
+        /* 只说给读屏听，屏幕上不占地方（骨架对读屏没有意义） */
+        .contact-sk-sr {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip-path: inset(50%);
+            white-space: nowrap;
+        }
+        .contact-sk-page {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 24px 0 30px;
+        }
+        .contact-sk-channels {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+            gap: 12px;
+            align-items: start;
+        }
+        .contact-sk-group {
+            display: grid;
+            gap: 12px;
+            min-width: 0;
+        }
+        .contact-sk-card {
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            height: 77px;
+            padding: 16px 18px;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: var(--sk-base);
+        }
+        .contact-sk-avatar {
+            flex: none;
+            width: 38px;
+            height: 38px;
             border-radius: 50%;
-            animation: contactSpin .8s linear infinite;
+            background: var(--sk-base-strong);
+        }
+        .contact-sk-lines {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+        .contact-sk-bar {
+            display: block;
+            height: 10px;
+            border-radius: 5px;
+            background: var(--sk-base-strong);
+        }
+        .contact-sk-bar-sm { width: 34px; }
+        .contact-sk-bar-lg { width: 104px; }
+        .contact-sk-note {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 16px 2px 0;
+        }
+        .contact-sk-note .contact-sk-bar { height: 13px; }
+
+        /* 光带扫在卡片这一层，一次盖过里面的圆形和文字条，
+           看起来是「整张卡在动」，而不是几个零件各自闪。
+           1.4s 一轮：浮窗通常 0.7s 左右就位，太快像闪烁，太慢则一次都看不到。 */
+        .contact-sk-card::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            transform: translateX(-100%);
+            background: linear-gradient(90deg, transparent 0%, var(--sk-shine) 50%, transparent 100%);
+            animation: contactSkeletonSweep 1.4s ease-in-out infinite;
+        }
+        @keyframes contactSkeletonSweep {
+            from { transform: translateX(-100%); }
+            to { transform: translateX(100%); }
         }
 
         /* 关闭是「加一个类」，用 @keyframes 而不是 transition：
@@ -290,7 +395,6 @@
             from { opacity: 1; transform: none; }
             to { opacity: 0; transform: translateY(10px) scale(.99); }
         }
-        @keyframes contactSpin { to { transform: rotate(360deg); } }
 
         /* 浮窗打开时背后不许滚 */
         body.is-contact-open { overflow: hidden; }
@@ -301,6 +405,8 @@
             .contact-modal { padding: 12px; }
             .contact-panel { width: 100%; }
             .contact-panel-head { padding: 11px 11px 11px 18px; }
+            /* 单列时四张卡竖着排，骨架和占位都要高得多 */
+            .contact-frame { height: 450px; }
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -308,14 +414,16 @@
             .contact-panel,
             .contact-modal.is-closing .contact-backdrop,
             .contact-modal.is-closing .contact-panel { animation: none; }
+            /* 骨架留着（它表达「还在加载」），只是别扫了 */
+            .contact-sk-card::after { animation: none; }
         }
     </style>
 </head>
 <body>
     <div class="wrap">
         <p class="code">404</p>
-        <h1>这个页面不存在</h1>
-        <p>链接可能拼错了，或者内容已经搬家。<br>博客地址现在就是 annie106.github.io。</p>
+        <h1>Not Found</h1>
+        <p>链接可能拼错了，或内容不存在。<br></p>
         <div class="actions">
             <a class="btn primary" href="/">回到首页</a>
             <!-- 有 JS 时点它是开浮窗（href 被 preventDefault 拦下）；
@@ -343,9 +451,50 @@
                 </button>
             </div>
             <div class="contact-panel-body" id="contactPanelBody">
-                <div class="contact-loading" id="contactLoading">
-                    <span class="contact-spinner" aria-hidden="true"></span>
-                    <span>正在打开…</span>
+                <!-- 加载骨架：形状照 contact.html 的两列四卡 + 说明排的。
+                     iframe 一到就把整块 [hidden] 掉（JS 那边还是按 id 找它，没变）。 -->
+                <div class="contact-loading" id="contactLoading" role="status">
+                    <span class="contact-sk-sr">正在打开获取联系</span>
+                    <div class="contact-sk-page" aria-hidden="true">
+                        <div class="contact-sk-channels">
+                            <div class="contact-sk-group">
+                                <div class="contact-sk-card">
+                                    <span class="contact-sk-avatar"></span>
+                                    <span class="contact-sk-lines">
+                                        <span class="contact-sk-bar contact-sk-bar-sm"></span>
+                                        <span class="contact-sk-bar contact-sk-bar-lg"></span>
+                                    </span>
+                                </div>
+                                <div class="contact-sk-card">
+                                    <span class="contact-sk-avatar"></span>
+                                    <span class="contact-sk-lines">
+                                        <span class="contact-sk-bar contact-sk-bar-sm"></span>
+                                        <span class="contact-sk-bar contact-sk-bar-lg"></span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="contact-sk-group">
+                                <div class="contact-sk-card">
+                                    <span class="contact-sk-avatar"></span>
+                                    <span class="contact-sk-lines">
+                                        <span class="contact-sk-bar contact-sk-bar-sm"></span>
+                                        <span class="contact-sk-bar contact-sk-bar-lg"></span>
+                                    </span>
+                                </div>
+                                <div class="contact-sk-card">
+                                    <span class="contact-sk-avatar"></span>
+                                    <span class="contact-sk-lines">
+                                        <span class="contact-sk-bar contact-sk-bar-sm"></span>
+                                        <span class="contact-sk-bar contact-sk-bar-lg"></span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="contact-sk-note">
+                            <span class="contact-sk-bar" style="width: 78%"></span>
+                            <span class="contact-sk-bar" style="width: 42%"></span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -368,6 +517,46 @@
             var CONTACT_PATH = 'project_subpage/blog/contact.html';
             var ROOT = window.location.protocol === 'file:' ? '' : '/';
 
+            /* ---------------- 趁用户还在看这页，先把「获取联系」预热进缓存 ----------------
+               contact.html 是点击那一刻才插进 iframe 的，所以第一次打开是彻底的
+               冷启动。这页自己没有任何外部依赖（样式全在 <style> 里），load 来得
+               极快，正好拿这段时间把「点开要用到的那几个文件」先抓一遍。
+
+               实测（本地把每个响应延迟 200ms 模拟跨境 RTT）：
+                 不预热 → iframe load 447ms，子资源各 213ms
+                 预热后 → iframe load 234ms，子资源各 5ms
+               ⚠️ 只有「子资源」能命中。iframe 的 HTML 文档那一次请求复用不了预热
+               结果，prefetch、prefetch+as="document"、fetch() 三种都试过，一样。
+               所以别指望点击后是 0 等待，仍会有一次文档请求走网络。
+
+               两个容易漏的点：
+               1. prefetch 不递归。contact.html 引的样式表和脚本必须逐个列出来，
+                  少一个就多一次跨境往返。
+               2. icons.css 这一页用不到（图标已改成内联 SVG），但它挂在
+                  style.css 首行的 @import 上，是无条件请求的，所以照样要预热。
+               缓存时长跟 GitHub Pages 的 max-age=600 走：十分钟内点开就是命中。
+               代价是没点的人也会多下这 80 KB —— 只为 404 页做，可以接受；
+               浏览器开了省流量模式就不预取。 */
+            var PREFETCH = [
+                CONTACT_PATH + '?embedded=1',
+                'css/style.css',
+                'fonts/icons.css',
+                'js/copyToClipboard.js'
+            ];
+
+            function prefetchContact() {
+                if (navigator.connection && navigator.connection.saveData) return;
+                for (var i = 0; i < PREFETCH.length; i++) {
+                    var pre = document.createElement('link');
+                    pre.rel = 'prefetch';
+                    pre.href = ROOT + PREFETCH[i];
+                    document.head.appendChild(pre);
+                }
+            }
+
+            if (document.readyState === 'complete') prefetchContact();
+            else window.addEventListener('load', prefetchContact);
+
             var frame = null;
             var isOpen = false;
             var pushedState = false;
@@ -382,10 +571,12 @@
                 frame.title = '获取联系';
                 frame.src = ROOT + CONTACT_PATH + '?embedded=1';
                 frame.addEventListener('load', function () {
-                    loading.hidden = true;
-                    /* 框里那页量完高度会先发一条 postMessage（在它的 load 里），
-                       等它把高度换上来再露脸，避免先按 420 的占位高度闪一下 */
+                    /* 骨架和 iframe 必须同一帧切换：先撤骨架、60ms 后再露 iframe
+                       的话，中间就是一段白屏（以前转圈时代不明显，换成整块骨架就很容易看出来）。
+                       这 60ms 是等框里把高度 postMessage 上来，避免按占位高度先闪一下；
+                       占位高度现在和真实高度只差十几像素，主要是防极端布局。 */
                     window.setTimeout(function () {
+                        loading.hidden = true;
                         frame.classList.add('is-ready');
                     }, 60);
                     /* 把当前主题推给框里的页面，免得深浅色对不上 */

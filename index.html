@@ -36,17 +36,22 @@
          @import 引入。页面不用、也不要再单独引 CDN 图标样式表——
          那会让图标在断网/CDN 抖动时消失。新增图标的写法见 AGENTS.md。 -->
 
+    <!-- giscus 只在文章 / 评论视图里用，首页不显示评论区。
+         这里原来还有一条 client.js 的 preload，等于每打开一次首页就白等
+         一个第三方域名（实测 TTFB 1.2 秒），已经删掉。
+         preconnect 保留：它只握手不下载，成本极低，换到文章页时能省一次连接。 -->
     <link rel="preconnect" href="https://giscus.app" crossorigin>
-    <link rel="preload" href="https://giscus.app/client.js" as="script" crossorigin="anonymous" fetchpriority="low">
 
     <!-- 图标字体的两跳串行，用预加载摊平：
          style.css 里 @import 了 icons.css，icons.css 里才声明 @font-face，
          所以不预加载的话浏览器要「HTML → CSS → icons.css → woff2」四跳才拿到字体，
          每一跳都是一次跨境往返。预加载让后两个从第 0 秒就开始，和 CSS 并行。
-         注意 woff2 的 preload 必须带 crossorigin，否则会和字体请求对不上、
-         变成下载两次。 -->
+         ⚠️ woff2 的 preload 必须带 crossorigin，否则会和字体请求对不上、下载两次。
+         2026-11-13 实测过把它整条删掉会怎样：CSS 和 JS 只快 23ms（噪声级），
+         字体却晚了 793ms（895 → 1688）——图标集体迟到，不值。所以留着，
+         但加了 fetchpriority="low" 表明它可以让路给 CSS / JS，别去抢带宽。 -->
     <link rel="preload" href="fonts/icons.css" as="style">
-    <link rel="preload" href="fonts/remixicon.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="fonts/remixicon.woff2" as="font" type="font/woff2" crossorigin fetchpriority="low">
 
     <link rel="stylesheet" href="css/style.css">
 
@@ -771,7 +776,7 @@
             </section>
 
             <!-- 版本号：从页脚挪到这里，收在关于页右下角 -->
-            <p class="about-version">版本 0.4.23.052</p>
+            <p class="about-version">版本 0.4.23.063</p>
         </div>
 
         <!-- ==================== 文章详情视图 ==================== -->
