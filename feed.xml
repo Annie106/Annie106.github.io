@@ -20,6 +20,17 @@
       <media:thumbnail url="https://annie106.github.io/share_cover.jpg"/>
     </item>
     <item>
+      <title>使用、修改和部署这个博客的操作指南</title>
+      <link>https://annie106.github.io/?article=10</link>
+      <guid isPermaLink="true">https://annie106.github.io/?article=10</guid>
+      <pubDate>Fri, 13 Nov 2026 00:00:00 +0800</pubDate>
+      <description>从零开始构建个人博客的完整教程，包含配置、部署和进阶技巧</description>
+      <category>教程</category>
+      <category>指南</category>
+      <category>置顶</category>
+      <media:thumbnail url="https://annie106.github.io/share_cover.jpg"/>
+    </item>
+    <item>
       <title>电影板块停了，这次是真的</title>
       <link>https://annie106.github.io/?article=15</link>
       <guid isPermaLink="true">https://annie106.github.io/?article=15</guid>
@@ -28,17 +39,6 @@
       <category>电影</category>
       <category>随笔</category>
       <media:thumbnail url="https://picgocloud.com/m/48d2d099-aa9d-47c3-82eb-498f411a3936.png"/>
-    </item>
-    <item>
-      <title>使用、修改和部署这个博客的操作指南</title>
-      <link>https://annie106.github.io/?article=10</link>
-      <guid isPermaLink="true">https://annie106.github.io/?article=10</guid>
-      <pubDate>Sun, 08 Nov 2026 00:00:00 +0800</pubDate>
-      <description>从零开始构建个人博客的完整教程，包含配置、部署和进阶技巧</description>
-      <category>教程</category>
-      <category>指南</category>
-      <category>置顶</category>
-      <media:thumbnail url="https://annie106.github.io/share_cover.jpg"/>
     </item>
     <item>
       <title>我的其它网站</title>
