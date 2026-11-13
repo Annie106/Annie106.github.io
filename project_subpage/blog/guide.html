@@ -1778,7 +1778,7 @@ git push</code></pre>
                             </tr>
                             <tr>
                                 <td><strong>Deploy from a branch</strong><br>（老方式）</td>
-                                <td>直接把仓库根目录发出去，靠 <code>_config.yml</code> 的 exclude 挡住开发文件。能用，但构建过程是个黑盒，配错了整站直接 404。</td>
+                                <td>直接把仓库根目录发出去，靠 <code>_config.yml</code> 的 exclude 挡住开发文件。能用，但构建过程是个黑盒，配错了整站直接 404。<strong>注意：这个仓库已经删掉了 <code>_config.yml</code>，选这条路要自己补回一份 exclude，否则开发文件会全部暴露。</strong></td>
                             </tr>
                         </tbody>
                     </table>
@@ -1945,7 +1945,7 @@ rm -rf "$TMP"</code></pre>
                     <i class="ri-checkbox-circle-line"></i>
                     删了也没事的
                 </h3>
-                <p><code>archive/music-player.js</code> 是旧版播放器，页面根本没加载它。<code>README.md</code> 和 <code>AGENTS.md</code> 是纯文字说明，不参与网页显示。<code>_config.yml</code> 是以前用 Jekyll 发布时的配置，改成 Actions 之后它不再起作用，留着只是为了万一要切回老方式。</p>
+                <p><code>archive/music-player.js</code> 是旧版播放器，页面根本没加载它。<code>README.md</code> 和 <code>AGENTS.md</code> 是纯文字说明，不参与网页显示。原来的 <code>_config.yml</code>（Jekyll 时代用来挡开发文件的排除配置）已经删掉了 —— 改成 Actions 之后它不再起作用，留着反而让人以为还有一层保护。</p>
 
                 <h3 class="guide-subtitle">
                     <i class="ri-alert-line"></i>

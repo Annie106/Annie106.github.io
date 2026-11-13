@@ -141,7 +141,7 @@ python -m http.server 8000
 node tools/build-site.js    # 生成 dist/，白名单在脚本顶部
 ```
 
-- 该发布的文件由 `tools/build-site.js` 的白名单决定，开发文件（`AGENTS.md`、`README.md`、`tools/`、`_config.yml`）不会进入产物 —— 线上访问它们是 404。
+- 该发布的文件由 `tools/build-site.js` 的白名单决定，开发文件（`AGENTS.md`、`README.md`、`tools/`、`check-icons.bat`）不会进入产物 —— 线上访问它们是 404。
 - 新页面放在 `project_subpage/` 或 `archive/` 里会自动带上；放在根目录或新建根级目录才要加白名单。**忘了加不会静默放过**：脚本会比对仓库里的 `.html` 和产物，发现有源码没产物的页面就报错退出。
 - push 到 main 后 `.github/workflows/deploy.yml` 自动构建并发布 `dist/`。
 - ⚠️ 仓库设置的 Pages → Source 必须是「GitHub Actions」。改成网页上那一步只能人工做；如果源还是分支发布，站点会由旧的 Jekyll 流程提供，新产物不会生效。

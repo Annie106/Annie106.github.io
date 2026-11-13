@@ -2,9 +2,9 @@
 /*
  * 生成发布产物 dist/。
  *
- * 这个站以前靠 GitHub Pages 的 Jekyll 构建挡开发文件（_config.yml 的 exclude）。
- * 现在改成自己构建：这个脚本决定「哪些文件会出现在线上」，GitHub 只负责
- * 把 dist/ 原样托管出去（见 .github/workflows/deploy.yml）。
+ * 这个站以前靠 GitHub Pages 的 Jekyll 构建挡开发文件（那份 _config.yml 已于
+ * 2026-11-13 删除）。现在改成自己构建：这个脚本决定「哪些文件会出现在线上」，
+ * GitHub 只负责把 dist/ 原样托管出去（见 .github/workflows/deploy.yml）。
  *
  * 用**白名单**而不是黑名单：漏发一个页面会立刻 404、当场发现；
  * 而误发一个开发文件（AGENTS.md、tools/）往往没人察觉。
@@ -209,6 +209,7 @@ function main() {
 
     const copied = [];
     const missing = [];
+    const skippedDirs = [];
 
     for (const name of PUBLISH_FILES) {
         const src = path.join(ROOT, name);
@@ -222,8 +223,13 @@ function main() {
 
     for (const name of PUBLISH_DIRS) {
         const src = path.join(ROOT, name);
+        /* 目录不存在时**跳过**，不报错。
+           原因：git 不追踪空目录。本地有个空的 images/，clean clone 之后就没了
+           （2026-11-13 CI 就是因为这个挂了 15 秒）。没有目录 = 没有要发的资源，
+           不是错误。真写错名字了也不用担心静默：输出里会把跳过的目录列出来。
+           注意这里只放宽「目录」，PUBLISH_FILES 里的文件缺了照样报错。 */
         if (!fs.existsSync(src)) {
-            missing.push(name + '/');
+            skippedDirs.push(name);
             continue;
         }
         copyDir(src, path.join(OUT, name), name);
@@ -264,9 +270,13 @@ function main() {
     console.log('  文件 ' + files.length + ' 个，共 ' + mb + ' MB');
     console.log('');
     console.log('  已收录：' + copied.join('  '));
+    if (skippedDirs.length) {
+        console.log('');
+        console.log('  跳过（仓库里没有这个目录，不影响构建）：' + skippedDirs.join('  '));
+    }
     console.log('');
     console.log('  未收录（开发文件，不会出现在线上）：');
-    console.log('    AGENTS.md  README.md  _config.yml  _template.html');
+    console.log('    AGENTS.md  README.md  _template.html');
     console.log('    check-icons.bat  tools/  .github/  .workbuddy/  dist/');
     console.log('');
     console.log('  本地预览：任意静态服务器指向 dist/，例如 npx serve dist');
