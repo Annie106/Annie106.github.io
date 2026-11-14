@@ -2,7 +2,9 @@
 
 > 由 AI 辅助构建
 
-原生 HTML + CSS + JavaScript 的静态博客，无 npm 依赖。构建只有一步：按白名单把要发布的文件复制到 `dist/`。
+原生 HTML + CSS + JavaScript 的静态博客，**没有 npm 依赖、没有后端**。构建 = `node tools/build-site.js`：先校验图标子集，再按白名单把要发布的文件复制到 `dist/`。
+
+本地开发另需 **Node 18+** 和 **Python 3.9+**（Python 只用来裁图标子集），依赖与常见报错见 [`tools/README.md`](tools/README.md)。
 
 完整配置教程在站内「使用指南」文章（`project_subpage/blog/guide.html`），本文件只做速查。让 AI 改这个仓库之前，先让它读 `AGENTS.md`。
 
@@ -16,15 +18,22 @@ favicon.svg                 站点图标
 share_cover.jpg             分享卡片封面，1080×1080
 images/manor_photos/        归宿照图集（文章 id 11 用）
 css/style.css               全部样式与响应式
-fonts/icons.css             图标字体样式（Remix Icon 本地副本，由 style.css 引入）
-fonts/remixicon.woff2       图标字体文件，约 165 KB
+fonts/icons.css             图标字体样式（由 style.css 引入的生成物）
+fonts/remixicon.woff2       图标字体子集，约 7 KB（只含用到的图标）
 _template.html              新建页面时复制这份，head 已经引对了样式
 feed.xml                    RSS 订阅源，由 tools/build-feed.js 生成，别手改
 .github/workflows/feed.yml  push 文章数据时自动重建并提交 feed.xml
 .github/workflows/deploy.yml 跑构建并把 dist/ 发布到 GitHub Pages
 tools/check-icons.js        图标自检：CDN 残留、图标名是否存在、页面是否引了样式
+tools/subset-icons.py       裁图标子集（扫 ri-* → 生成 fonts/ 下两个文件）
+tools/precommit-icons.js    提交前自动重生成图标（由 git 钩子调用）
+tools/setup.bat             新机器初始化：查环境、装依赖、装钩子
+tools/update-icons.bat      手动重裁图标（平时钩子会自动跑）
+tools/install-hooks.bat     只装 git 钩子（setup.bat 已包含）
+tools/remixicon-src.*       图标全量源（不发布，别删）
 tools/build-feed.js         从 js/posts-data.js 生成 feed.xml
-tools/build-site.js         按白名单生成发布产物 dist/（构建入口）
+tools/build-site.js         校验图标 + 按白名单生成 dist/（构建入口）
+tools/README.md             上面这些怎么用、报错怎么修
 dist/                       发布产物，已 gitignore，由 build-site.js 生成
 AGENTS.md                   给 AI 工具的项目约定，跨工具生效
 js/posts-data.js            全部文章数据（首页与归档页共用）
@@ -43,7 +52,7 @@ archive/                    归档，不参与显示
 ## 功能
 
 - 导航五个视图：首页、文章列表、归档、电影、关于（另有文章详情、「本周折腾」、「问题反馈」、「提交成功」四个不占导航的视图），移动端自适应
-- 标签筛选，支持置顶文章
+- 标签筛选，支持置顶文章；首页「最新 / 全部 / 置顶 / 随笔」都支持原地分页（「全部」每页 8 篇，其余每页 6 篇，带上一页 / 页码 / 下一页）
 - 全站搜索（<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd> 或 <kbd>/</kbd>）：搜标题、摘要、标签、正文；多关键词按「与」匹配，命中高亮，空状态给最近搜索与标签入口
 - 文章卡片「⋯」菜单支持三类：站内文章、独立页面（`externalPage`）、自定义链接（`link`）
 - 文章可内嵌独立 HTML（`embeddedPage`），自动调高并跟随主题
@@ -80,7 +89,7 @@ archive/                    归档，不参与显示
 
 **只需要这一行。** 引了 style.css，正文、标题、按钮和表单控件就会默认使用博客字体与主题变量，也能直接复用文章页的 `.article-topbar`、`.article-bottombar`、`.back-link`、`.article-feedback`、`.divider-thin` 等 UI 样式。
 
-图标字体（Remix Icon）也在这一行里：字体文件放在 `fonts/`，由 `style.css` 顶部的 `@import` 带进来，所以不需要、也不要再引任何 CDN 图标样式表（那会让图标在 CDN 抖动时整片消失）。图标名去 [remixicon.com](https://remixicon.com/) 挑，本地是 v4.3.0 全量（近 3000 个），写进 HTML 就能用，不用重新生成任何文件。名字拼错不报错、只显示空白，所以改完跑一次检查——**双击根目录的 `check-icons.bat`**，或在项目目录里执行：
+图标字体（Remix Icon）也在这一行里：`fonts/` 下的是**从全量 4.3.0 裁出来的子集**（只含站内用到的图标，约 7 KB），由 `style.css` 顶部的 `@import` 带进来，所以不需要、也不要再引任何 CDN 图标样式表（那会让图标在 CDN 抖动时整片消失）。图标名去 [remixicon.com](https://remixicon.com/) 挑；**换了字体里没有的新图标，要双击 `tools/update-icons.bat` 重新生成**（全量源在 `tools/remixicon-src.*`）。名字拼错或忘了重新生成都不报错、只显示空白，所以改完跑一次检查——**双击根目录的 `check-icons.bat`**，或在项目目录里执行：
 
 ```bash
 node tools/check-icons.js
@@ -93,7 +102,7 @@ node tools/check-icons.js
 - 分享封面必须写绝对地址，如 `https://annie106.github.io/share_cover.jpg`；相对路径抓不到，带 Referer 鉴权的 CDN 也抓不到。
 - 全站共用一个 `/?article=N` 地址，微信不执行 JS，所以所有文章共用同一张封面。
 - 改文章 `id` 会让已分享的链接失效。
-- 首页标签在 `js/script.js` 的 `renderTagPills` 里，目前是「置顶 / 社交 / 随笔」。
+- 首页标签：`最新` / `全部` 由 `renderTagPills` 固定，其余由 `HOME_TAGS` 决定；分页每页 8 篇（`HOME_PAGE_SIZE`）或 6 篇（`HOME_POST_LIMIT`），超过一页才出现控件。
 - 移动或重命名子页面后，同步 `embeddedPage` 与 `articleMenus` 的路径。
 
 ## 本地预览
@@ -103,6 +112,14 @@ python -m http.server 8000
 ```
 
 访问 <http://localhost:8000>，或直接打开 `index.html`。背景音乐需用户交互后才能播放。
+
+### 换一台机器 / 别人使用
+
+- 只是浏览站点：什么都不用装。
+- **要改内容（写文章、改样式、动图标）：Node.js + Python 3.9+ 两样都要装**，然后双击一次 **`tools/setup.bat`**——它会检查环境、装图标裁剪依赖（`fonttools` + `brotli`）、生成图标子集、装好 git 钩子。
+- 为什么必须装 Python：图标字体是按源码裁出来的子集，生成它需要 Python。**没有 Python 时，提交会被钩子拦下、`node tools/build-site.js` 也会中止**——这是刻意的，避免本地预览缺图标。
+- Python 是否装好的判断标准：命令行里 `python --version` 或 `py --version` 能打印版本号。只看 `where python` 不算——Windows 自带一个应用商店占位符，`where` 找得到但运行报 9009。
+- 各个脚本分别是干什么的，见 [`tools/README.md`](tools/README.md)。
 
 ## RSS 订阅
 

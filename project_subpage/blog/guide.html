@@ -970,9 +970,15 @@
 ├── .gitignore               ← 让 Git 忽略 dist/ 等产物
 │
 ├── tools/                   ← 构建与检查脚本（不会发布到线上）
-│   ├── build-site.js        ← 生成发布产物 dist/，白名单决定哪些文件上线
+│   ├── build-site.js        ← 先校验图标，再按白名单生成 dist/
 │   ├── build-feed.js        ← 从文章数据生成 feed.xml
-│   └── check-icons.js       ← 检查图标名写错、CDN 残留
+│   ├── check-icons.js       ← 检查图标名写错、CDN 残留
+│   ├── subset-icons.py      ← 裁图标字体：只保留站内用到的图标
+│   ├── precommit-icons.js   ← 提交前自动重裁图标（git 钩子调用）
+│   ├── setup.bat            ← 双击：新机器装依赖 + 装钩子（只跑一次）
+│   ├── update-icons.bat     ← 双击：重新裁剪 + 自检
+│   ├── install-hooks.bat    ← 双击：只装 git 钩子
+│   └── remixicon-src.*      ← 全量图标字体（种子，生成子集用，不上线）
 │
 ├── .github/workflows/       ← GitHub 自动化（不会发布到线上）
 │   ├── deploy.yml           ← 推送后自动构建并发布到 Pages
@@ -986,9 +992,9 @@
 ├── css/
 │   └── style.css            ← 所有样式：颜色、字号、间距、深色模式
 │
-├── fonts/                   ← 图标字体（本地副本，平时不用动）
+├── fonts/                   ← 图标字体（子集，只含站内用到的图标）
 │   ├── icons.css            ← 图标样式，由 style.css 自动引入
-│   └── remixicon.woff2      ← 字体文件，约 165 KB
+│   └── remixicon.woff2      ← 字体文件，约 7 KB
 │
 ├── js/
 │   ├── posts-data.js        ← 全部文章数据
@@ -1163,7 +1169,18 @@
 &lt;/div&gt;</code></pre>
                 <p>换成自己的联系方式，就改 <code>copyToClipboard()</code> 括号里第一个东西，两边都要留英文单引号。第二个是点击后的提示文字，随便写。</p>
                 <p>想换图标：<code>&lt;i class="ri-wechat-fill"&gt;&lt;/i&gt;</code> 里的 <code>ri-wechat-fill</code> 就是图标名，去 <a href="https://remixicon.com/" target="_blank" rel="noopener noreferrer">remixicon.com</a> 挑一个替换掉。</p>
-                <p>图标字体已经下载到 <code>fonts/</code>，和网页在同一台服务器上：换图标、加图标都只改 HTML，不用动字体文件，也不会再出现「网络一抖图标就空白」的情况。</p>
+                <p>图标字体已经裁成只含站内用到的那些（约 7 KB），和网页在同一台服务器上，所以不会出现「网络一抖图标就空白」。</p>
+
+                <div class="guide-tip">
+                    <div class="guide-tip-title">
+                        <i class="ri-lightbulb-line"></i>
+                        换图标 / 加图标怎么办
+                    </div>
+                    <p>换成一个<b>字体里已有</b>的图标：直接改 <code>ri-xxx</code> 那串名字，保存刷新就能看到。</p>
+                    <p>想用一个<b>字体里还没有</b>的新图标（名字去 remixicon.com 搜）：写完 <code>&lt;i class="ri-xxx"&gt;&lt;/i&gt;</code> 直接提交就行——提交时会自动把新图标裁进字体。想在本地先看到效果，双击 <code>tools/update-icons.bat</code>；第一次在一台新电脑上用，先双击一次 <code>tools/setup.bat</code>（装依赖、装自动钩子，一次就够）。</p>
+                    <p><b>电脑上需要 Python 3.9+</b>：裁字体要用它。没装的话，提交会被钩子拦下、本地构建也会中止——这是故意的，免得本地预览缺图标。装好后跑一次 <code>tools/setup.bat</code> 就不用再管了。判断装没装好：命令行敲 <code>python --version</code> 能出版本号才算（Windows 的 <code>python</code> 可能只是应用商店占位符，敲了会报 9009）。</p>
+                    <p>图标名字打错不会报错，只会显示空白。拿不准就双击根目录的 <code>check-icons.bat</code>，它会指出哪个名字不对、在哪个文件第几行。</p>
+                </div>
                 <p>想加一个，就复制一整段 <code>&lt;a ...&gt;...&lt;/a&gt;</code> 粘在下面。比如加抖音：</p>
                 <pre><code>&lt;a href="https://www.douyin.com/user/你的主页" target="_blank" rel="noopener noreferrer" title="抖音"&gt;
     &lt;i class="ri-tiktok-fill"&gt;&lt;/i&gt;
@@ -1799,7 +1816,7 @@ git push</code></pre>
                 </h3>
                 <p>线上跑的是 <code>dist/</code> 里的内容，不是仓库根目录。想确认发布后的样子，或者排查「本地好好的、线上却不对」，先构建一次：</p>
                 <pre><code>node tools/build-site.js</code></pre>
-                <p>它会生成 <code>dist/</code> 文件夹，再用静态服务器指向这个文件夹预览即可（Live Server 右键选 <code>dist/index.html</code>）。这一步要装 Node.js，没装不影响写博客 —— 推送后 GitHub 会替你构建。</p>
+                <p>它会生成 <code>dist/</code> 文件夹，再用静态服务器指向这个文件夹预览即可（Live Server 右键选 <code>dist/index.html</code>）。这一步要装 <b>Node.js</b>；如果改过图标，还要装 <b>Python 3.9+</b>（裁字体用），否则构建会在图标检查那一步中止。没装这两样也不影响写文章——推送后 GitHub 会替你构建。</p>
 
                 <div class="guide-warning">
                     <div class="guide-warning-title">

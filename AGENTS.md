@@ -8,46 +8,28 @@
 
 ## 这个站是什么
 
-纯静态博客：原生 HTML + CSS + JavaScript，**没有 npm 依赖、没有后端**，托管在 GitHub Pages 上。
+纯静态博客：原生 HTML + CSS + JavaScript，**没有 npm 依赖、没有后端**，托管在 GitHub Pages 上。本地开发需要 **Node**（构建）和 **Python 3.9+**（裁图标子集，见「图标」一节）。
 
-- 不要引入打包器、框架、TypeScript、CSS 预处理器或任何 npm 运行依赖。唯一的构建步骤是 `tools/build-site.js`，它只做一件事：按白名单把要发布的文件**复制**到 `dist/`。不要把它扩展成打包器（不编译、不转译、不哈希、不压缩）。
+- 不要引入打包器、框架、TypeScript、CSS 预处理器或任何 npm 运行依赖。`tools/build-site.js` 只做两件事：**先跑图标校验**（字体和源码不一致就中止），再按白名单把要发布的文件**复制**到 `dist/`。不要把它扩展成打包器（不编译、不转译、不哈希、不压缩）。
 - `dist/` 是产物目录，已在 `.gitignore` 里；页面源码仍然是「能直接打开就能看」的原样文件，产物只是同一批文件的副本。见「构建与部署」一节。
 - 所有路径都是相对路径（用户站部署在根路径，但本地也可能用 file:// 打开）。
 
-## 图标：只用本地字体，禁止 CDN
+## 图标：本地子集字体，禁止 CDN
 
-这是这个项目最容易写错的地方，请严格遵守：
-
-- 图标字体是 **Remix Icon v4.3.0 的本地副本**，位于 `fonts/`：
-  - `fonts/icons.css` —— `@font-face` + 全部 `.ri-*` 规则（约 2900 条，生成物）
-  - `fonts/remixicon.woff2` —— 字体文件（约 165 KB）
-- `css/style.css` **第一行**用 `@import url('../fonts/icons.css')` 引入它们。因此**任何引了 `css/style.css` 的页面自动拥有图标**，页面不用做任何额外声明。
-- **禁止**在任何页面添加指向 `cdn.jsdelivr.net`、`unpkg.com`、`fonts.googleapis.com` 等外部域名图标字体的 `<link>`。历史原因：之前图标只有一个境外 CDN 来源，网络抖动时整站图标会集体消失（表现为图标位置空白或豆腐块），这是本项目已经修掉的 bug，不要重新引入。
-- 用法：`<i class="ri-moon-line" aria-hidden="true"></i>`。图标名去 https://remixicon.com 查，本地是 4.3.0 全量（近 3000 个），直接用即可，无需生成任何文件。
-- 图标名写错（拼错、后缀漏写、用了更高版本才有的图标）**不会报错，只会渲染成空白**。所以任何涉及图标的改动，结束前必须跑：
-
-  ```bash
-  node tools/check-icons.js
-  ```
-
-- 不要手动编辑 `fonts/icons.css`（它是生成物）。
+- `fonts/icons.css` + `fonts/remixicon.woff2` 是**从全量 Remix Icon 4.3.0 裁出来的子集**（只含站内用到的约 100 个图标，字体约 7 KB）。`css/style.css` 第一行 `@import` 引入，引了 style.css 的页面自动有图标。
+- **加 / 换图标只需写 `<i class="ri-xxx">` 然后提交**：pre-commit 钩子（`tools/precommit-icons.js`，装一次：`tools/setup.bat`）会自动重跑 `tools/subset-icons.py` 并把 `fonts/` 下两个生成物加进提交。**本地必须能跑 Python 3.9+**（生成子集用），没有 Python 时钩子和 `build-site.js` 都会中止——这是刻意的，不要改成"跳过放行"。换机器/重新克隆后要再装一次钩子；手动补跑用 `tools/update-icons.bat`。全量源在 `tools/remixicon-src.css` / `remixicon-src.woff2`，别删；`fonts/` 下两个文件是生成物，不要手改。
+- 图标名写错、或加了图标忘了重新生成，**都不会报错，只会渲染成空白**。所以改完必须 `node tools/check-icons.js`——`tools/build-site.js` 已把它设为构建前置，漏跑会直接构建失败。
+- **禁止**在任何页面引 CDN 图标字体（`cdn.jsdelivr.net`、`unpkg.com`、`fonts.googleapis.com`）。历史 bug：唯一来源是境外 CDN 时，网络一抖整站图标集体消失。
 
 ### 版本状态：刻意停在 4.3.0，不要主动升级
 
 2026-11-12 核查过，结论是先不升：
 
-- 上游最新是 **4.9.1**，比本地多 338 个图标，woff2 从 162 KB 涨到 185 KB。
-- 但 4.3.0 **没有任何功能缺口**：全站用到的 93 个图标都在，`check-icons.js` 三项全绿。
-- 4.9.1 只移除了一个 `ri-font-sans`，全站无引用，改名风险为零。
-- 所以这**不是"版本太旧待升级"**，是评估后的选择。除非用户明确要求，或者确实要用某个 4.3.0 里没有的图标（比如 AI 相关的 `ri-ai-*`、`ri-openai-*`、`ri-anthropic-*`），否则别动它。
+- 上游最新是 **4.9.1**，比本地多 338 个图标。
+- 但 4.3.0 **没有任何功能缺口**：全站用到的图标都在，`check-icons.js` 三项全绿。
+- 所以这**不是"版本太旧待升级"**，是评估后的选择。除非用户明确要求，或者确实要用某个 4.3.0 里没有的图标（比如 `ri-ai-*`），否则别动。
 
-要升级时按这个流程，**五步一步都不能漏**：
-
-1. 取 `remixicon@<版本>` 的 `fonts/remixicon.css` 与 `fonts/remixicon.woff2`。
-2. 用上游 css 覆盖 `fonts/icons.css`，但**只保留 woff2 一个 `@font-face`** —— 上游还引了 eot/woff/ttf/svg，本地没这些文件，留着只会在控制台刷一串 404。
-3. 改 `fonts/icons.css` 顶部的版本注释（版本号 + 上游发布日期 + 来源链接）。
-4. 同步版本号/体积表述到 `AGENTS.md`（本节 + 上面两行）、`README.md`、`project_subpage/blog/guide.html`（目录树里那行 `remixicon.woff2 ← 约 165 KB`）。
-5. 跑 `node tools/check-icons.js`，必须全绿。有图标名报错说明新版本删了或改了这个图标，先改页面再提交。
+要升级时：替换 `tools/remixicon-src.css` / `remixicon-src.woff2`（上游 css **只保留 woff2 一个 @font-face**，其余格式本地没有会刷 404）→ 跑 `tools/update-icons.bat` → 更新 `README.md` 和 `guide.html` 里的体积表述。
 
 ## 新建 HTML 页面
 
@@ -122,9 +104,16 @@
 - 头像的「主/备」链接是自己在 `index.html` 的 `<img class="avatar">` 上用内联 `onerror` 做的（它不属于高速/慢速那套）：`src` 失败 → 换成 `data-fallback-src`（PicGo Cloud 那张）→ 再失败才退回透明占位 gif。因为挂在 `.avatar` 上被排除在外，**别把它接进 `image-loading.js`**，否则会吃掉当天额度。改头像时三个值（`src`、`data-fallback-src`、`alt`）要一起看。
 - 低速预览预热只在**这次高速成功**时才做（回退慢速后再预热一次慢图是白跑一趟）。
 
+## 首页文章列表
+
+- `homeTag` 有两个虚拟值：`latest`（默认，每页 6 篇）/ `all`（每页 8 篇）。分页控件任何标签只要总页数 > 1 就出现（`renderHomePager`）。快照迁移看 `homeTagRev: 2`；新增存储位置要一并写 `homePage`。
+- 切筛选 / 翻页走 `swapPostsList()`（淡出 → 重画 → 容器高度过渡），别直接 `innerHTML`；标签选中态只切 class（`syncTagPillsActive`），下划线是 `::after + scaleX`。
+- **卡片尺寸保持原样**（约 174～199，文案多长就多高），不要做等比化。
+
 ## 别乱动的地方
 
 - `js/script.js` 是 SPA 式路由核心（`/?article=N`、`?view=xxx`、浏览器返回键、滚动位置恢复）。这里的逻辑和历史记录强耦合，改动前先读相关注释，不要顺手重构。
+- 首页「最近折腾」三张卡是只读展示：不要加 `role="button"` / `tabindex` / 点击跳转 / hover 抬起。进完整列表走「全部折腾 →」。
 - `js/posts-data.js` / `js/tweaks-data.js` 是数据文件：可以增删条目，但不要改字段名，`script.js` 依赖它们。
 - `favicon.svg`、`share_cover.jpg` 被多个页面和分享卡片引用，改文件名要同步全站。
 - **发布走自建构建，不再让 Pages 跑 Jekyll。** 详见下面「构建与部署」一节。
@@ -134,6 +123,7 @@
 2026-11-13 之前是「Pages 直接吃仓库根目录 + 用 `_config.yml` 的 `exclude` 挡开发文件」。现在改成自己构建。
 
 - **`tools/build-site.js` 是唯一的发布入口。** 它按**白名单**把该发布的文件复制到 `dist/`，开发文件一个都进不去。用白名单而不是黑名单：漏发一个页面会立刻 404、当场发现；误发一个开发文件（`AGENTS.md`、`tools/`）往往没人察觉。
+- 开头先跑**图标校验**（`check-icons.js`），字体和源码不一致就直接中止 —— 因为缺字形只会显示空白、不会报错。所以本地构建需要 Node + Python（见「图标」一节）。
   - 白名单在脚本顶部：`PUBLISH_FILES`（根级文件）+ `PUBLISH_DIRS`（目录）。新页面只要落在 `project_subpage/`、`archive/` 这些已列目录里就**自动带上，不用改脚本**；只有新增**根级文件**（`robots.txt`、`sitemap.xml`、根目录的 `about.html`）或**根级新目录**（`assets/`）才需要加。
   - **不想发布的内容，用下划线前缀。** 以 `_` 或 `.` 开头的文件和目录一律不进产物（`_draft.html`、`_notes/`、`.env`），`.md` / `.markdown` 也不进。这一条比改脚本重要：白名单里的目录是**整份递归复制**的，放在 `project_subpage/blog/` 下的任何文件都会被发出去 —— 包括草稿页和笔记，而 orphans 检查拦不住它们（在产物里确实存在）。静态站没有访问控制，进了 `dist/` 就等于公开，所以只能在「不发出去」这一层解决。
   - **漏加会被拦下来。** 脚本会扫仓库里所有 `.html` 和产物逐一比对，发现「有源码、没进产物」的页面就直接报错退出并点名文件 —— 因为这种漏发在构建时不会暴露，只会在线上变成 404，是最难自己发现的一类问题。确实不该上线的页面优先用下划线前缀；不以下划线命名的例外写进脚本顶部的 `IGNORE_HTML`（目前只有 `_template.html`，其实已被 `_` 规则覆盖，留作示例）。

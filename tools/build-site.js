@@ -204,6 +204,23 @@ function fail(msg) {
 }
 
 function main() {
+    /* 构建前置：图标子集必须是「按当前源码生成过的」。
+       加了新图标却没重跑生成时，字形不在字体里、页面只会显示空白，肉眼很难发现，
+       所以这里直接中止构建，并给出唯一的修复命令。 */
+    const woff2 = path.join(ROOT, 'fonts', 'remixicon.woff2');
+    if (!fs.existsSync(woff2) || fs.statSync(woff2).size < 1024) {
+        fail('字体文件 fonts/remixicon.woff2 不存在或明显不完整。\n' +
+            '    先跑 tools\\update-icons.bat 重新生成（需要 Python 3.9+ 与 fonttools/brotli）。');
+    }
+    const iconCheck = require('child_process').spawnSync(
+        process.execPath, [path.join(__dirname, 'check-icons.js')], { stdio: 'inherit' }
+    );
+    if (iconCheck.status !== 0) {
+        fail('图标子集没跟上源码（见上面的输出）。\n' +
+            '    先双击 tools\\update-icons.bat 重新生成，再构建。\n' +
+            '    第一次在新电脑上用，先跑 tools\\setup.bat（装 Python 依赖 + 钩子）。');
+    }
+
     if (fs.existsSync(OUT)) emptyDir(OUT);
     else fs.mkdirSync(OUT, { recursive: true });
 

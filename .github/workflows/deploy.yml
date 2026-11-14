@@ -40,6 +40,20 @@ jobs:
         with:
           node-version: '20'
 
+      # 图标是「按源码里用到的图标裁出来的子集」。贡献者本地不必装 Python：
+      # 这里在构建前重新裁一遍，保证产物里的字体和图标用法一致。
+      # 如果谁写了一个不存在的图标名，这一步会失败并指出是哪个文件第几行。
+      - name: 准备 Python（图标子集用）
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 安装图标裁剪依赖
+        run: pip install fonttools brotli
+
+      - name: 重新生成图标子集
+        run: python tools/subset-icons.py
+
       - name: 生成发布产物 dist/
         run: node tools/build-site.js
 

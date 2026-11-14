@@ -650,6 +650,7 @@
             display: none;
         }
         .home-tag-filter .tag-pill {
+            position: relative;
             flex: 0 0 auto;
             padding: 4px 0;
             border: 0;
@@ -666,7 +667,25 @@
             background: transparent;
             color: var(--color-text-primary);
             border-color: transparent;
-            box-shadow: inset 0 -1px var(--color-text-primary);
+        }
+        /* 选中下划线用伪元素 + scaleX 做「从中间长出来」的过渡。
+           原来是 box-shadow: inset 0 -1px —— 它只能整条淡入，没有方向感，
+           换标签时看着像"啪"地跳了一下。JS 那边也配合只切 class、
+           不重建这一行，节点留着过渡才跑得起来。 */
+        .home-tag-filter .tag-pill::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 1px;
+            background: currentColor;
+            transform: scaleX(0);
+            transform-origin: 50% 50%;
+            transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .home-tag-filter .tag-pill.active::after {
+            transform: scaleX(1);
         }
         /* 搜索进行中，标签筛选暂时不参与，淡出并停止响应点击 */
         .home-tag-filter.is-muted {
@@ -2202,6 +2221,108 @@
             align-items: stretch;
             gap: 20px;
         }
+        /* 切筛选 / 翻页：旧卡片先整体淡出（120ms），JS 随后换内容再淡入。
+           直接 innerHTML 覆盖是一帧硬切，卡片"啪"地换掉、列表高度也跟着跳；
+           淡出这 120ms 里高度变化藏在透明里，看起来是一次交叉过渡。
+           淡出期间不接点击，免得点到正在消失的卡片。
+           注意：这里只动透明度/位移，不改卡片尺寸。 */
+        .posts-list.is-filtering {
+            pointer-events: none;
+            animation: postListOut 0.12s ease forwards;
+        }
+        @keyframes postListOut {
+            from {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateY(-6px);
+            }
+        }
+
+        /* 首页列表底部的收尾行：分页控件 + 「查看全部文章」。
+           两者居中并排；窄屏放不下就换行，分页留在上面一行。 */
+        .home-more {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 10px 16px;
+            margin-top: 20px;
+        }
+        /* 「查看全部 N 篇文章 →」沿用 .tag-pill 的胶囊外观，
+           但它是 <a>，下划线和手型要自己补（原来是行内 style）。 */
+        .home-more #viewAllPosts {
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .home-pager {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .home-pager[hidden] {
+            display: none;
+        }
+        .home-pager-pages {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        /* 翻页按钮和标签胶囊同一套观感：白底、一像素描边、20px 圆角。
+           高度比胶囊略矮，免得和最下面的「查看全部」抢注意力。 */
+        .home-pager-step,
+        .home-pager-page {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            height: 30px;
+            padding: 0 11px;
+            border: 1px solid var(--color-border);
+            border-radius: 20px;
+            background: var(--color-bg);
+            color: var(--color-text-secondary);
+            font-family: inherit;
+            font-size: 0.74rem;
+            line-height: 1;
+            cursor: pointer;
+            user-select: none;
+            transition: var(--transition-fast);
+        }
+        .home-pager-page {
+            min-width: 30px;
+            padding: 0 8px;
+            font-variant-numeric: tabular-nums;
+        }
+        .home-pager-step i {
+            font-size: 0.92rem;
+        }
+        html:not(.is-touch-input) .home-pager-step:not([disabled]):hover,
+        html:not(.is-touch-input) .home-pager-page:not([aria-current]):hover {
+            border-color: #ccc;
+            color: var(--color-text-primary);
+        }
+        /* 当前页：和选中标签一样反色（深色主题下自动变成浅底深字） */
+        .home-pager-page[aria-current='page'] {
+            background: var(--color-text-primary);
+            border-color: var(--color-text-primary);
+            color: var(--color-bg);
+            font-weight: 600;
+        }
+        /* 翻到头的那一侧置灰但留在原位，布局不会因为按钮"消失"而左右跳 */
+        .home-pager-step[disabled] {
+            opacity: 0.35;
+            cursor: default;
+        }
+        .home-pager-gap {
+            padding: 0 2px;
+            color: var(--color-text-tertiary);
+            font-size: 0.74rem;
+            line-height: 1;
+            user-select: none;
+        }
         /* ==================== 首页骨架屏 ==================== */
         /* 首页文章数据（js/posts-data.js + js/script.js）就绪前先铺一层占位卡片。
            骨架直接写死在 index.html 里，所以脚本还在下载、解析的那几百毫秒里
@@ -3064,6 +3185,14 @@
                 animation: none;
             }
             .post-card {
+                transition: none;
+            }
+            /* 减弱动效时不淡出（JS 那边也会跳过等待，直接换内容） */
+            .posts-list.is-filtering {
+                animation: none;
+            }
+            /* 下划线不做缩放，直接出现 */
+            .home-tag-filter .tag-pill::after {
                 transition: none;
             }
         }
@@ -4711,6 +4840,18 @@
             .article-full-title {
                 font-size: 1.5rem;
             }
+            /* 首页收尾行：分页和「查看全部」并排时把间距收紧，
+               360 宽的屏上「上一页 1 2 下一页」也能一行放下 */
+            .home-more {
+                gap: 8px 12px;
+            }
+            .home-pager,
+            .home-pager-pages {
+                gap: 5px;
+            }
+            .home-pager-step {
+                padding: 0 9px;
+            }
             .music-player-card {
                 padding: 12px 14px 10px;
             }
@@ -4945,7 +5086,6 @@
             background: transparent;
             color: #ffffff;
             border-color: transparent;
-            box-shadow: inset 0 -1px #ffffff;
         }
 
         /* ==================== 全站搜索（深色） ==================== */
@@ -5465,30 +5605,12 @@
             border-radius: 14px;
             background: var(--color-bg);
             box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
-            /* 整张卡可点：点进去是「全部折腾」里的同一条 */
-            cursor: pointer;
-            transition:
-                transform 0.2s ease,
-                box-shadow 0.2s ease,
-                border-color 0.2s ease,
-                background-color 0.2s ease;
+            /* 只是「看一眼」的内容卡：不可点，所以没有手型、没有悬停抬起。
+               要进完整列表走右上角「全部折腾 →」。 */
+            cursor: default;
         }
-        .tweak-card:focus-visible {
-            outline: 2px solid var(--card-accent);
-            outline-offset: 2px;
-        }
-        /* 悬停：浅灰底 + 抬起，和文章卡片同一套手感 */
-        @media (hover: hover) and (pointer: fine) {
-            .tweak-card:hover {
-                transform: translateY(-2px);
-                background: var(--tweak-hover-bg);
-                border-color: var(--tweak-border-hover);
-                box-shadow: var(--tweak-hover-shadow);
-            }
-        }
+        /* 悬停不做任何强调：卡片本身不可点，抬起来会让人以为能点进去 */
         @media (prefers-reduced-motion: reduce) {
-            .tweak-card { transition: none; }
-            .tweak-card:hover { transform: none; }
             .tweak-all i { transition: none; }
         }
 

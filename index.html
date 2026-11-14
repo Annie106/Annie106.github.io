@@ -310,7 +310,7 @@
                     </div>
                     <!-- ★ 修改个人简介 ★ -->
                     <p class="hero-bio">思考 · 记录 · 创造</p>
-                    <p class="hero-description">我的网络cn：回忆；伍月；安妮</p>
+                    <p class="hero-description">我的网络昵称：回忆；伍月；安妮</p>
                     <div class="hero-meta">
                         <!-- ★ 修改所在地、职业等信息 ★ -->
                         <span><i class="ri-map-pin-line"></i> 辽宁</span>
@@ -394,7 +394,7 @@
             <!-- 最新文章 -->
             <div class="section-header">
                 <div class="home-section-head">
-                    <span class="section-label">最新文章</span>
+                    <span class="section-label" id="homePostsLabel">最新文章</span>
                     <!-- 搜索入口：打开全站搜索面板（桌面是浮层，手机是全屏面板）。 -->
                     <button class="search-trigger" type="button" data-search-open
                             aria-label="搜索全站内容" aria-haspopup="dialog" aria-expanded="false"
@@ -404,8 +404,11 @@
                         <kbd class="search-trigger-kbd" aria-hidden="true">Ctrl K</kbd>
                     </button>
                 </div>
+                <!-- 「最新」= 最近 6 篇，「全部」= 完整列表 + 分页，两个都是站内筛选。
+                     这里先写死两项兜底，JS 还会补上「置顶」「随笔」。 -->
                 <div class="tag-filter home-tag-filter" id="tagFilterHome">
-                    <span class="tag-pill active" data-tag="all">全部</span>
+                    <span class="tag-pill active" data-tag="latest">最新</span>
+                    <span class="tag-pill" data-tag="all">全部</span>
                 </div>
             </div>
             <div class="posts-list" id="postsListHome">
@@ -535,10 +538,21 @@
                     </div>
                 </div>
             </div>
-            <div class="home-more" style="text-align:center;margin-top:20px;">
+            <div class="home-more" id="homeMore">
+                <!-- 分页：只在「全部」且不止一页时出现（script.js 的 renderHomePager）。
+                     页码由篇数算出，这里留空壳，避免 JS 还没跑时闪一个错的页码。 -->
+                <nav class="home-pager" id="homePager" aria-label="文章分页" hidden>
+                    <button class="home-pager-step" type="button" data-page="prev">
+                        <i class="ri-arrow-left-s-line" aria-hidden="true"></i>上一页
+                    </button>
+                    <div class="home-pager-pages" id="homePagerPages"></div>
+                    <button class="home-pager-step" type="button" data-page="next">
+                        下一页<i class="ri-arrow-right-s-line" aria-hidden="true"></i>
+                    </button>
+                </nav>
                 <!-- 文字由 script.js 的 syncAllPostsCount() 按 blogPosts 数量填成
                      「查看全部 N 篇文章 →」；这里留一份兜底文案，JS 没跑也有内容 -->
-                <a href="#" class="tag-pill" id="viewAllPosts" data-nav="blog" style="text-decoration:none;cursor:pointer;">查看全部文章 →</a>
+                <a href="#" class="tag-pill" id="viewAllPosts" data-nav="blog">查看全部文章 →</a>
             </div>
 
             <!-- ==================== 本周折腾 ==================== -->

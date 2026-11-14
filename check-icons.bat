@@ -17,4 +17,5 @@ if "%RESULT%"=="0" (
 )
 
 echo.
-pause
+echo Press any key to close this window . . .
+pause >nul

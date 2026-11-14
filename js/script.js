@@ -63,6 +63,9 @@
             const postsListBlog = $('#postsListBlog');
             const tagFilterHome = $('#tagFilterHome');
             const tagFilterBlog = $('#tagFilterBlog');
+            const homePostsLabel = $('#homePostsLabel');
+            const homePager = $('#homePager');
+            const homePagerPages = $('#homePagerPages');
             const searchOverlay = $('#searchOverlay');
             const searchBackdrop = $('#searchBackdrop');
             const searchPanel = $('#searchPanel');
@@ -104,8 +107,18 @@
             let currentView = 'home';
             /* 首页和文章页各记各的标签：
                在文章页选了「教程」，回到首页不该被这个选择带走——
-               首页默认永远是「最新」。两行标签互不影响。 */
-            let homeTag = 'all';
+               首页默认永远是「最新」。两行标签互不影响。
+
+               首页标签行里有两个虚拟项，不是文章标签：
+                 latest = 最新（只摊开最近 6 篇，默认）
+                 all    = 全部（完整列表 + 每页 8 篇的分页）
+               早先「最新」也存成 all，那样分页没法区分「6 篇」和「全部」，
+               所以拆成两个值；老快照里的 all 由 restoreTagsFromSnapshot 迁移。 */
+            const HOME_TAG_LATEST = 'latest';
+            const HOME_TAG_ALL = 'all';
+            let homeTag = HOME_TAG_LATEST;
+            // 「全部」当前停在第几页（切标签时归 1）
+            let homePage = 1;
             let blogTag = 'all';
             // 某个视图对应的筛选项
             function tagOfView(viewName) {
@@ -263,6 +276,8 @@
                         articleId: currentArticleId,
                         tag: homeTag,
                         homeTag: homeTag,
+                        homePage: homePage,
+                        homeTagRev: 2,
                         blogTag: blogTag,
                         scroll: window.scrollY,
                         scrollPositions: viewScrollPositions,
@@ -288,10 +303,25 @@
             function restoreTagsFromSnapshot(snapshot) {
                 if (!snapshot) return;
                 const allTags = getAllTags();
-                const pick = value => (typeof value === 'string' && allTags.includes(value) ? value : null);
-                const legacy = pick(snapshot.tag);
-                homeTag = pick(snapshot.homeTag) || legacy || homeTag;
-                blogTag = pick(snapshot.blogTag) || legacy || blogTag;
+                const pickBlogTag = value => (typeof value === 'string' && allTags.includes(value) ? value : null);
+                // 「最新」是首页的虚拟项，不在文章标签里，要单独放行
+                const pickHomeTag = value => {
+                    if (typeof value !== 'string') return null;
+                    if (value === HOME_TAG_LATEST) return value;
+                    return allTags.includes(value) ? value : null;
+                };
+                const legacy = pickHomeTag(snapshot.tag);
+                const savedHomeTag = pickHomeTag(snapshot.homeTag) || legacy;
+                /* 旧版本把「最新」也存成 all（那时首页还没有「全部 + 分页」）。
+                   没有 homeTagRev 标记的快照一律按「最新」解释，
+                   免得升级后老会话一进来就落在「全部」的第 1 页上。 */
+                homeTag = savedHomeTag
+                    ? (savedHomeTag === HOME_TAG_ALL && snapshot.homeTagRev !== 2 ? HOME_TAG_LATEST : savedHomeTag)
+                    : homeTag;
+                blogTag = pickBlogTag(snapshot.blogTag) || pickBlogTag(snapshot.tag) || blogTag;
+                if (typeof snapshot.homePage === 'number' && snapshot.homePage > 0) {
+                    homePage = snapshot.homePage;
+                }
             }
 
             // ==================== 分享链接 ====================
@@ -429,6 +459,8 @@
                         snapshot.scrollPositions = snapshot.scrollPositions || {};
                         snapshot.scrollPositions[currentView] = top;
                         snapshot.homeTag = homeTag;
+                        snapshot.homePage = homePage;
+                        snapshot.homeTagRev = 2;
                         snapshot.blogTag = blogTag;
                     }
                     next.annieScrollTop = top;
@@ -1228,15 +1260,16 @@
                 const isHome = containerId === 'tagFilterHome';
                 const tag = isHome ? homeTag : blogTag;
                 if (isHome) {
-                    // 首页这一行：「最新」= 当下展示的最近几篇，默认选中；
-                    // 「全部」不是筛选，点了直接去文章页看完整列表
+                    /* 首页这一行：「最新」= 最近 6 篇（默认），
+                       「全部」= 完整列表 + 每页 8 篇的分页，两个都是站内筛选，
+                       点「全部」不再跳到文章页。 */
                     container.innerHTML = [
-                        `<span class="tag-pill${tag === 'all' ? ' active' : ''}" data-tag="all">最新</span>`,
-                        `<span class="tag-pill" data-tag-jump="blog" title="去文章页看全部文章">全部</span>`,
-                        ...HOME_TAGS.map(t =>
-                            `<span class="tag-pill${t === tag ? ' active' : ''}" data-tag="${t}">${t}</span>`
-                        ),
-                    ].join('');
+                        { tag: HOME_TAG_LATEST, label: '最新' },
+                        { tag: HOME_TAG_ALL, label: '全部' },
+                        ...HOME_TAGS.map(t => ({ tag: t, label: t })),
+                    ].map(item =>
+                        `<span class="tag-pill${item.tag === tag ? ' active' : ''}" data-tag="${escapeHtml(item.tag)}">${escapeHtml(item.label)}</span>`
+                    ).join('');
                 } else {
                     /* 标签后面跟篇数，但只在 2 篇以上才显示：大部分标签只有一篇，
                        每个都挂个「1」既啰嗦又把标签栏撑成两行。
@@ -1250,31 +1283,39 @@
                 }
                 container.querySelectorAll('.tag-pill').forEach(pill => {
                     pill.addEventListener('click', function() {
-                        // 「全部」：首页回到「最新」，文章页也一并清空筛选，然后跳过去
-                        if (this.getAttribute('data-tag-jump')) {
-                            homeTag = 'all';
-                            blogTag = 'all';
-                            renderTagPills('tagFilterHome');
-                            renderTagPills('tagFilterBlog');
-                            renderPostsList('postsListHome', true);
-                            renderPostsList('postsListBlog', true);
-                            // 文章的列表页也要从头看起，先清掉记忆里的位置，
-                            // 否则切过去会被「恢复上次位置」再拽回去，看着像闪了一下
-                            viewScrollPositions.blog = 0;
-                            navigateToView('blog');
-                            window.scrollTo({ top: 0, behavior: 'instant' });
-                            return;
-                        }
                         const nextTag = this.getAttribute('data-tag');
+                        if (!nextTag) return;
+                        /* 当前选中的是谁要现读，不能用渲染时闭包里的 tag——
+                           现在切标签只改 class、不重建这一行，闭包里那个值会过期。 */
+                        const activeTag = isHome ? homeTag : blogTag;
+                        // 点的是当前这一项：什么也不做，免得列表白白重画一次（会闪）
+                        if (nextTag === activeTag) return;
+                        // 首页换筛选：分页回到第 1 页，从最新的那篇重新看起
+                        const scrollTarget = isHome ? homeListScrollTarget() : null;
+                        if (isHome) homePage = 1;
                         setTagOfView(isHome ? 'home' : 'blog', nextTag);
-                        renderTagPills('tagFilterHome');
-                        renderTagPills('tagFilterBlog');
-                        // 只重画这一屏的列表，另一屏的筛选状态没变
-                        renderPostsList(isHome ? 'postsListHome' : 'postsListBlog', true);
+                        /* 只改选中态、不重建整行：胶囊节点留着，下划线和字色的
+                           过渡才跑得起来（重建 DOM 会直接跳到终态）。另一行筛选
+                           没变，也不必跟着重画。 */
+                        syncTagPillsActive(containerId);
+                        swapPostsList(isHome ? 'postsListHome' : 'postsListBlog');
+                        if (isHome) scrollHomeListToTop(scrollTarget);
                     });
                 });
                 // 标签数量和文字长度都变了，重新判断搜索入口放不放得下
                 scheduleSearchTriggerFit();
+            }
+
+            /* 把某一行的选中态同步到当前 tag，只切 class、不重建节点。
+               重建会让 .tag-pill 的 transition 失效——新节点从终态开始，
+               下划线是"啪"地出现而不是滑过去。 */
+            function syncTagPillsActive(containerId) {
+                const container = document.getElementById(containerId);
+                if (!container) return;
+                const tag = containerId === 'tagFilterHome' ? homeTag : blogTag;
+                container.querySelectorAll('.tag-pill').forEach(pill => {
+                    pill.classList.toggle('active', pill.getAttribute('data-tag') === tag);
+                });
             }
 
             // ==================== 搜索入口：空间自适应 ====================
@@ -1500,19 +1541,122 @@
                 return posts.sort((a, b) => Number(isPinnedPost(b)) - Number(isPinnedPost(a)));
             }
 
-            // 首页只摊开最近更新的几篇，剩下的都在「文章」页
+            // 首页「最新」只摊开最近更新的几篇，剩下的都在「文章」页
             const HOME_POST_LIMIT = 6;
+            // 首页「全部」每页展示的篇数（两列网格，8 篇正好四行）
+            const HOME_PAGE_SIZE = 8;
 
-            // 首页：置顶依旧在最前面，其余按日期倒序，总共最多 6 篇
+            // 首页当前筛选下的完整文章池：置顶在最前，其余按展示日期倒序
+            function getHomePool() {
+                const tag = homeTag === HOME_TAG_LATEST ? 'all' : homeTag;
+                return getFilteredPosts(tag).sort((a, b) => {
+                    const pinnedDiff = Number(isPinnedPost(b)) - Number(isPinnedPost(a));
+                    if (pinnedDiff) return pinnedDiff;
+                    // 改过的文章用 updated 参与排序，跟卡片上显示的日期保持一致
+                    return postDisplayDate(b).localeCompare(postDisplayDate(a));
+                });
+            }
+
+            function isHomePaged() {
+                return homeTag === HOME_TAG_ALL;
+            }
+
+            /* 每页几篇：「全部」看满一屏 8 篇；其余标签（最新 / 置顶 / 随笔）
+               一页 6 篇，超过 6 篇就出分页。 */
+            function getHomePageSize() {
+                return isHomePaged() ? HOME_PAGE_SIZE : HOME_POST_LIMIT;
+            }
+
+            function getHomeTotalPages() {
+                return Math.max(1, Math.ceil(getHomePool().length / getHomePageSize()));
+            }
+
+            /* 首页这次要画的卡片：当前筛选、当前页的那一批。
+               「最新」按 6 篇一页翻，「全部」按 8 篇一页翻；
+               页码越界（文章删了、从旧快照回来）在这里收回来。 */
             function getHomePosts() {
-                return getFilteredPosts(homeTag)
-                    .sort((a, b) => {
-                        const pinnedDiff = Number(isPinnedPost(b)) - Number(isPinnedPost(a));
-                        if (pinnedDiff) return pinnedDiff;
-                        // 改过的文章用 updated 参与排序，跟卡片上显示的日期保持一致
-                        return postDisplayDate(b).localeCompare(postDisplayDate(a));
-                    })
-                    .slice(0, HOME_POST_LIMIT);
+                const pool = getHomePool();
+                const size = getHomePageSize();
+                const total = Math.max(1, Math.ceil(pool.length / size));
+                homePage = Math.min(Math.max(homePage, 1), total);
+                const start = (homePage - 1) * size;
+                return pool.slice(start, start + size);
+            }
+
+            /* 分页控件：只要不止一页就出现（不限「全部」）。
+               页数少时全列出来；多了就留首尾 + 当前页前后，中间用「…」，
+               宽度不会随文章数无限长下去。 */
+            function buildPagerPages(current, total) {
+                if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+                const pages = [1];
+                const start = Math.max(2, current - 1);
+                const end = Math.min(total - 1, current + 1);
+                if (start > 2) pages.push('gap');
+                for (let page = start; page <= end; page += 1) pages.push(page);
+                if (end < total - 1) pages.push('gap');
+                pages.push(total);
+                return pages;
+            }
+
+            /* 页码按当前状态重画：上一页 / 下一页走到头就禁用，
+               当前页用 aria-current 标出来（读屏和样式共用这一个状态）。 */
+            function renderHomePager() {
+                if (!homePager || !homePagerPages) return;
+                const total = getHomeTotalPages();
+                // 只有一页时控件没有意义，直接收起（任何标签都一样）
+                const visible = total > 1;
+                homePager.hidden = !visible;
+                if (!visible) {
+                    homePagerPages.innerHTML = '';
+                    return;
+                }
+                const current = Math.min(Math.max(homePage, 1), total);
+                homePagerPages.innerHTML = buildPagerPages(current, total).map(page =>
+                    page === 'gap'
+                        ? '<span class="home-pager-gap" aria-hidden="true">…</span>'
+                        : `<button type="button" class="home-pager-page" data-page="${page}"${page === current ? ' aria-current="page"' : ''}>${page}</button>`
+                ).join('');
+                const prev = homePager.querySelector('[data-page="prev"]');
+                const next = homePager.querySelector('[data-page="next"]');
+                if (prev) prev.disabled = current <= 1;
+                if (next) next.disabled = current >= total;
+            }
+
+            // 列表开头在文档里的位置（减去吸顶的页头，别让第一行贴到导航条上）
+            function homeListScrollTarget() {
+                if (!postsListHome) return null;
+                const headerOffset = siteHeader ? siteHeader.offsetHeight + 16 : 24;
+                return Math.max(0, postsListHome.getBoundingClientRect().top + window.scrollY - headerOffset);
+            }
+
+            /* 翻页 / 换筛选后，如果列表开头已经滚出视口，就平滑地回到列表顶部。
+               否则从第 2 页开始看时，人还停在上一页滚动到的位置，会以为没翻页。 */
+            function scrollHomeListToTop(target) {
+                if (typeof target !== 'number') return;
+                if (window.scrollY <= target + 8) return;
+                window.scrollTo({ top: target, behavior: prefersReducedMotion() ? 'instant' : 'smooth' });
+            }
+
+            function goHomePage(page) {
+                const next = Math.min(Math.max(page, 1), getHomeTotalPages());
+                if (!Number.isFinite(next) || next === homePage) return;
+                // 先把起点位置量好：列表淡出时会带 -6px 位移，量晚了会差一截
+                const scrollTarget = homeListScrollTarget();
+                homePage = next;
+                // 页码高亮立刻跟上，别等 120ms 的淡出跑完
+                renderHomePager();
+                swapPostsList('postsListHome');
+                scrollHomeListToTop(scrollTarget);
+            }
+
+            if (homePager) {
+                homePager.addEventListener('click', function(e) {
+                    const button = e.target.closest('[data-page]');
+                    if (!button || button.disabled) return;
+                    const raw = button.getAttribute('data-page');
+                    const page = raw === 'prev' ? homePage - 1 : raw === 'next' ? homePage + 1 : parseInt(raw, 10);
+                    goHomePage(page);
+                });
             }
 
             /* 首页底部「查看全部文章 →」带上总篇数，省得点进去才知道有多少篇。
@@ -1530,6 +1674,87 @@
                内容其实没变却整块重画——卡片里的图片被重建，
                「模糊 → 清晰」的淡入又放一遍，看着就是闪。 */
             const postsRenderKeys = new Map();
+
+            /* 每个列表最近一次「淡出后重画」的编号。
+               期间又切了筛选时，靠它把前一次排队的回调作废，
+               避免慢一步的旧数据把新内容盖回去。 */
+            const listSwapTokens = new Map();
+
+            function prefersReducedMotion() {
+                return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+            }
+
+            /* 切换筛选 / 翻页的统一入口：旧卡片先整体淡出 120ms，再换内容淡入。
+               直接 innerHTML 覆盖是一帧硬切——卡片"啪"地换掉，列表高度也跟着跳；
+               淡出这 120ms 里高度变化藏在透明里，看起来是一次交叉过渡。
+               入场动画仍由 renderPostsList 的 animate 分支负责（.post-card-enter）。
+               注意：卡片本身的尺寸一点没动，高度差只在这里用动画吸收。 */
+            function swapPostsList(containerId) {
+                const container = document.getElementById(containerId);
+                if (!container) return;
+                const token = (listSwapTokens.get(containerId) || 0) + 1;
+                listSwapTokens.set(containerId, token);
+                // 上一轮的高度过渡还没跑完就又要切：先把残留的内联高度清掉
+                clearListHeight(container);
+                // 没有旧卡片（首屏 / 骨架还在）/ 用户要求减弱动效：直接画
+                if (!container.querySelector('.post-card') || prefersReducedMotion()) {
+                    renderPostsList(containerId, true);
+                    return;
+                }
+                // 换内容前后各量一次高度：6 篇 ↔ 8 篇差一整行，硬切会让
+                // 下面「查看全部」和「本周折腾」整体跳一下，这里让它滑过去
+                const fromHeight = container.getBoundingClientRect().height;
+                container.classList.add('is-filtering');
+                window.setTimeout(function() {
+                    if (listSwapTokens.get(containerId) !== token) return;
+                    renderPostsList(containerId, true);
+                    container.classList.remove('is-filtering');
+                    animateListHeight(container, fromHeight);
+                }, 120);
+            }
+
+            /* 列表高度过渡：把容器高度先钉在换内容前的高度，再过渡到新高度。
+               overflow: hidden 只在过渡这 260ms 里临时挂——高度比内容矮时，
+               卡片会溢出压到下面的「查看全部」上；结束后把内联样式全部摘掉，
+               回到自然高度，字体缩放、窗口变宽都不用再管。 */
+            function animateListHeight(container, fromHeight) {
+                if (!fromHeight || prefersReducedMotion()) return;
+                const toHeight = container.getBoundingClientRect().height;
+                if (!toHeight || Math.abs(toHeight - fromHeight) < 1) return;
+                container.style.height = fromHeight + 'px';
+                container.style.overflow = 'hidden';
+                // 先把起始高度应用掉，否则同一帧里改两次 height 会被合并成一次
+                void container.offsetHeight;
+                container.style.transition = 'height 0.26s cubic-bezier(0.4, 0, 0.2, 1)';
+                container.style.height = toHeight + 'px';
+                let finished = false;
+                const finish = function() {
+                    if (finished) return;
+                    finished = true;
+                    container.removeEventListener('transitionend', onEnd);
+                    clearListHeight(container);
+                };
+                // 只认 height 的结束事件：卡片入场动画的 transitionend 也会冒泡上来
+                const onEnd = function(e) {
+                    if (e.target === container && e.propertyName === 'height') finish();
+                };
+                container.addEventListener('transitionend', onEnd);
+                // 兜底：切到后台 / 打断过渡时 transitionend 不一定来
+                window.setTimeout(finish, 400);
+            }
+
+            function clearListHeight(container) {
+                container.style.height = '';
+                container.style.overflow = '';
+                container.style.transition = '';
+            }
+
+            /* 标题跟着筛选走：「最新」→ 最新文章，「全部」→ 全部文章。
+               两个都是四字，宽度不变，不用重新量搜索入口。 */
+            function syncHomeSectionLabel() {
+                if (!homePostsLabel) return;
+                homePostsLabel.textContent = isHomePaged() ? '全部文章' : '最新文章';
+            }
 
             /* 首页骨架屏退场。
                直接把骨架删掉（innerHTML 整个覆盖）是一帧硬切：灰块瞬间消失、
@@ -1570,10 +1795,23 @@
                 if (!container) return;
                 const isHomeList = postsListHome && container === postsListHome;
                 const posts = isHomeList ? getHomePosts() : getFilteredPosts(blogTag);
-                const listKey = (isHomeList ? 'home:' : 'blog:') + (isHomeList ? homeTag : blogTag);
-                // 换筛选、或明确要求播入场动画（animate）时才真的重画
+                const listKey = (isHomeList ? 'home:' : 'blog:') + (isHomeList ? homeTag : blogTag)
+                    + (isHomeList ? ':' + homePage : '');
+                // 列表没重画，页码和标题也可能需要同步（比如从文章返回首页）
+                if (isHomeList) {
+                    syncHomeSectionLabel();
+                    renderHomePager();
+                }
+                // 换筛选 / 翻页、或明确要求播入场动画（animate）时才真的重画
                 if (!animate && postsRenderKeys.get(containerId) === listKey && container.firstChild) return;
                 postsRenderKeys.set(containerId, listKey);
+                /* 这一帧是即时局部重画：把可能在跑的淡出/高度过渡中止掉，
+                   否则 120ms 后那次定时回调会用旧数据把列表盖回去。 */
+                if (!animate) {
+                    listSwapTokens.set(containerId, (listSwapTokens.get(containerId) || 0) + 1);
+                    container.classList.remove('is-filtering');
+                    clearListHeight(container);
+                }
                 if (posts.length === 0) {
                     releaseSkeleton(container);
                     container.innerHTML = '<p style="color:#999;text-align:center;padding:30px 0;">暂无文章</p>';
@@ -1763,9 +2001,10 @@
             function renderTweaks() {
                 const list = document.getElementById('tweakList');
                 if (!list) return;
+                /* 首页这三张只是「看一眼」：不加 role/tabindex，也不挂点击，
+                   进完整列表只走右上角「全部折腾 →」。 */
                 list.innerHTML = blogTweaks.map(item => `
-                    <article class="tweak-card" role="button" tabindex="0"
-                             aria-label="去「全部折腾」看完整记录：${escapeHtml(item.label)}">
+                    <article class="tweak-card">
                         <div class="tweak-meta">
                             <time class="tweak-date" datetime="${item.iso}">${item.date}</time>
                             <span class="tweak-cat"><span class="tweak-emoji" aria-hidden="true">${item.emoji}</span>${escapeHtml(item.label)}</span>
@@ -1775,7 +2014,7 @@
             }
 
             // 「全部折腾」：切到站内的折腾视图（不占导航栏，走视图历史，
-            // 返回键能退回首页原位）。首页卡片也走这里，进列表顶部，不按索引往下滚。
+            // 返回键能退回首页原位），进列表顶部。
             function openTweaksView() {
                 viewScrollPositions.tweaks = 0;
                 navigateToView('tweaks');
@@ -1786,24 +2025,6 @@
                 const allLink = document.getElementById('tweakAll');
                 if (!allLink) return;
                 allLink.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    openTweaksView();
-                });
-            })();
-
-            (function bindTweakCards() {
-                const list = document.getElementById('tweakList');
-                if (!list) return;
-                list.addEventListener('click', function(e) {
-                    const card = e.target.closest('.tweak-card');
-                    if (!card || !list.contains(card)) return;
-                    openTweaksView();
-                });
-                // 卡片上挂了 role="button"，Enter / 空格也要能进
-                list.addEventListener('keydown', function(e) {
-                    if (e.key !== 'Enter' && e.key !== ' ') return;
-                    const card = e.target.closest('.tweak-card');
-                    if (!card) return;
                     e.preventDefault();
                     openTweaksView();
                 });
@@ -1887,8 +2108,8 @@
                 mount.querySelectorAll('[data-cloud-tag]').forEach(pill => {
                     pill.addEventListener('click', function () {
                         setTagOfView('blog', this.getAttribute('data-cloud-tag'));
-                        renderTagPills('tagFilterHome');
-                        renderTagPills('tagFilterBlog');
+                        // 只改文章页那一行的选中态；首页的行没变，不用跟着重建
+                        syncTagPillsActive('tagFilterBlog');
                         renderPostsList('postsListBlog', true);
                         // 清掉记忆里的位置，否则跳过去会被「恢复上次位置」拽回来
                         viewScrollPositions.blog = 0;
@@ -3709,6 +3930,8 @@
                     view: currentView,
                     articleId: currentArticleId,
                     homeTag: homeTag,
+                    homePage: homePage,
+                    homeTagRev: 2,
                     blogTag: blogTag,
                     scroll: articleReturnScroll,
                     scrollPositions: {
@@ -3824,6 +4047,11 @@
                 if (viewName === 'home') {
                     viewHome.style.display = 'block';
                     viewHome.classList.add('active-view');
+                    /* 从历史 / 文章页回来时，首页的筛选、页码可能已经被快照
+                       改过（restoreTagsFromSnapshot），这里按当前状态补一次；
+                       内容没变时 renderPostsList 会自己跳过重画。 */
+                    syncTagPillsActive('tagFilterHome');
+                    renderPostsList('postsListHome');
                     // 首页重新显示，尺寸要等到下一帧才准
                     scheduleSearchTriggerFit();
                 } else if (viewName === 'blog') {
