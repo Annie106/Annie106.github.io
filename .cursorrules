@@ -1,0 +1,10 @@
+# 项目约定
+
+先读仓库根目录的 `AGENTS.md`，它是唯一约定来源；本文件只是指针。
+
+硬前提：
+1. 本地需要 Node 18+ 和 Python 3.9+（fonttools + brotli）；新机器跑一次 tools/setup.bat。
+2. fonts/icons.css 与 fonts/remixicon.woff2 是生成物，不要手改。加图标 = 写 <i class="ri-xxx"> 后跑 tools/update-icons.bat（提交时钩子也会自动跑）。字体与源码不一致时构建会中止。
+3. 构建 = node tools/build-site.js（先校验图标，再按白名单复制到 dist/）。不要引入打包器、框架、TypeScript、npm 依赖。
+
+别乱动：js/script.js 的路由与历史逻辑、AGENTS.md 里「别乱动的地方」列出的文件。
