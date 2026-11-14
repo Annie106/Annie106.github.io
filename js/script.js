@@ -514,6 +514,10 @@
             // 留多久：原来 3.2s，提到 3.6s —— 提示改成从导航下方落下来之后，
             // 用户的视线要先「找」到它，多给半秒才读得完一句话
             const TOAST_DURATION = 3600;
+            // 淡出走完之后才真正 hidden。transition 是 opacity 0.24s +
+            // transform 0.34s，按 0.24s 收就会把最后那段下移切掉，
+            // 所以取 380ms（> 0.34s）
+            const TOAST_EXIT_MS = 380;
             function showToast(message, isError) {
                 const toast = document.getElementById('siteToast');
                 const text = document.getElementById('siteToastText');
@@ -552,11 +556,18 @@
                 }
 
                 toastHideTimer = setTimeout(() => {
-                    toast.classList.remove('visible');
-                    // 连带动画类一起摘：animation-fill 是 both，留着会把 opacity 钉住
+                    // ⚠️ 顺序不能换：先摘动画类、强制重排，再摘 .visible。
+                    // is-replaying 的 animation-fill-mode 是 both，动画播完会把
+                    // opacity 钉在 1；这两个类如果在同一帧一起摘，浏览器会把
+                    // 1→0 当成「动画被取消」的跳变，transition 根本不启动 ——
+                    // 表现就是叠加过的提示「啪」地消失。没叠加过的那条反而
+                    // 正常（它从没挂过 is-replaying），所以这个 bug 只在
+                    // 连点两次复制时才看得到。
                     toast.classList.remove('is-replaying');
+                    void toast.offsetWidth;
+                    toast.classList.remove('visible');
                     // 等淡出过渡走完再真正隐藏，否则会被 display:none 打断
-                    toastCleanupTimer = setTimeout(() => { toast.hidden = true; }, 300);
+                    toastCleanupTimer = setTimeout(() => { toast.hidden = true; }, TOAST_EXIT_MS);
                 }, TOAST_DURATION);
             }
 

@@ -5608,9 +5608,18 @@
             /* 只是「看一眼」的内容卡：不可点，所以没有手型、没有悬停抬起。
                要进完整列表走右上角「全部折腾 →」。 */
             cursor: default;
+            transition: background-color 0.2s ease;
         }
-        /* 悬停不做任何强调：卡片本身不可点，抬起来会让人以为能点进去 */
+        /* 悬停只换一层浅灰底：卡片本身不可点，所以不做位移、不加阴影、
+           也不动边框，否则会被读成「能点进去」。底色走 --tweak-hover-bg，
+           和折腾列表 .tweak-entry、时间线的悬停是同一个值。 */
+        @media (hover: hover) and (pointer: fine) {
+            .tweak-card:hover {
+                background: var(--tweak-hover-bg);
+            }
+        }
         @media (prefers-reduced-motion: reduce) {
+            .tweak-card { transition: none; }
             .tweak-all i { transition: none; }
         }
 

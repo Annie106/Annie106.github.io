@@ -71,13 +71,19 @@
         }
 
         copyToastTimer = setTimeout(function () {
-            toast.classList.remove('visible');
-            // 动画类是 fill: both，留着会把 opacity 钉在 1、收不起来
+            // ⚠️ 顺序不能换：先摘动画类、强制重排，再摘 .visible。
+            // is-replaying 的 animation-fill-mode 是 both，动画播完会把
+            // opacity 钉在 1；两个类在同一帧一起摘的话，浏览器会把 1→0
+            // 当成「动画被取消」的跳变，transition 不启动 —— 叠加过的
+            // 提示就会「啪」地消失（只弹过一次的反而正常）。
             toast.classList.remove('is-replaying');
-            // 等淡出过渡走完再真正隐藏，否则会被 display:none 打断
+            void toast.offsetWidth;
+            toast.classList.remove('visible');
+            // 等淡出过渡走完再真正隐藏，否则会被 display:none 打断。
+            // opacity 0.24s + transform 0.34s，按后者取 380ms。
             copyToastCleanupTimer = setTimeout(function () {
                 toast.hidden = true;
-            }, 300);
+            }, 380);
         }, 3600);
     }
 
