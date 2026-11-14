@@ -270,11 +270,12 @@
             <img
             class="avatar"
             src="https://1837491863.cdn.123clouddisk.com/1837491863/46000074#"
+            data-fallback-src="https://picgocloud.com/m/844ab16d-c3d5-4add-8e1c-c54b4259c57b.jpg"
             alt="Annie 的头像"
             width="38"
             height="38"
             decoding="async"
-            onerror="this.onerror=null;this.src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'"
+            onerror="if(this.dataset.fallbackSrc){this.src=this.dataset.fallbackSrc;delete this.dataset.fallbackSrc;console.info('%c[头像] 主链接加载失败，已切换到备用链接','color:#f08c00;font-weight:600;');}else{this.onerror=null;this.src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';}"
             />
             <span class="site-title-group">
                 <span class="site-title">Annie</span>
@@ -776,7 +777,7 @@
             </section>
 
             <!-- 版本号：从页脚挪到这里，收在关于页右下角 -->
-            <p class="about-version">版本 0.4.24.017</p>
+            <p class="about-version">版本 0.4.24.021</p>
         </div>
 
         <!-- ==================== 文章详情视图 ==================== -->

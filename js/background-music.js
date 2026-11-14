@@ -156,7 +156,7 @@
             </button>
             <p class="audio-error-message">
                 <i class="ri-error-warning-line" aria-hidden="true"></i>
-                <span>当前ip已达到流量限制，请等待次日0:00重新尝试</span>
+                <span>音乐无法播放：当前ip已达到流量限制，请等待次日0:00重新尝试</span>
             </p>
         `;
 

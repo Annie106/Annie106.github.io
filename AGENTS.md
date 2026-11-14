@@ -106,6 +106,22 @@
 - `syncUrlWithView()` 只改 query、**原样保留 pathname** —— 所以入口的 pathname 决定了之后所有地址栏形态。别把它改成拼接死路径。
 - 验证手法：起本地 http server，用临时页 iframe 读 `contentWindow.location` 对比 `pathname + search`。**每个用例必须用独立的 `--user-data-dir`**，否则 `sessionStorage` 里的「上次所在视图」会污染下一个用例 —— 表现是 `/` 被改写成 `/?view=about`，看着像 bug，其实是视图记忆（`readViewState`）。
 
+## 图片加载：高速 / 慢速直链（每张图每天 1 次高速）
+
+`js/image-loading.js` 除了模糊占位和清晰化，还负责在 `data-fast-src`（高速直链）和 `data-slow-src`（慢速直链）之间选一条。**2026-11-14 按用户要求改成「每张图每天 1 次高速」的额度制**，别改回时间冷却（原来是 20 秒冷却，已废弃）：
+
+- 默认优先高速直链。每次用高速**成功**后，把这张图记进当天额度（`localStorage` 的 `annie-image-fast-daily`，结构 `{date:'YYYY-MM-DD', images:['<data-fast-src>']}`），当天再来就只走慢速。
+- 没配 `data-fast-src`、或当天额度已用完 → 直接慢速；高速加载失败 → 立即回退慢速。
+- **失败不占用额度**（用户明确选的）：`error` 时只回退、不写记录，下次进页面还会再试一次高速。所以高速链接长期挂着的话，每访问一次会有一个失败请求，这是刻意的取舍，不要"优化"成失败后当天禁用。
+- 额度是**每张图**（以 `data-fast-src` 的地址区分），不是全站共享；同页多张图各用各的。同一张图同页重复出现时，靠内存里的 `fastInFlight` 去重，后来的那张走慢速，避免一次额度打两次请求。
+- 日期用本地日期拼（`getFullYear/getMonth/getDate`），**不要用 `toISOString()`**：那是 UTC，东八区晚上 8 点后会把额度算到"明天"。
+- 存不了 `localStorage` 时依次退回 `sessionStorage`、内存，额度范围随之变成"当前标签页/当前页面"，控制台会有 warn 说明。
+- **控制台日志是需求的一部分**（用户明确要求"加载高速/慢速直链在控制台里体现"）：前缀分别是 `[图片加载·高速直链]`（绿）、`[图片加载·慢速直链]`（橙）、`[图片加载·回退]`（红 warn）、`[图片加载·失败]`。选链时一条、成功/回退时一条，别合并成一条，也别静音。
+- 调试：控制台敲 `AnnieImageLoading.getDailyQuota()` 看今天哪些图用过高速；`AnnieImageLoading.resetDailyQuota()` 清空重来（验证高速有没有生效时用）。
+- **头像和音乐不参与这套策略**：`EXCLUDED_SELECTOR`（`.avatar, .music-player-card, .music-enable-hint, [data-image-loading="off"], [data-fast-quota="off"]`）命中的图片直接跳过 —— 不占额度、也不打日志。音乐本身是 `<audio>`，压根不进 `image-loading.js`；以后若要给别的图挂"不受额度限制"，加 `data-fast-quota="off"` 即可，不用改 JS。
+- 头像的「主/备」链接是自己在 `index.html` 的 `<img class="avatar">` 上用内联 `onerror` 做的（它不属于高速/慢速那套）：`src` 失败 → 换成 `data-fallback-src`（PicGo Cloud 那张）→ 再失败才退回透明占位 gif。因为挂在 `.avatar` 上被排除在外，**别把它接进 `image-loading.js`**，否则会吃掉当天额度。改头像时三个值（`src`、`data-fallback-src`、`alt`）要一起看。
+- 低速预览预热只在**这次高速成功**时才做（回退慢速后再预热一次慢图是白跑一趟）。
+
 ## 别乱动的地方
 
 - `js/script.js` 是 SPA 式路由核心（`/?article=N`、`?view=xxx`、浏览器返回键、滚动位置恢复）。这里的逻辑和历史记录强耦合，改动前先读相关注释，不要顺手重构。

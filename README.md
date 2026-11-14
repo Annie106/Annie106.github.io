@@ -34,7 +34,7 @@ js/theme.js                 深色模式
 js/touch-hover.js           触屏悬停修正
 js/background-music.js      首页背景音乐
 js/copyToClipboard.js       联系方式复制
-js/image-loading.js         图片占位与清晰化
+js/image-loading.js         图片占位、清晰化与高速/慢速直链（每张图每天 1 次高速）
 project_subpage/blog/       站点页：contact / guide / submission / thanks / 文章内嵌页 ...
 project_subpage/projects/   项目页：appeal-guide ...
 archive/                    归档，不参与显示

@@ -2184,18 +2184,76 @@ html:not(.is-touch-input) [data-theme="dark"] .contact-btn:hover{transform:scale
 </div>
 
 <script>
-/* ===== 停服公告：等电影模块完全加载完再出现 =====
-   先铺阴影（.is-dim），两百多毫秒后卡片浮上来（.is-open）。
+/* ===== 停服公告：出现 + 守护 =====
+   出现：先铺阴影（.is-dim），两百多毫秒后卡片浮上来（.is-open）。
    挂在 window 的 load 上而不是 DOMContentLoaded：load 之后图片、字体
-   也都到位了，阴影不会压在一个还在长的空壳上。 */
+   也都到位了，阴影不会压在一个还在长的空壳上。
+
+   守护：电影板块已停服，这一页不允许再被操作，公告就是唯一该存在的东西，
+   所以它必须一直在。下面三个机制会在公告被移除、被 hidden、被改 class/style
+   之后立刻把它放回去 ——
+     ① MutationObserver 盯属性（class / style / hidden / aria-hidden）
+     ② MutationObserver 盯 DOM 树，发现被摘走就重新挂回 body
+     ③ setInterval 兜底，防前两个 observer 被一起断掉
+   这不是安全边界（能开控制台的人总能赢），是为了防止别的脚本顺手清 DOM、
+   或者手滑改样式，把停服中的模块意外放开。 */
 (function () {
   var notice = document.getElementById('serviceNotice');
   if (!notice) return;
 
-  function reveal() {
-    notice.classList.add('is-dim');
-    setTimeout(function () { notice.classList.add('is-open'); }, 240);
+  /* 0 = 还没到出现的时候，1 = 阴影铺好，2 = 卡片浮起。
+     用阶段号而不是布尔，是为了让守护不去抢 reveal 的两段动画。 */
+  var stage = 0;
+  var restoring = false;
+
+  function desiredClass() {
+    return stage === 2 ? 'is-dim is-open' : (stage === 1 ? 'is-dim' : '');
   }
+
+  function restore() {
+    if (restoring) return;
+    restoring = true;
+    try {
+      if (!notice.isConnected) document.body.appendChild(notice);
+      if (notice.className !== desiredClass()) notice.className = desiredClass();
+      if (notice.hidden) notice.hidden = false;
+      if (notice.hasAttribute('hidden')) notice.removeAttribute('hidden');
+      if (notice.hasAttribute('style')) notice.removeAttribute('style');
+      if (notice.hasAttribute('aria-hidden')) notice.removeAttribute('aria-hidden');
+    } finally {
+      restoring = false;
+    }
+  }
+
+  function reveal() {
+    stage = 1;
+    notice.classList.add('is-dim');
+    setTimeout(function () {
+      stage = 2;
+      notice.classList.add('is-open');
+    }, 240);
+  }
+
+  /* ① 属性被改 */
+  new MutationObserver(restore).observe(notice, {
+    attributes: true,
+    attributeFilter: ['class', 'style', 'hidden', 'aria-hidden']
+  });
+
+  /* ② 被从文档里摘走（remove / removeChild / 清空父级 / innerHTML 覆盖） */
+  new MutationObserver(function (records) {
+    for (var i = 0; i < records.length; i++) {
+      var gone = records[i].removedNodes;
+      for (var j = 0; j < gone.length; j++) {
+        if (gone[j] === notice) { restore(); return; }
+      }
+    }
+  }).observe(document.body, { childList: true, subtree: true });
+
+  /* ③ 兜底巡检 */
+  setInterval(function () {
+    if (!notice.isConnected || notice.hidden || notice.className !== desiredClass()) restore();
+  }, 1000);
 
   if (document.readyState === 'complete') {
     setTimeout(reveal, 0);
