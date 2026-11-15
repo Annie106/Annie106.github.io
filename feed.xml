@@ -7,9 +7,19 @@
     <link>https://annie106.github.io/</link>
     <description>思考 · 记录 · 创造 —— 记录阅读、成长和日常灵感。</description>
     <language>zh-cn</language>
-    <lastBuildDate>Fri, 13 Nov 2026 00:00:00 +0800</lastBuildDate>
+    <lastBuildDate>Sun, 15 Nov 2026 00:00:00 +0800</lastBuildDate>
     <generator>tools/build-feed.js</generator>
     <atom:link href="https://annie106.github.io/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>给这个博客配一个本地服务器</title>
+      <link>https://annie106.github.io/posts/17/</link>
+      <guid isPermaLink="true">https://annie106.github.io/?article=17</guid>
+      <pubDate>Sun, 15 Nov 2026 00:00:00 +0800</pubDate>
+      <description>线上跑的是构建产物，双击 HTML 看不到它。两个文件放在仓库外面，这篇文章说清为什么、怎么用、出错先看哪。</description>
+      <category>教程</category>
+      <category>网站</category>
+      <media:thumbnail url="https://annie106.github.io/share_cover.jpg"/>
+    </item>
     <item>
       <title>心有波澜：在喧嚣的人世间，找回被生活点燃的自己</title>
       <link>https://annie106.github.io/posts/16/</link>
