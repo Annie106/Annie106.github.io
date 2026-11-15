@@ -564,8 +564,8 @@
                 <a href="#" class="tag-pill" id="viewAllPosts" data-nav="blog">查看全部文章 →</a>
             </div>
 
-            <!-- ==================== 本周折腾 ==================== -->
-            <!-- 本周对博客本身的更新与修改（不是文章）。
+            <!-- ==================== 最近折腾 ==================== -->
+            <!-- 最近对博客本身的更新与修改（不是文章）。
                  数据在 js/tweaks-data.js，这里只露前三张，
                  「全部折腾」切到站内的折腾视图（#view-tweaks）看完整列表。 -->
             <section class="tweak-section" id="tweakSection" aria-labelledby="tweakTitle">
@@ -726,13 +726,13 @@
             <div class="archive-feed" id="archiveFeed"></div>
         </div>
 
-        <!-- ==================== 本周折腾视图 ==================== -->
+        <!-- ==================== 最近折腾视图 ==================== -->
         <!-- 首页「全部折腾 →」点进来的完整列表；不占导航栏位置。
              数据是 js/tweaks-data.js 的 BLOG_TWEAKS，和首页那三张卡片共用。 -->
         <div id="view-tweaks" class="view" style="display:none;">
             <header class="tweaks-hero">
                 <p class="tweaks-eyebrow">// NOTES</p>
-                <h1 class="tweaks-title">本周折腾</h1>
+                <h1 class="tweaks-title">最近折腾</h1>
                 <p class="tweaks-lead">来不及写成长文的，都以小记的形式堆在这里。短，但都是真的。</p>
             </header>
             <div class="tweaks-feed" id="tweaksFeed"></div>
@@ -858,7 +858,7 @@
         <!-- ==================== 问题反馈视图 ==================== -->
         <!-- 文章页底部「问题反馈」、卡片「⋯」菜单、文章不可用页的入口都切到这里，
              不再跳原来的 project_subpage/blog/feedback.html（那个文件已归档到 archive/）。
-             标题版式直接复用「本周折腾」那套 .tweaks-eyebrow / .tweaks-title /
+             标题版式直接复用「最近折腾」那套 .tweaks-eyebrow / .tweaks-title /
              .tweaks-lead，两页看起来是同一层级的站内页。
              文章信息走地址栏的 fa / ft 带进来（fa=文章 id，ft=标题）：
              不能复用 ?article=，那个参数的含义是「直接打开这篇文章」，

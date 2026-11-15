@@ -300,4 +300,70 @@ window.BLOG_POSTS = [{
                         <p>https://annie106.github.io/myweb/</p>
                         <p>https://annie106.github.io/mayuwo/</p>
                     `,
+            }, {
+                id: 17,
+                title: '给这个博客配一个本地服务器',
+                date: '2026-11-15',
+                excerpt: '线上跑的是构建产物，双击 HTML 看不到它。两个文件放在仓库外面，这篇文章说清为什么、怎么用、出错先看哪。',
+                tags: ['教程', '网站'],
+                content: `
+                    <p>这个博客的线上版本跑的是构建产物 <code>dist/</code>，不是仓库根目录。改完代码想立刻确认「线上会是什么样」，光双击 <code>index.html</code> 不行，得有一个真服务器。为此仓库外面常驻着两个文件：一个服务器脚本，一个双击就用的启动器。这篇写给后面接手它的人：为什么必须要服务器、这两个文件为什么不能放进仓库、出错时先看哪里。</p>
+
+                    <h2>为什么不能直接双击 HTML</h2>
+                    <p>双击打开的是 <code>file://</code> 地址。首页能渲染，但站内每篇文章的真实地址是 <code>/posts/&lt;id&gt;/</code>，那是一个<strong>目录</strong>，不是文件。点进文章后地址栏会变成这个目录，而磁盘上没有「访问目录就自动给 index.html」这回事：浏览器遇到 <code>file:///…/dist/posts/17/</code>，给你看的是它自带的文件列表。刷新、复制链接发给别人、从微信里点回来，全都不成立。</p>
+                    <p>还有一个更直接的证据：文章页的 <code>&lt;head&gt;</code> 里写着 <code>&lt;base href="/"&gt;</code>，样式和脚本全按站点根解析。换成 <code>file://</code>，这个「根」会变成磁盘根，第一张样式表就 404，页面出来是裸的。</p>
+                    <p>把这个目录请求翻译成 <code>index.html</code>，只有服务器会做。所以服务器不是「更专业的打开方式」，是这个站的非可选件。</p>
+
+                    <h2>为什么放在仓库外面</h2>
+                    <p>这两个文件跟博客内容一点关系都没有，它们是「这台机器的开发环境」。放进仓库会有三个后果：</p>
+                    <ul>
+                        <li><code>dist/</code> 每次构建都会被清空，放进去等于放进碎纸机。</li>
+                        <li>放在仓库根，<code>git status</code> 里就永远挂着它们，总有一天被 <code>git add .</code> 顺手带上。构建是按白名单复制的，不会把它们发布出去，但「不会误发」和「不会误提交」是两件事。</li>
+                        <li>仓库是要被整包复制、克隆、交给别人的东西。里面塞着带本机路径的启动脚本，换台电脑就是一堆失效的绝对路径。</li>
+                    </ul>
+                    <p>现在的排法是「仓库 + 工具」并排：<code>annie106/</code> 是仓库，<code>static-server.js</code> 和 <code>启动服务器.cmd</code> 放在它旁边，同一个父目录里。</p>
+                    <p>这个位置不是随手放的。<code>.cmd</code> 里所有路径都从 <code>%~dp0</code> 起算，批处理里它就是「脚本自己所在的目录」，所以整个 <code>博客</code> 文件夹拖到 D 盘、换个用户名，双击照样能跑，一个字都不用改。唯一的约束是仓库目录必须还叫 <code>annie106</code>，因为脚本里写死了 <code>cd /d "%~dp0annie106"</code>。</p>
+
+                    <h2>两个文件各管什么</h2>
+                    <p><b><code>static-server.js</code></b>：不到一百行，只用 Node 自带的 <code>http</code>、<code>fs</code>、<code>path</code>，没有任何依赖，也不该加依赖。它做的三件事都对着这个站的脾气：</p>
+                    <ul>
+                        <li><b>目录请求补 <code>index.html</code></b>。少了这一条，<code>/posts/17/</code> 就是 404，整站文章全打不开。</li>
+                        <li><b>一张 MIME 表</b>。字体是 <code>.woff2</code>，类型给错浏览器直接不认，表现是图标集体变空白，而且不报错。</li>
+                        <li><b>所有响应带 <code>Cache-Control: no-cache</code></b>。改完样式按 F5 就是新的，不用清缓存猜自己看的是哪一版。</li>
+                    </ul>
+                    <p>另外两个细节：只监听 <code>127.0.0.1</code>，同一局域网里的其它设备连不上，想用手机试得自己把监听地址改成 <code>0.0.0.0</code>，试完记得改回来；请求路径越出根目录会直接 403，不会被 <code>../</code> 带出去。端口默认 8000，可以 <code>node static-server.js 8080</code> 临时换，被占用时会直接说清楚，不会静默失败。</p>
+                    <p><b><code>启动服务器.cmd</code></b>：双击入口，一串固定流程。</p>
+                    <ul>
+                        <li><b>先构建三步</b>：<code>build-site.js</code> → <code>build-posts.js</code> → <code>minify.js</code>。<code>dist/</code> 是产物，源码改了不重新构建，看到的还是旧的。</li>
+                        <li><b>minify 可以缺</b>。没装 esbuild 时会跳过并打一行提示，只影响体积，不影响功能。但另外两步失败会直接停下，不会拿一个残缺的 <code>dist/</code> 去开服务。</li>
+                        <li><b>把工作目录切到 <code>annie106\\dist</code></b>，再起服务器，等两秒打开 <code>http://localhost:8000/</code>。等这两秒是为了别让浏览器抢在服务器前面刷出一张空页。</li>
+                    </ul>
+
+                    <h2>怎么跑起来</h2>
+                    <p>前提三样：Node 18 及以上（跑构建和服务器）、Python 3.9 及以上（裁图标子集，构建会检查）、以及一次 <code>npm install</code>（只为 esbuild）。齐了以后每次都是同一个动作：</p>
+                    <ul>
+                        <li>双击 <code>启动服务器.cmd</code>，窗口里会依次打出构建过程和访问地址。</li>
+                        <li>浏览器自动打开 <code>http://localhost:8000/</code>，这一份就是线上那一份。</li>
+                        <li>用完直接关窗口，或在窗口里按 <code>Ctrl+C</code>。它不是常驻服务，窗口一关就停了。</li>
+                    </ul>
+                    <p>如果只想改文章、调样式，不想每次等构建，可以退一步：在仓库根跑 <code>node ..\\static-server.js</code>。这时看到的是源码，文章走旧地址 <code>?article=</code>，<code>/posts/&lt;id&gt;/</code> 一定是 404，不是坏了，是产物还没生成。</p>
+
+                    <h2>出错先看这几条</h2>
+                    <ul>
+                        <li><b>点文章 404</b>：服务器根目录指错了。要指到 <code>dist/</code>，不是仓库根。</li>
+                        <li><b><code>'node' 不是内部或外部命令</code></b>：Node 没装，或者装了没进 PATH。装完要重开一个窗口才生效。</li>
+                        <li><b>端口 8000 已被占用</b>：上一次的窗口没关干净。先关掉，或者手动 <code>node static-server.js 8080</code>。自己换端口时，<code>.cmd</code> 里那两处 <code>8000</code> 也得一起改，否则自动打开的地址还是旧的。</li>
+                        <li><b>构建那一步失败</b>：多半是 Python 没装好，图标子集裁不出来，或者加了字体里没有的图标。这时 <code>dist/</code> 可能残缺，别拿它下结论。</li>
+                        <li><b>页面出来了但图标全空白</b>：<code>fonts/</code> 没复制进 <code>dist/</code>，或者字体 MIME 不对。先跑一次构建再看。</li>
+                    </ul>
+
+                    <h2>文件在这</h2>
+                    <p>两个文件打包好了，两个网盘互为备份，内容一样，下一个就行：</p>
+                    <ul>
+                        <li><a href="https://1837491863.share.123pan.cn/123pan/WNqITd-Au6hh?pwd=5200#" target="_blank" rel="noopener noreferrer" data-confirm-leave="123 云盘" data-confirm-title="前往 123 云盘" data-confirm-desc="将打开 123 云盘的分享页下载本地服务器文件，提取码 5200。">123 云盘（提取码 5200）</a></li>
+                        <li><a href="https://pan.baidu.com/s/1oRPmETkAHg4x91f9mSL_Rg?pwd=5200" target="_blank" rel="noopener noreferrer" data-confirm-leave="百度网盘" data-confirm-title="前往百度网盘" data-confirm-desc="将打开百度网盘的分享页下载本地服务器文件，提取码 5200。">百度网盘（提取码 5200）</a></li>
+                    </ul>
+                    <p>下载后解压，让 <code>annie106</code> 和这两个文件在同一层，保持上面的位置关系，再双击 <code>.cmd</code>。位置错了脚本会找不到仓库：<code>cd /d</code> 失败没有明显提示，只是后面每一步都跑在错的目录里，报出来的错会误导人。</p>
+                    <p>最后一句：这套东西的作用是「看到真相」，不是「看起来更专业」。哪次它给出的结果和线上不一样，先怀疑构建，别怀疑服务器。</p>
+                `,
             }, ];
