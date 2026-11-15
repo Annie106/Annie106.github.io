@@ -87,6 +87,7 @@
             const articleTitle = $('#articleTitle');
             const articleMeta = $('#articleMeta');
             const articleContent = $('#articleContent');
+            const articleAdjacent = $('#articleAdjacent');
             const articleUnavailableNotice = $('#articleUnavailableNotice');
             const articleUnavailableMount = $('#articleUnavailableMount');
             const articleCommentsDivider = $('#articleCommentsDivider');
@@ -325,8 +326,12 @@
             }
 
             // ==================== 分享链接 ====================
-            // 文章地址统一用 ?article=<id> 表示，这样复制出去的链接
-            // 在别人的浏览器里也能直接打开对应文章（sessionStorage 只在本机有效）。
+            /* 文章地址是 /posts/<id>/ 这种目录形式，由 tools/build-posts.js 生成。
+               复制出去的链接别人点开能直接读，爬虫也抓得到标题和正文
+               —— 以前是 ?article=<id>，整站只有一份 HTML，爬虫什么也拿不到。
+               ?article=<id> 保留成**旧链接的别名**：以前分享过的地址、feed 里
+               还在发的链接、收藏夹里的地址都长那样，读到它照样能打开文章，
+               switchView 之后地址栏会自动收敛成 /posts/<id>/。新链接一律发路径。 */
             const ARTICLE_PARAM = 'article';
             const VIEW_PARAM = 'view';
             /* 反馈页的「针对哪篇文章」用单独的短参数名（fa = feedback article，
@@ -340,11 +345,64 @@
             const COMMENTS_ARTICLE_PARAM = 'ca';
             const COMMENTS_TITLE_PARAM = 'ct';
 
+            /* 站点根的绝对地址（带协议 / 主机 / 端口，结尾是 /），**启动时算一次就固定**。
+               文章页是 /posts/<id>/ 这种目录形式，其它视图都在根上；页面里要拼的
+               相对地址必须按「根」算，不能按「当前地址」算 —— 打开文章后地址栏会
+               变成 /posts/<id>/，再拿 location.href 当基准就会拼出
+               /posts/<id>/js/… 这种必 404 的地址。
+               为什么不用 <base> 统一：脚本里设 <base href> 是无效的，浏览器的
+               预加载扫描器在脚本执行前就按当前地址把 <link>/<script> 解析掉了
+               （实测整站资源全 404）。
+               为什么不能写死 '/'：file:// 下根是 file:///C:/…/，写死会让本地预览失效。 */
+            const SITE_BASE_URL = (function () {
+                const matched = /^(.*?)\/posts\/\d+\/?$/.exec(window.location.pathname);
+                try {
+                    return new URL(matched ? matched[1] + '/' : './', window.location.href).href;
+                } catch (e) {
+                    return window.location.href;
+                }
+            })();
+
+            // 站点根的路径部分（/，file:// 下是 /C:/…/），给 history API 和 href 用
+            function siteBasePath() {
+                try {
+                    return new URL(SITE_BASE_URL).pathname;
+                } catch (e) {
+                    return '/';
+                }
+            }
+
+            function siteBaseUrl() {
+                return SITE_BASE_URL;
+            }
+
+            // 当前地址是不是文章页（/posts/<id>/），是就返回 id，否则 null
+            function readArticleIdFromPath() {
+                const matched = /\/posts\/(\d+)\/?$/.exec(window.location.pathname);
+                return matched ? parseInt(matched[1], 10) : null;
+            }
+
             function buildArticleUrl(id) {
-                const url = new URL(window.location.href);
-                url.searchParams.set(ARTICLE_PARAM, String(id));
-                url.hash = '';
-                return url.href;
+                return siteBaseUrl() + 'posts/' + id + '/';
+            }
+
+            /* 把正文里的相对地址补成绝对地址。
+               文章内容里的配图写的是 images/xxx.jpg，注入到 /posts/<id>/ 这一页时
+               会按当前地址解析成 /posts/<id>/images/xxx.jpg。已经带协议、以 // 或 /
+               开头、纯锚点、data:/mailto: 这类一概不动。 */
+            function absolutizeHtml(html) {
+                const base = siteBaseUrl();
+                return String(html || '').replace(
+                    /(\s(?:src|href|poster)=["'])([^"']+)(["'])/gi,
+                    function (whole, before, url, after) {
+                        if (/^(?:[a-z][a-z0-9+.-]*:|\/\/|\/|#)/i.test(url)) return whole;
+                        try {
+                            return before + new URL(url, base).href + after;
+                        } catch (e) {
+                            return whole;
+                        }
+                    }
+                );
             }
 
             // 读地址栏里的文章 id；没有或不是有效数字时返回 null
@@ -380,16 +438,26 @@
                 } catch (e) {}
             }
 
-            // 把地址栏同步成当前状态：打开文章写入 ?article=id，返回时清掉。
+            // 把地址栏同步成当前状态：文章页写入 /posts/<id>/，其它视图回到根路径 + 查询串。
             // 用 replaceState 而不是 pushState，避免污染历史记录
             //（文章的前进/后退由已有的 history.state 机制负责）。
             function syncUrlWithView() {
-                const url = new URL(window.location.href);
+                /* 文章页的地址是纯路径，不带任何查询串 —— 带上就不像个文章地址了，
+                   也容易让人以为 ?article= 还是主形式。这里直接整条替换。 */
                 if (currentView === 'article' && currentArticleId !== null) {
-                    url.searchParams.set(ARTICLE_PARAM, String(currentArticleId));
-                } else {
-                    url.searchParams.delete(ARTICLE_PARAM);
+                    const next = buildArticleUrl(currentArticleId);
+                    // 只比较路径：next 是绝对地址，address 那一侧是相对路径
+                    const nextPath = new URL(next).pathname + new URL(next).search;
+                    if (nextPath !== window.location.pathname + window.location.search) {
+                        history.replaceState(history.state, '', nextPath);
+                    }
+                    return;
                 }
+                const url = new URL(window.location.href);
+                /* 从文章页离开时把路径收回站点根：这时 pathname 还停在
+                   /posts/<id>/ 上，不重置的话首页会变成 /posts/<id>/?view=blog */
+                url.pathname = siteBasePath();
+                url.searchParams.delete(ARTICLE_PARAM);
                 if (currentView === 'about' || currentView === 'archive' || currentView === 'tweaks'
                     || currentView === 'feedback' || currentView === 'thanks'
                     || currentView === 'comments') {
@@ -1898,7 +1966,7 @@
                                     ${menuLinks}
                                 </div>
                             </div>
-                            <h3 class="task-title">${p.title}</h3>
+                            <h3 class="task-title"><a href="posts/${p.id}/">${p.title}</a></h3>
                             <p class="task-excerpt">${p.excerpt}</p>
                             <div class="stats">
                                 <div class="stats-main">
@@ -1913,6 +1981,12 @@
                 container.querySelectorAll('.post-card').forEach(card => {
                     card.addEventListener('click', function(e) {
                         if (e.target.closest('.options, .post-menu')) return;
+                        /* 标题现在是真链接（href 指向 /posts/<id>/，给爬虫和
+                           「在新标签打开」用），点它别走浏览器默认跳转：
+                           站内打开交给 openArticle，整页重载会丢掉视图历史。
+                           按着修饰键 / 中键时放行，让浏览器开新标签。 */
+                        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                        e.preventDefault();
                         const id = parseInt(this.getAttribute('data-article-id'));
                         openArticle(id);
                     });
@@ -2148,7 +2222,7 @@
                         const posts = monthGroup.posts.map(post => `
                             <li class="tl-post">
                                 <span class="tl-date">${post.day}</span>
-                                <a class="tl-post-title" href="index.html?article=${post.id}" data-timeline-article="${post.id}">${escapeHtml(post.title)}</a>
+                                <a class="tl-post-title" href="posts/${post.id}/" data-timeline-article="${post.id}">${escapeHtml(post.title)}</a>
                             </li>`).join('');
                         return `
                             <div class="tl-month${monthOpen ? ' is-open' : ''}">
@@ -2306,7 +2380,7 @@
                     const rows = byYear.get(year).map(item => `
                         <li class="archive-item">
                             <time class="archive-date" datetime="${item.date}">${item.year}年${item.month}月${item.day}日</time>
-                            <a class="archive-link" href="index.html?article=${item.id}" data-archive-article="${item.id}">${escapeHtml(item.title)}</a>
+                            <a class="archive-link" href="posts/${item.id}/" data-archive-article="${item.id}">${escapeHtml(item.title)}</a>
                         </li>`).join('');
                     return `
                         <section class="archive-year">
@@ -2333,7 +2407,9 @@
             // 这些记录会占掉一次“返回”，导致返回首页要按两次，所以统一改用
             // location.replace() 切换内嵌页面：它只替换当前记录，不新增记录。
             function setFrameSource(frame, url) {
-                const target = url ? new URL(url, window.location.href).href : 'about:blank';
+                /* 基准用站点根，不用当前地址：打开文章后地址栏在 /posts/<id>/，
+                   拿它当基准会把 movie.html、project_subpage/… 拼进文章目录。 */
+                const target = url ? new URL(url, siteBaseUrl()).href : 'about:blank';
                 let current = '';
                 try {
                     current = frame.contentWindow ? frame.contentWindow.location.href : '';
@@ -2919,6 +2995,54 @@
                 }
             }
 
+            /* 按「发布日期倒序」排出前后篇。置顶不参与排序 —— 它是展示策略，
+               不该改变「哪篇更早写」这个事实。同一天的两篇按 id 倒序，
+               和列表、时间线、feed 用的是同一套规则。
+               只收能正常站内打开的文章：未开放的和「跳到站外」的那几篇不参与。 */
+            function getAdjacentPosts(post) {
+                const ordered = blogPosts
+                    .filter(item => isArticlePublic(item) && (!item.externalPage || item.embeddedPage))
+                    .slice()
+                    .sort(function (a, b) {
+                        const diff = postDisplayDate(b).localeCompare(postDisplayDate(a));
+                        return diff !== 0 ? diff : (b.id || 0) - (a.id || 0);
+                    });
+                const index = ordered.findIndex(item => item.id === post.id);
+                if (index < 0) return { prev: null, next: null };
+                /* ordered 是新的在前，所以：
+                     下标 +1 = 更早写的（上一篇）
+                     下标 -1 = 更晚写的（下一篇） */
+                return {
+                    prev: ordered[index + 1] || null,
+                    next: ordered[index - 1] || null,
+                };
+            }
+
+            /* 正文下面那对翻页卡片。标签里带日期，避免读者对「上一篇 / 下一篇」
+               到底朝哪个方向有歧义。href 是真实地址（/posts/<id>/），
+               点击由 document 上的委托拦下交给 openArticle，不整页刷新。 */
+            function renderAdjacentArticles(post, isUnavailableArticle) {
+                if (!articleAdjacent) return;
+                if (isUnavailableArticle) {
+                    articleAdjacent.innerHTML = '';
+                    return;
+                }
+                const { prev, next } = getAdjacentPosts(post);
+                const itemMarkup = (target, className, label, icon) => {
+                    if (!target) return '';
+                    return `
+                        <a class="article-adjacent-link ${className}" href="posts/${target.id}/" data-adjacent-article="${target.id}">
+                            <span class="adj-label"><i class="${icon}" aria-hidden="true"></i> ${label} · ${postDisplayDate(target)}</span>
+                            <span class="adj-title">${escapeHtml(target.title)}</span>
+                        </a>`;
+                };
+                articleAdjacent.classList.toggle('is-single', Boolean(prev) !== Boolean(next));
+                articleAdjacent.innerHTML = [
+                    itemMarkup(prev, 'is-prev', '上一篇', 'ri-arrow-left-line'),
+                    itemMarkup(next, 'is-next', '下一篇', 'ri-arrow-right-line'),
+                ].join('');
+            }
+
             function renderArticle(post) {
                 const isUnavailableArticle = !isArticlePublic(post);
                 /* 同一篇文章重新进入时正文可以原样复用：
@@ -2969,13 +3093,15 @@
                     ? '当前文章不对外开放'
                     : '文章内嵌页面';
                 if (!canReuseContent) {
-                    articleContent.innerHTML = isUnavailableArticle ? '' : (post.content || '');
+                    // 正文里的相对配图要按站点根补全，不能按 /posts/<id>/ 解析
+                    articleContent.innerHTML = isUnavailableArticle ? '' : absolutizeHtml(post.content || '');
                     if (window.AnnieImageLoading) {
                         window.AnnieImageLoading.initialize(articleContent);
                     }
                 }
                 renderedArticleId = post.id;
                 renderedArticleUnavailable = isUnavailableArticle;
+                renderAdjacentArticles(post, isUnavailableArticle);
                 renderArticleComments(post, isUnavailableArticle);
                 // 换了文章就重新开始量高度，否则会沿用上一篇记下的旧值
                 embeddedFrameHeight = 0;
@@ -3922,7 +4048,31 @@
                 closeSearch({ restoreFocus: false });
             }
 
-            function openArticle(id) {
+            /* 文章之间翻页的过渡。
+               用 Web Animations API 而不是给 .article-detail 加一个动画类：
+               那个元素本身挂着 `animation: fadeSlideIn`，加类再删类会让它重播
+               一次（表现为淡入两遍、中间闪一下）。脚本动画优先级更高，只在
+               这 300ms 盖住它，播完自动交还，不碰任何样式状态。
+               方向跟点的是哪一侧一致：下一篇从右边进、上一篇从左边进。 */
+            let articleSwapAnimation = null;
+            function playArticleSwapAnimation(direction) {
+                if (!viewArticle || !direction) return;
+                if (prefersReducedMotion()) return;
+                if (typeof viewArticle.animate !== 'function') return;
+                const offset = direction === 'prev' ? -28 : 28;
+                if (articleSwapAnimation) articleSwapAnimation.cancel();
+                articleSwapAnimation = viewArticle.animate(
+                    [
+                        { opacity: 0, transform: `translate3d(${offset}px, 0, 0)` },
+                        { opacity: 1, transform: 'translate3d(0, 0, 0)' },
+                    ],
+                    { duration: 300, easing: 'cubic-bezier(0.22, 0.61, 0.36, 1)' }
+                );
+            }
+
+            /* options.direction：'prev' / 'next'，只有「上一篇 / 下一篇」会传，
+               决定翻页动画从哪一侧进来。其它入口不传，就等于没有额外动画。 */
+            function openArticle(id, options) {
                 const post = blogPosts.find(p => p.id === id);
                 if (!post) return;
                 /* 已经在读这篇了（比如连点两下卡片）：什么都不用做。
@@ -3935,31 +4085,58 @@
                     window.location.href = post.externalPage;
                     return;
                 }
-                articleReturnView = currentView === 'article' ? 'home' : currentView;
-                articleReturnScroll = window.scrollY;
-                const viewStateSnapshot = {
-                    view: currentView,
-                    articleId: currentArticleId,
-                    homeTag: homeTag,
-                    homePage: homePage,
-                    homeTagRev: 2,
-                    blogTag: blogTag,
-                    scroll: articleReturnScroll,
-                    scrollPositions: {
-                        ...viewScrollPositions,
-                        [currentView]: articleReturnScroll,
-                    },
-                    returnView: articleReturnView,
-                    returnScroll: articleReturnScroll,
-                };
-                history.replaceState({ annieViewSnapshot: viewStateSnapshot }, '', window.location.href);
+
+                /* 已经在读某一篇时又点了「上一篇 / 下一篇」：把**当前这条**历史记录
+                   改掉，不新增一条。这样页面里的「返回」和浏览器返回都直接回到
+                   进文章之前的那个页面，而不是一篇一篇往回翻 —— 长文章里翻十篇
+                   就要按十次返回才出得去。 */
+                const isSwitchingArticle = currentView === 'article' && currentArticleId !== null;
+
+                if (isSwitchingArticle) {
+                    /* 返回落点沿用原来那条记录里存的（首页 / 文章列表 / 归档…），
+                       不要因为「当前正在读文章」就把它覆盖成 home。 */
+                    const previous = history.state || {};
+                    if (typeof previous.annieReturnView === 'string') {
+                        articleReturnView = previous.annieReturnView;
+                    }
+                    if (typeof previous.annieReturnScroll === 'number') {
+                        articleReturnScroll = previous.annieReturnScroll;
+                    }
+                } else {
+                    articleReturnView = currentView;
+                    articleReturnScroll = window.scrollY;
+                    const viewStateSnapshot = {
+                        view: currentView,
+                        articleId: currentArticleId,
+                        homeTag: homeTag,
+                        homePage: homePage,
+                        homeTagRev: 2,
+                        blogTag: blogTag,
+                        scroll: articleReturnScroll,
+                        scrollPositions: {
+                            ...viewScrollPositions,
+                            [currentView]: articleReturnScroll,
+                        },
+                        returnView: articleReturnView,
+                        returnScroll: articleReturnScroll,
+                    };
+                    history.replaceState({ annieViewSnapshot: viewStateSnapshot }, '', window.location.href);
+                }
+
                 const articleHistoryState = {
                     annieArticleId: post.id,
                     annieReturnView: articleReturnView,
                     annieReturnScroll: articleReturnScroll,
                 };
-                history.pushState(articleHistoryState, '', window.location.href);
-                articleHistoryEntryActive = true;
+                if (isSwitchingArticle) {
+                    history.replaceState(articleHistoryState, '', window.location.href);
+                } else {
+                    history.pushState(articleHistoryState, '', window.location.href);
+                    articleHistoryEntryActive = true;
+                }
+
+                // 动画先起、内容紧接着渲染，两者落在同一帧，不会先闪一下旧正文
+                playArticleSwapAnimation(options && options.direction);
                 renderArticle(post);
                 switchView('article');
                 /* 直接落到顶部，不要平滑滚动。
@@ -4251,7 +4428,9 @@
                     params.set(FEEDBACK_ARTICLE_PARAM, String(id));
                 }
                 if (title) params.set(FEEDBACK_TITLE_PARAM, title);
-                return '?' + params.toString();
+                /* 带上站点根路径：从 /posts/<id>/ 点「反馈」时，裸 '?' 会拼成
+                   /posts/<id>/?view=feedback，那不是首页的地址。 */
+                return siteBasePath() + '?' + params.toString();
             }
 
             function openFeedback(post) {
@@ -4977,6 +5156,20 @@
                 openArticle(Number(link.getAttribute('data-archive-article')));
             });
 
+            /* 文章底部的「上一篇 / 下一篇」同理：href 是真地址（爬虫和
+               「在新标签打开」都靠它），有 JS 就站内切换，别整页重载 ——
+               整页重载会绕开视图历史，返回键就回不到刚才那一屏。 */
+            document.addEventListener('click', function(e) {
+                const link = e.target.closest('[data-adjacent-article]');
+                if (!link) return;
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                e.preventDefault();
+                openArticle(Number(link.getAttribute('data-adjacent-article')), {
+                    // 动画方向跟着点的那一侧走，别一律从右边进
+                    direction: link.classList.contains('is-prev') ? 'prev' : 'next',
+                });
+            });
+
             document.addEventListener('click', function(e) {
                 if (e.target.matches('[data-nav="blog"]') && e.target.closest('.tag-pill')) {
                     e.preventDefault();
@@ -5025,9 +5218,12 @@
                 renderSearchSuggestions();
                 renderSearchHistory();
 
-                // 优先处理地址栏里的文章参数：别人分享过来的链接
-                // （...?article=3）要能直接打开那篇文章。
-                const urlArticleId = readArticleIdFromUrl();
+                /* 优先处理地址栏里的文章地址，两种形式都认：
+                   ① /posts/15/ —— 现在的正式地址（这一份脚本同时跑在文章静态页里）
+                   ② ?article=15 —— 旧链接的别名，打开后地址栏会自动收敛成 ①
+                   别人分享过来的链接要能直接打开那篇文章。 */
+                const pathArticleId = readArticleIdFromPath();
+                const urlArticleId = pathArticleId !== null ? pathArticleId : readArticleIdFromUrl();
                 const urlPost = urlArticleId === null
                     ? null
                     : blogPosts.find(p => p.id === urlArticleId);
@@ -5046,6 +5242,8 @@
                 // 清掉参数并回到首页，避免地址栏留着一个无效值
                 if (urlArticleId !== null && !urlPost) {
                     const clean = new URL(window.location.href);
+                    // 路径形式要连 /posts/<id>/ 一起收回到根，只删查询串不够
+                    clean.pathname = siteBasePath();
                     clean.searchParams.delete(ARTICLE_PARAM);
                     clean.hash = '';
                     history.replaceState(history.state, '', clean.pathname + clean.search);

@@ -2,11 +2,44 @@
 
 > 由 AI 辅助构建
 
-原生 HTML + CSS + JavaScript 的静态博客，**没有 npm 依赖、没有后端**。构建 = `node tools/build-site.js`：先校验图标子集，再按白名单把要发布的文件复制到 `dist/`。
-
-本地开发另需 **Node 18+** 和 **Python 3.9+**（Python 只用来裁图标子集），依赖与常见报错见 [`tools/README.md`](tools/README.md)。
+原生 HTML + CSS + JavaScript 的静态博客，**运行时零依赖、没有后端**（构建期只有一个 npm 包）。构建是三步：`build-site.js`（校验图标 + 按白名单复制到 `dist/`）→ `build-posts.js`（每篇文章的 `/posts/<id>/` 静态页 + `sitemap.xml` + `robots.txt`）→ `minify.js`（压缩产物里的 JS/CSS）。一键：`npm run build`。
 
 完整配置教程在站内「使用指南」文章（`project_subpage/blog/guide.html`），本文件只做速查。让 AI 改这个仓库之前，先让它读 `AGENTS.md`。
+
+## 依赖（本地构建）
+
+在本地跑 `npm run build` 需要下面这些。
+
+| 依赖 | 版本 | 用途 | 缺了会怎样 | 怎么装 |
+| --- | --- | --- | --- | --- |
+| **Node.js** | 18+ | 跑 `tools/*.js`：构建、图标校验、git 钩子 | 任何构建命令都跑不起来 | [nodejs.org](https://nodejs.org/) 装 LTS |
+| **npm** | 随 Node 附带 | 装下面那个 esbuild | 压缩那步会被跳过，其余步骤照常 | 装 Node 就有 |
+| **esbuild** | 0.28.x | 压缩 `dist/` 里的 JS/CSS（gzip 约省一半） | `minify.js` 报错退出，产物偏大一倍 | `npm install` |
+| **Python** | 3.9+ | 裁图标子集：用到哪些 `ri-*` 就只保留哪些字形 | **提交被钩子拦下，`build-site.js` 也中止** | [python.org](https://www.python.org/) |
+| **fonttools** | 4.x | 读 / 写字体文件（上一条的实现） | 同上 | `python -m pip install fonttools` |
+| **brotli** | 1.x | 生成 woff2 的压缩算法 | 同上 | `python -m pip install brotli` |
+
+一次装完：
+
+```bash
+# Node 装好之后，在仓库根跑一次
+npm install
+
+# Python 装好之后
+python -m pip install fonttools brotli
+```
+
+> Windows 上 `python` 不认就换成 `py`。也可以双击 `tools/setup.bat`，它会把 Python 那两个包装好、生成图标子集、再把 git 钩子挂上。
+
+确认都到位：
+
+```bash
+node --version                        # v18.x 以上
+npm --version
+python --version                      # 3.9 以上
+python -c "import fontTools, brotli"  # 没有任何输出 = 装好了
+npm ls --depth=0                      # 应该只有一行 esbuild
+```
 
 ## 目录
 
@@ -32,9 +65,12 @@ tools/update-icons.bat      手动重裁图标（平时钩子会自动跑）
 tools/install-hooks.bat     只装 git 钩子（setup.bat 已包含）
 tools/remixicon-src.*       图标全量源（不发布，别删）
 tools/build-feed.js         从 js/posts-data.js 生成 feed.xml
-tools/build-site.js         校验图标 + 按白名单生成 dist/（构建入口）
+tools/build-site.js         校验图标 + 按白名单生成 dist/（构建第一步）
+tools/build-posts.js        生成每篇文章的静态页 + sitemap.xml + robots.txt（第二步）
+tools/minify.js             压缩 dist/ 里的 JS 和 CSS（第三步，需要 npm install）
+package.json                唯一的 devDependency：esbuild（只给 minify 用）
 tools/README.md             上面这些怎么用、报错怎么修
-dist/                       发布产物，已 gitignore，由 build-site.js 生成
+dist/                       发布产物，已 gitignore，由上面两个脚本生成
 AGENTS.md                   给 AI 工具的项目约定，跨工具生效
 js/posts-data.js            全部文章数据（首页与归档页共用）
 js/script.js                筛选、搜索、路由、页面状态
@@ -57,9 +93,10 @@ archive/                    归档，不参与显示
 - 文章卡片「⋯」菜单支持三类：站内文章、独立页面（`externalPage`）、自定义链接（`link`）
 - 文章可内嵌独立 HTML（`embeddedPage`），自动调高并跟随主题
 - 每篇公开文章使用 Giscus 展示 GitHub Discussions 评论；博客启动时会低优先级预载 Giscus 脚本和连接，打开文章时再加载对应讨论；文章卡片的「查看评论」切到站内评论视图（`/?view=comments`），讨论串按文章 ID 区分；仓库需启用 Discussions 并安装 Giscus App
-- 分享链接形如 `/?article=<id>`；微信内改为复制链接 + 右上角引导，其它端走系统分享。地址栏不留 `index.html`（启动时自动收敛成根路径）
+- 文章地址形如 `/posts/<id>/`（站内点卡片、分享、RSS、sitemap 全用它）；旧链接 `/?article=<id>` 仍然可用，打开后自动换回新地址。地址栏不留 `index.html`（启动时自动收敛成根路径）
 - `isPublic: false` 关闭单篇正文，改为 `true` 恢复
 - 页面状态记忆：离开文章、切标签、关页后返回，恢复视图与滚动位置
+- 文章底部有「上一篇 / 下一篇」，按发布日期排序（置顶不参与顺序）；标签里带日期，避免对方向产生歧义
 - 正文链接加 `class="gated-link"` 后点击弹出「链接已停止访问」提示
 - 独立视频页：侧边播放列表、加载动画、水印，附验证码 / 地区限制 / 解码失败等错误提示
 - 点击图标复制微信号、QQ 号、邮箱
@@ -100,18 +137,32 @@ node tools/check-icons.js
 几个注意点：
 
 - 分享封面必须写绝对地址，如 `https://annie106.github.io/share_cover.jpg`；相对路径抓不到，带 Referer 鉴权的 CDN 也抓不到。
-- 全站共用一个 `/?article=N` 地址，微信不执行 JS，所以所有文章共用同一张封面。
+- **全站 `noindex`**：页面能访问、能分享（卡片正常），但不出现在搜索结果里。开关在 `tools/build-posts.js` 顶部的 `ALLOW_SEARCH_INDEXING`，改回 `true` 时记得同步 `index.html` 里那条 robots 标签
+- 每篇文章有独立的静态页 `/posts/<id>/`，微信和爬虫抓得到标题、摘要、正文；封面默认仍共用 `share_cover.jpg`，想换就在文章数据里加 `cover`。
 - 改文章 `id` 会让已分享的链接失效。
 - 首页标签：`最新` / `全部` 由 `renderTagPills` 固定，其余由 `HOME_TAGS` 决定；分页每页 8 篇（`HOME_PAGE_SIZE`）或 6 篇（`HOME_POST_LIMIT`），超过一页才出现控件。
 - 移动或重命名子页面后，同步 `embeddedPage` 与 `articleMenus` 的路径。
 
 ## 本地预览
 
+两种，看你要预览什么：
+
+**① 只看站点（改文章、调样式）** —— 对着仓库根：
+
 ```bash
 python -m http.server 8000
 ```
 
 访问 <http://localhost:8000>，或直接打开 `index.html`。背景音乐需用户交互后才能播放。
+
+**② 看线上那一份（含文章专属地址 `/posts/<id>/`）** —— 先构建，再指向 `dist/`：
+
+```bash
+npm run build
+cd dist && python -m http.server 8000
+```
+
+⚠️ `/posts/<id>/` 只存在于 `dist/` 里。对着仓库根起服务器，站内点进文章会 404 —— 这不是 bug，是产物没生成或服务器指错了目录。
 
 ### 换一台机器 / 别人使用
 
@@ -155,7 +206,10 @@ python -m http.server 8000
 自己构建，GitHub 只负责托管。
 
 ```bash
-node tools/build-site.js    # 生成 dist/，白名单在脚本顶部
+npm install                 # 只需一次：装 esbuild（压缩用）
+node tools/build-site.js    # 第一步：生成 dist/，白名单在脚本顶部
+node tools/build-posts.js   # 第二步：生成文章静态页 + sitemap + robots
+node tools/minify.js        # 第三步：压缩 dist/ 里的 JS 和 CSS
 ```
 
 - 该发布的文件由 `tools/build-site.js` 的白名单决定，开发文件（`AGENTS.md`、`README.md`、`tools/`、`check-icons.bat`）不会进入产物 —— 线上访问它们是 404。

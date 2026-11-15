@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="robots" content="noindex,follow">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>使用指南</title>
     <link rel="icon" type="image/svg+xml" href="../../favicon.svg">
@@ -971,6 +972,8 @@
 │
 ├── tools/                   ← 构建与检查脚本（不会发布到线上）
 │   ├── build-site.js        ← 先校验图标，再按白名单生成 dist/
+│   ├── build-posts.js       ← 给每篇文章生成 /posts/&lt;id&gt;/ 静态页 + sitemap + robots
+│   ├── minify.js            ← 压缩 dist/ 里的 JS 和 CSS（需要 npm install）
 │   ├── build-feed.js        ← 从文章数据生成 feed.xml
 │   ├── check-icons.js       ← 检查图标名写错、CDN 残留
 │   ├── subset-icons.py      ← 裁图标字体：只保留站内用到的图标
@@ -984,7 +987,10 @@
 │   ├── deploy.yml           ← 推送后自动构建并发布到 Pages
 │   └── feed.yml             ← 文章数据变化时重建 feed.xml
 │
-├── dist/                    ← 发布产物，由 build-site.js 生成，不提交
+├── dist/                    ← 发布产物，由两个 build 脚本生成，不提交
+│   ├── posts/&lt;id&gt;/          ← 每篇文章的静态页（构建时生成）
+│   ├── sitemap.xml          ← 全部文章地址（本站 noindex，只用来让爬虫快点看到「别收录」）
+│   └── robots.txt           ← 允许抓取 + 指向 sitemap（不能写 Disallow，原因见 AGENTS.md）
 │
 ├── images/                  ← 图片都放这里
 │   └── manor_photos/        ← 第五人格归宿照（manor_01.jpg / manor_02.jpg）
@@ -1285,7 +1291,7 @@
                     <i class="ri-share-line"></i>
                     6.7 把文章分享给别人
                 </h3>
-                <p>每篇文章都有一个专属链接，形式是 <code>你的网址/?article=文章id</code>。别人打开这个链接，会直接进入对应文章详情。把 <code>isPublic</code> 设为 <code>false</code> 的文章会显示未开放提示，而不会显示正文。</p>
+                <p>每篇文章都有一个专属链接，形式是 <code>你的网址/posts/文章id/</code>（例如 <code>https://annie106.github.io/posts/16/</code>）。别人打开这个链接，会直接进入对应文章详情。把 <code>isPublic</code> 设为 <code>false</code> 的文章不会生成这个页面，也不会出现在 sitemap 里。</p>
                 <p>拿到链接有两种办法：</p>
                 <ul>
                     <li><strong>文章里点「分享」</strong>：打开文章后，标题上方有一个「分享」按钮。手机点它会唤起系统分享面板（微信、QQ 等），电脑点它会直接把链接复制到剪贴板，然后右上角弹出提示。</li>
@@ -1297,8 +1303,10 @@
                         <i class="ri-information-line"></i>
                         链接里的数字就是文章 id
                     </div>
-                    <p><code>?article=10</code> 里的 <code>10</code> 就是文章数据里的 <code>id</code>。所以<strong>改 id 会让已经发出去的链接失效</strong>——想改文章内容就改标题和正文，别动 <code>id</code>。</p>
-                    <p>如果链接里的 id 不存在（文章被删了），页面会自动回到首页并清掉地址栏里的参数；如果文章设为未开放，则会在文章详情区域显示未开放提示。</p>
+                    <p><code>/posts/10/</code> 里的 <code>10</code> 就是文章数据里的 <code>id</code>。所以<strong>改 id 会让已经发出去的链接失效</strong>——想改文章内容就改标题和正文，别动 <code>id</code>。</p>
+                    <p>如果链接里的 id 不存在（文章被删了），页面会自动回到首页并清掉地址栏里的路径；如果文章设为未开放，则会显示未开放提示。</p>
+                    <p>以前的老链接长这样：<code>你的网址/?article=10</code>。它<strong>仍然能用</strong>，打开后地址栏会自动换回 <code>/posts/10/</code>，所以早就发出去的链接不会失效。</p>
+                    <p><strong>本站默认不让搜索引擎收录</strong>（全站 noindex）：链接照常能打开、微信和 QQ 的分享卡片也照常显示标题封面，只是搜不到。想让某个页面重新被收录，改 <code>tools/build-posts.js</code> 顶部的 <code>ALLOW_SEARCH_INDEXING</code>，并同步 <code>index.html</code> 里那条 robots 标签。</p>
                 </div>
 
                 <div class="guide-warning">
@@ -1388,7 +1396,8 @@
                         改完没生效？是缓存
                     </div>
                     <p>微信会<strong>长期缓存</strong>抓取结果，同一个链接可能一直显示旧图、甚至一直是灰图标。测试时务必换一个<strong>从没分享过的链接</strong>（比如在网址后面加 <code>?v=2</code>），否则很容易误判成"改了没用"。</p>
-                    <p>另外，本站所有文章共用 <code>index.html?article=N</code> 一个页面、靠 JavaScript 换内容，而微信不会执行 JavaScript 后再抓图，所以<strong>全站共用同一张封面</strong>。标题会随文章变，图片不会。想让每篇文章有不同封面，需要为每篇文章单独生成静态 HTML 页。</p>
+                    <p>以前所有文章共用 <code>index.html?article=N</code> 一个页面、靠 JavaScript 换内容，而微信不会执行 JavaScript 后再抓取，所以标题和封面都抓不到。现在每篇文章都有自己的静态页 <code>/posts/&lt;id&gt;/</code>，标题、摘要、正文都是烤好的，抓取正常。</p>
+                    <p>只有<strong>封面图</strong>还是全站共用一张：没在文章数据里写 <code>cover</code> 的话，分享卡片就显示 <code>share_cover.jpg</code>。想让某篇换封面，在那篇文章的数据里加一行 <code>cover: 'images/xxx.jpg'</code> 即可（RSS 用的也是这一张）。</p>
                 </div>
 
                 <!-- 6.10 音乐 -->
@@ -1793,7 +1802,7 @@ git push</code></pre>
                         <tbody>
                             <tr>
                                 <td><strong>GitHub Actions</strong><br>（本仓库用的）</td>
-                                <td>推送后由 <code>.github/workflows/deploy.yml</code> 跑 <code>tools/build-site.js</code>，只把 <code>dist/</code> 里的文件发出去。上线内容由白名单决定，<code>AGENTS.md</code>、<code>tools/</code> 这些开发文件天然不在网上。</td>
+                                <td>推送后由 <code>.github/workflows/deploy.yml</code> 依次跑 <code>build-site.js</code>、<code>build-posts.js</code>、<code>minify.js</code>，只把 <code>dist/</code> 里的文件发出去。上线内容由白名单决定，<code>AGENTS.md</code>、<code>tools/</code> 这些开发文件天然不在网上。</td>
                             </tr>
                             <tr>
                                 <td><strong>Deploy from a branch</strong><br>（老方式）</td>
@@ -1814,9 +1823,74 @@ git push</code></pre>
                     <i class="ri-terminal-line"></i>
                     本地看「真正会上线的那一份」
                 </h3>
-                <p>线上跑的是 <code>dist/</code> 里的内容，不是仓库根目录。想确认发布后的样子，或者排查「本地好好的、线上却不对」，先构建一次：</p>
-                <pre><code>node tools/build-site.js</code></pre>
-                <p>它会生成 <code>dist/</code> 文件夹，再用静态服务器指向这个文件夹预览即可（Live Server 右键选 <code>dist/index.html</code>）。这一步要装 <b>Node.js</b>；如果改过图标，还要装 <b>Python 3.9+</b>（裁字体用），否则构建会在图标检查那一步中止。没装这两样也不影响写文章——推送后 GitHub 会替你构建。</p>
+                <p>线上跑的是 <code>dist/</code> 里的内容，不是仓库根目录。想确认发布后的样子，或者排查「本地好好的、线上却不对」，先构建一次（<strong>三步，顺序不能反</strong>）：</p>
+                <pre><code>npm install                    # 只需一次
+node tools/build-site.js
+node tools/build-posts.js
+node tools/minify.js</code></pre>
+                <p>第一条按白名单把文件复制进 <code>dist/</code>（会先清空它），第二条给每篇文章生成 <code>dist/posts/&lt;id&gt;/</code> 静态页并写出 <code>sitemap.xml</code> 和 <code>robots.txt</code>，第三条把产物里的 JS/CSS 压掉注释和空白（gzip 大约省一半）。</p>
+                <p><strong>顺序不能变</strong>：第一条会清空 <code>dist/</code>，所以文章页必须排在它后面；压缩必须排最后，否则压完又被复制覆盖。嫌麻烦就 <code>npm run build</code>，它按顺序跑完这三条。</p>
+                <p>然后把静态服务器<strong>指向 <code>dist/</code> 这个文件夹</strong>（不是仓库根目录）再预览。这一点比以前重要：文章页只存在于 <code>dist/</code> 里，对着仓库根起服务器点进文章会 404。</p>
+                <p>这一步要装的东西列在这儿。<strong>访客的浏览器什么都不用装</strong>（站点是纯静态文件，运行时零依赖），只有「要在本地构建或部署」的人才需要下面这些：</p>
+
+                <div class="guide-table-wrap">
+                    <table class="guide-table">
+                        <thead>
+                            <tr>
+                                <th>要装什么</th>
+                                <th>版本</th>
+                                <th>用来做什么</th>
+                                <th>缺了会怎样</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Node.js</strong></td>
+                                <td>18+</td>
+                                <td>跑 <code>tools/</code> 里的构建脚本、图标校验、git 钩子</td>
+                                <td>构建命令直接跑不起来</td>
+                            </tr>
+                            <tr>
+                                <td><strong>esbuild</strong><br>（npm 包）</td>
+                                <td>0.28.x</td>
+                                <td>压缩 <code>dist/</code> 里的 JS 和 CSS</td>
+                                <td>压缩那步报错退出；不压也能上线，只是体积大一倍</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Python</strong></td>
+                                <td>3.9+</td>
+                                <td>裁剪图标字体：用到哪些图标就只保留哪些字形</td>
+                                <td><strong>提交会被钩子拦下，构建也会中止</strong>（故意的，免得线上缺图标）</td>
+                            </tr>
+                            <tr>
+                                <td><strong>fonttools</strong><br><strong>brotli</strong></td>
+                                <td>4.x / 1.x</td>
+                                <td>上一条用到的两个 Python 包</td>
+                                <td>同上</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p>一次装完（第一条在仓库根跑，后面那条只要能跑 <code>python</code> 就行）：</p>
+                <pre><code>npm install
+python -m pip install fonttools brotli</code></pre>
+                <p>Windows 上 <code>python</code> 不认就换成 <code>py</code>。也可以双击 <code>tools/setup.bat</code>，它会把 Python 那两个包、图标子集、git 钩子一次办完。</p>
+
+                <div class="guide-tip">
+                    <div class="guide-tip-title">
+                        <i class="ri-checkbox-circle-line"></i>
+                        怎么确认装好了
+                    </div>
+                    <p>每条都能打印出版本号才算数：</p>
+                    <pre><code>node --version
+npm ls --depth=0                       # 应该只有一行 esbuild
+python --version
+python -c "import fontTools, brotli"    # 没有任何输出就是装好了</code></pre>
+                    <p><strong>不要用 <code>where python</code> 判断。</strong> Windows 自带一个「应用商店占位符」，<code>where</code> 找得到，真运行报 <code>9009</code>。装 Python 时记得在第一屏勾上 <b>Add python.exe to PATH</b>。</p>
+                </div>
+
+                <p>没装这些也不影响写文章——推送后 GitHub 会替你构建：它按 <code>package-lock.json</code> 装 esbuild、按 <code>deploy.yml</code> 里的命令装 fonttools 和 brotli，版本跟你本地无关。</p>
 
                 <div class="guide-warning">
                     <div class="guide-warning-title">
@@ -1951,6 +2025,10 @@ rm -rf "$TMP"</code></pre>
                             <tr>
                                 <td><code>tools/build-site.js</code></td>
                                 <td>网页不会立刻坏，但下次推送时 Actions 构建不了，站点停在旧版本 —— 你明明改了东西却看不到变化。</td>
+                            </tr>
+                            <tr>
+                                <td><code>tools/build-posts.js</code></td>
+                                <td>站内看文章一切正常，但每篇文章的专属地址 <code>/posts/&lt;id&gt;/</code> 不会生成，<code>sitemap.xml</code> 也不再更新 —— 分享出去的链接会 404，刷新后也拿不到正确的标题和封面。</td>
                             </tr>
                             <tr>
                                 <td><code>.github/workflows/deploy.yml</code></td>

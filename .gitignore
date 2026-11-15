@@ -1,3 +1,6 @@
 # 构建产物：由 tools/build-site.js 生成，交给 GitHub Actions 发布，不进版本库。
 # 想在本地看线上长什么样：node tools/build-site.js 然后起个静态服务器指向 dist/
 dist/
+
+# 构建期依赖（只有 esbuild，压缩用）。不进版本库，npm install 即可还原。
+node_modules/

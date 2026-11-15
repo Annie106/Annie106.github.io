@@ -54,8 +54,22 @@ jobs:
       - name: 重新生成图标子集
         run: python tools/subset-icons.py
 
+      # 唯一的构建期依赖（esbuild），只给最后那步压缩用。npm ci 严格按 lockfile 装，
+      # 不会因为上游发了新版本导致产物悄悄变化。
+      - name: 安装构建依赖（压缩用）
+        run: npm ci
+
       - name: 生成发布产物 dist/
         run: node tools/build-site.js
+
+      # 每篇公开文章烤一份静态页（/posts/<id>/），外加 sitemap.xml 和 robots.txt。
+      # 必须在 build-site.js 之后：那一步会清空 dist/。
+      - name: 生成文章静态页
+        run: node tools/build-posts.js
+
+      # 必须最后跑：前面的步骤会把源码原样复制进 dist/，压早了会被覆盖。
+      - name: 压缩 dist/ 里的 JS 和 CSS
+        run: node tools/minify.js
 
       - name: 配置 Pages
         uses: actions/configure-pages@v5

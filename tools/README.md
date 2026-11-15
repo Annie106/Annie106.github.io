@@ -7,25 +7,34 @@
 
 ---
 
-## 一、依赖（两样都要有）
+## 一、依赖
+
+本地跑构建需要下面这些（站点运行时不需要任何依赖，那是另一回事，见根目录 README）。
 
 | 依赖 | 版本 | 用来干什么 | 缺了会怎样 |
 | --- | --- | --- | --- |
-| **Node.js** | 18 或更高 | 构建产物、图标校验、git 钩子 | `node tools/build-site.js` 直接跑不起来 |
-| **Python** | 3.9 或更高 | 裁剪图标字体（需要 `fonttools` + `brotli`） | **提交被钩子拦下、本地构建中止** |
+| **Node.js** | 18 或更高（CI 用 20） | 跑所有 `tools/*.js`：构建、图标校验、git 钩子 | `node tools/build-site.js` 直接跑不起来 |
+| **npm** | 随 Node 附带 | 只用来装 `esbuild` | 压缩那步跳过，其它照常 |
+| **esbuild** | 0.28.x | 压缩 `dist/` 里的 JS/CSS（gzip 约省一半） | `minify.js` 报错退出；不压也能上线，只是产物大 |
+| **Python** | 3.9 或更高 | 裁剪图标字体 | **提交被钩子拦下、本地构建中止** |
+| **fonttools** | 4.x | 读 / 写字体文件（裁子集用） | 同上 |
+| **brotli** | 1.x | 生成 woff2 的压缩算法 | 同上 |
 
-Python 装好后还要装两个包（`setup.bat` 会自动装）：
+一次装完：
 
 ```
+npm install
 python -m pip install fonttools brotli
 ```
 
-> 用的是 `py` 命令的话，把上面的 `python` 换成 `py`。
+> 用的是 `py` 命令的话，把上面的 `python` 换成 `py`。`setup.bat` 会把 Python 那两个包、图标子集、git 钩子一次办完。
 
 ### 怎么确认装好了
 
 ```
 node --version          # 应该打印 v18.x / v20.x / v22.x
+npm --version
+npm ls --depth=0        # 应该只有一行 esbuild@0.28.x（出现 "extraneous" 说明 package.json 没记上）
 python --version        # 应该打印 Python 3.9+
 python -c "import fontTools, brotli"    # 没有任何输出 = 装好了
 ```
@@ -143,6 +152,8 @@ fonts/icons.css + remixicon.woff2     ← 子集（发布，页面实际加载�
 | --- | --- |
 | `build-site.js` | 按白名单复制到 `dist/`；开头先跑图标校验，不一致就中止 |
 | `build-feed.js` | 从 `js/posts-data.js` 生成 `feed.xml` |
+| `build-posts.js` | 给每篇公开文章生成 `/posts/<id>/` 静态页，并写出 `sitemap.xml` + `robots.txt`（必须在 `build-site.js` 之后） |
+| `minify.js` | 压缩 `dist/` 里的 JS 和 CSS（删注释/空白，**不重命名**）。需要 `npm install`，必须最后跑 |
 | `check-icons.js` | 查 CDN 残留 / 图标名是否存在 / 页面是否漏引 `style.css` |
 | `subset-icons.py` | 图标子集生成器（扫全站 `ri-*` → 裁字体 → 重写 `icons.css` → 复核 cmap） |
 | `precommit-icons.js` | git 钩子的实际逻辑：暂存区有 `.html/.js` 就先重生成并 `git add` 字体 |

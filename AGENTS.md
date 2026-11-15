@@ -10,9 +10,12 @@
 
 ## 这个站是什么
 
-纯静态博客：原生 HTML + CSS + JavaScript，**没有 npm 依赖、没有后端**，托管在 GitHub Pages 上。本地开发需要 **Node**（构建）和 **Python 3.9+**（裁图标子集，见「图标」一节）。
+纯静态博客：原生 HTML + CSS + JavaScript，**运行时没有任何依赖、没有后端**，托管在 GitHub Pages 上。本地开发需要 **Node**（构建）和 **Python 3.9+**（裁图标子集，见「图标」一节）。
 
-- 不要引入打包器、框架、TypeScript、CSS 预处理器或任何 npm 运行依赖。`tools/build-site.js` 只做两件事：**先跑图标校验**（字体和源码不一致就中止），再按白名单把要发布的文件**复制**到 `dist/`。不要把它扩展成打包器（不编译、不转译、不哈希、不压缩）。
+- 不要引入打包器、框架、TypeScript、CSS 预处理器。`tools/build-site.js` 只做两件事：**先跑图标校验**（字体和源码不一致就中止），再按白名单把要发布的文件**复制**到 `dist/`。不要把它扩展成打包器（不编译、不转译、不哈希、不压缩）。
+- **唯一的 npm 依赖是 `esbuild`，只在 `tools/minify.js` 里用**，作用是删掉 `dist/` 里 JS/CSS 的注释和空白（gzip 约省一半）。它是 `devDependency`，不进产物、不影响运行时。加别的依赖前先想清楚：这个站的全部价值在于「双击就能改、推送就能上」。
+  - ⚠️ **`minifyIdentifiers` 必须是 `false`。** `index.html` 里那三处 `onclick="copyToClipboard(…)"` 靠的是顶层函数名是全局的，重命名一开就静默失效。`tools/minify.js` 末尾的 `ASSERTIONS` 在守这条，挂了就构建失败、不要绕过。
+  - `charset` 必须显式写 `utf8`：默认值会把中文转成 `\uXXXX`，`posts-data.js` 反而胖 10KB。
 - `dist/` 是产物目录，已在 `.gitignore` 里；页面源码仍然是「能直接打开就能看」的原样文件，产物只是同一批文件的副本。见「构建与部署」一节。
 - 所有路径都是相对路径（用户站部署在根路径，但本地也可能用 file:// 打开）。
 
@@ -82,9 +85,9 @@
 
 - `script.js` 的 `normalizeHomeUrl()` 在 `init()` 第一行执行：把 `/index.html` 收敛成 `/`，`?article=` / `?view=` 等参数一个不动，`history.state` 也照旧。所以从站外链接、404 兜底、子页面跳回来，落地瞬间地址栏就是干净的。
 - ⚠️ **`file://` 下这个函数直接 return，别"顺手"删掉这个判断**：本地把 `index.html` 换成目录，浏览器会去列目录而不是渲染页面，预览反而打不开。
-- 新生成的 URL 一律用**查询串形式**（`?article=N`、`?view=xxx`），让 pathname 保持当前值：
-  - `buildFeedbackUrl()` 返回 `'?' + params`，不拼 `index.html`
-  - `tools/build-feed.js` 的 `articleUrl()` 返回 `https://annie106.github.io/?article=N`
+- `syncUrlWithView()` 只改 query、**原样保留 pathname** —— 所以入口的 pathname 决定了之后所有地址栏形态。（唯一例外是文章视图：它写的是 `/posts/<id>/` 这条纯路径，见上一节。）
+- 其它视图新生成的 URL 仍用**查询串形式**（`?view=xxx`），让 pathname 停在站点根：
+  - `buildFeedbackUrl()` 返回 `siteBasePath() + '?' + params`（带上根路径，否则从 `/posts/<id>/` 点反馈会拼进文章目录）
   - `404.html` 的兜底跳转写 `/?`，不是 `/index.html?`
 - 页面里现存的 `href="index.html?view=xxx"` **可以保留**：SPA 会拦下点击（不产生导航），真有整页跳转也会被 `normalizeHomeUrl` 收敛。但新建页面时优先写查询串，别主动加文件名。
 - `syncUrlWithView()` 只改 query、**原样保留 pathname** —— 所以入口的 pathname 决定了之后所有地址栏形态。别把它改成拼接死路径。
@@ -124,13 +127,14 @@
 
 2026-11-13 之前是「Pages 直接吃仓库根目录 + 用 `_config.yml` 的 `exclude` 挡开发文件」。现在改成自己构建。
 
-- **`tools/build-site.js` 是唯一的发布入口。** 它按**白名单**把该发布的文件复制到 `dist/`，开发文件一个都进不去。用白名单而不是黑名单：漏发一个页面会立刻 404、当场发现；误发一个开发文件（`AGENTS.md`、`tools/`）往往没人察觉。
+- **构建是三步，顺序固定**：`build-site.js`（复制）→ `build-posts.js`（文章静态页）→ `minify.js`（压缩产物）。第一条会清空 `dist/`，所以不能乱；第三条必须在最后，否则压缩结果被复制覆盖。CI 里是 `deploy.yml` 的三个连续步骤。
+- **`tools/build-site.js` 是发布入口**，决定哪些文件上线。它按**白名单**把该发布的文件复制到 `dist/`，开发文件一个都进不去。用白名单而不是黑名单：漏发一个页面会立刻 404、当场发现；误发一个开发文件（`AGENTS.md`、`tools/`）往往没人察觉。
 - 开头先跑**图标校验**（`check-icons.js`），字体和源码不一致就直接中止 —— 因为缺字形只会显示空白、不会报错。所以本地构建需要 Node + Python（见「图标」一节）。
   - 白名单在脚本顶部：`PUBLISH_FILES`（根级文件）+ `PUBLISH_DIRS`（目录）。新页面只要落在 `project_subpage/`、`archive/` 这些已列目录里就**自动带上，不用改脚本**；只有新增**根级文件**（`robots.txt`、`sitemap.xml`、根目录的 `about.html`）或**根级新目录**（`assets/`）才需要加。
   - **不想发布的内容，用下划线前缀。** 以 `_` 或 `.` 开头的文件和目录一律不进产物（`_draft.html`、`_notes/`、`.env`），`.md` / `.markdown` 也不进。这一条比改脚本重要：白名单里的目录是**整份递归复制**的，放在 `project_subpage/blog/` 下的任何文件都会被发出去 —— 包括草稿页和笔记，而 orphans 检查拦不住它们（在产物里确实存在）。静态站没有访问控制，进了 `dist/` 就等于公开，所以只能在「不发出去」这一层解决。
   - **漏加会被拦下来。** 脚本会扫仓库里所有 `.html` 和产物逐一比对，发现「有源码、没进产物」的页面就直接报错退出并点名文件 —— 因为这种漏发在构建时不会暴露，只会在线上变成 404，是最难自己发现的一类问题。确实不该上线的页面优先用下划线前缀；不以下划线命名的例外写进脚本顶部的 `IGNORE_HTML`（目前只有 `_template.html`，其实已被 `_` 规则覆盖，留作示例）。
   - 脚本末尾还有一组 `MUST_HAVE` 校验，产物缺关键文件同样直接报错退出，不会发出一份残站。
-- **`.github/workflows/deploy.yml`** 在 push 到 main 时执行构建，再用 `upload-pages-artifact` + `deploy-pages` 发布 `dist/`。**Pages 的 Source 必须设成「GitHub Actions」**（Settings → Pages），否则部署步骤会失败 —— 这一步只能人工在网页上改，代码改不了。
+- **`.github/workflows/deploy.yml`** 在 push 到 main 时执行构建（含 `npm ci` 装那个唯一的构建期依赖），再用 `upload-pages-artifact` + `deploy-pages` 发布 `dist/`。**Pages 的 Source 必须设成「GitHub Actions」**（Settings → Pages），否则部署步骤会失败 —— 这一步只能人工在网页上改，代码改不了。
   - 推荐的切换顺序：① 先 push 代码（此时 Source 还是分支发布，站点照常由 Jekyll 提供，只是 Actions 部署那步会失败）→ ② 去 Settings 把 Source 改成「GitHub Actions」→ ③ 在 Actions 页面手动 Run 一次「部署站点」。反过来先改 Source 会出现一段「还没有任何产物」的 404 空窗。
 - **`dist/` 进 `.gitignore`，不要提交。** 它是产物不是源码。本地想看线上效果：`node tools/build-site.js`，然后起静态服务器指向 `dist/`。
 - ⚠️ **这台机器上 `fs.cpSync` 和 `fs.rmSync` 都不要用。**
@@ -139,6 +143,49 @@
   - 所以 `build-site.js` 里是手写递归复制 + 逐项 `unlinkSync` / `rmdirSync` 清空。别"优化"回这两个 API。
 - `_config.yml` **已于 2026-11-13 删除，别再加回来。** 它是分支发布时代用来挡开发文件的排除清单，现在挡人的是 `build-site.js` 的白名单。加回 `_config.yml` 不会生效（Pages 已不跑 Jekyll），只会让人误以为还有一层保护。如果哪天真要切回分支发布，得自己重新写一份 `exclude`，并且在切之前就想清楚它会立刻暴露什么。
 - 注意这是「构建规则由你定、执行交给 CI」，不是「本地整站打包上传」。GitHub Pages 没有手动上传产物的入口，只有分支发布或 Actions 发布两条路。如果哪天要求构建也完全在本地完成，做法是本地生成 `dist/` 再推到 `gh-pages` 分支、Source 选那个分支 —— 但那样容易漏跑脚本导致线上是旧内容，除非明确要求，别改。
+
+## 文章地址：`/posts/<id>/`
+
+2026-11-15 起，文章地址是 `https://annie106.github.io/posts/<id>/`（目录形式，不留 `.html`）。站内点文章也是这个地址，**不是** `?article=N`。
+
+- **为什么要改**：整站只有一个 HTML 时，爬虫和微信/Telegram 的预览抓取都不执行 JS，拿到的永远是首页那份 title 和空白正文。有了独立地址 + 预渲染正文，收录和分享卡片才成立。
+- `?article=<id>` 保留成**旧链接别名**，读完会自动收敛成 `/posts/<id>/`。feed 里的 `guid` 故意还是旧地址：guid 一改，订阅者会收到全部历史文章的重复推送。
+- 地址由 `syncUrlWithView()` 写：文章视图 → 纯路径；其它视图 → 站点根 + 查询串（离开文章时会把 `/posts/<id>/` 收回根，别让它变成 `/posts/<id>/?view=blog`）。
+- 卡片标题是**真链接** `<a href="posts/<id>/">`（爬虫要实际地址）。样式在 `css/style.css` 的 `.task-title a`：**任何状态都不要下划线**（`:hover`/`:focus`/`:visited` 都显式写了 `none`），否则整排卡片像一片可点说明文字。点击由卡片自己的监听拦下，别去掉那个 `preventDefault`。
+
+### ⚠️ 三条会整页崩掉的坑（都实测踩过）
+
+1. **`index.html` 里绝对不能加 `<base>`。** 地址栏会被改成 `/posts/<id>/`，相对地址若按它解析，`js/…`、`css/…`、正文配图、内嵌 iframe 全部 404。用脚本设 `<base href>` 也没用 —— 浏览器的预加载扫描器在脚本执行前就把 `<link>`/`<script>` 解析完了。
+2. **`body` 末尾那些相对路径的 `<script src="js/…">` 必须排在 `script.js` 前面。** 它们是在解析到标签那一刻才解析路径的，排在 `script.js` 后面（那时地址已被改写）就是 `/posts/<id>/js/…`。
+3. **运行时拼地址一律走 `siteBaseUrl()`**（启动时算一次的 `SITE_BASE_URL`），不要用 `location.href` 当基准 —— 任何用当前地址拼相对路径的地方，在文章页上都会拼错。`setFrameSource()` 和正文注入（`absolutizeHtml()`）已经按这个改了。
+
+### 文章之间翻页（上一篇 / 下一篇）
+
+- **用 `replaceState`，不 `pushState`。** 已经在读文章时再点翻页，是把当前那条历史记录改掉，不是新增一条。否则从首页进 A → 翻到 B → 再翻到 C，按三次返回才出得去。
+- 返回落点沿用原来那条记录里存的 `annieReturnView` / `annieReturnScroll`，**不要**因为「当前在文章视图」就覆盖成 `home` —— 从归档翻页进去的，返回还要回归档。
+- 过渡动画用 **Web Animations API**（`playArticleSwapAnimation`），不要给 `.article-detail` 加动画类：那个元素自带 `animation: fadeSlideIn`，加类/删类会让它重播，表现为淡入两遍中间闪一下。脚本动画优先级更高，播完自动交还。
+- `openArticle(id, { direction })` 的第二个参数只给翻页用（`prev` 从左边进、`next` 从右边进）；其它入口不传，就没有额外动画。方向由链接上的 `is-prev` / `is-next` 类决定。
+- 记得留 `prefersReducedMotion()` 的早退，动画库不会自动尊重那个设置。
+
+### `tools/build-posts.js`
+
+- **必须在 `build-site.js` 之后跑**（后者清空 `dist/`）。本地：`node tools/build-site.js && node tools/build-posts.js`；CI 是 `deploy.yml` 的两个连续步骤。
+- 文章页不是另写模板，而是**拿 `dist/index.html` 改出来**：换 head、把正文塞进 `#articleContent`、隐藏 `#view-home`。所以 `index.html` 改了这里不用跟着改；但**几个锚点字符串（`MARK_*` 常量）改了就一定得同步**，对不上时构建会直接失败并点名（`replaceOnce`），不会静默生成坏页面。
+- 文章页带一条**静态** `<base href="/">`：它永远在 `dist/` 里、永远由服务器提供，`/` 是对的。别改成相对值。
+- 只发布 `isPublic !== false` 的文章，口径必须和 `script.js` 的 `isArticlePublic` 一致。
+- 产出全是产物：`dist/posts/<id>/index.html`、`dist/sitemap.xml`、`dist/robots.txt`，不要手改、不要提交、别加进 `build-site.js` 的白名单。
+- **本地预览要指向 `dist/`**（`/posts/<id>/` 只在产物里存在）。对着仓库根起服务器，点进文章会 404。
+
+## 搜索引擎收录：默认全站 noindex
+
+2026-11-15 起**全站不让搜索引擎收录**：页面能访问、能分享（微信/Telegram 的预览卡片照常），但不会出现在搜索结果里。
+
+- 开关在 `tools/build-posts.js` 顶部的 `ALLOW_SEARCH_INDEXING`（管文章页）。**改回 `true` 时还要同步 `index.html` 第 5 行那条 robots 标签**，因为首页那份是源码里手写的，没有代码去替换它。
+- 其余页面（`movie.html`、`404.html`、`project_subpage/**`、`archive/**`、`_template.html`）各自 head 里都有一条 `<meta name="robots" content="noindex,follow">`。新建页面照 `_template.html` 复制就自带。
+- 文章页的标签是**整条替换** `MARK_ROBOTS`，不是追加。两条互相矛盾的 robots 标签，抓取器取哪条全看运气。
+- ⚠️ **`robots.txt` 里绝对不能写 Disallow。** 这是最容易做错的一步：Disallow 让爬虫进不来 → 读不到页面里的 noindex → 已经收录的页面**永远删不掉**（搜索结果里只剩标题和「此页面无法访问」）。正确姿势是「允许抓取 + 页面声明 noindex」，所以 `Allow: /` 和 `Sitemap:` 都要留着。
+- 保留 `sitemap.xml` 是刻意的：它让爬虫更快抓到页面、更快看到 noindex、更快退出索引。等全站彻底从搜索结果消失，才可以把 `Sitemap:` 那行删掉。
+- 已经收录的内容不会立刻消失，一般 1～4 周。要快，去 Search Console 用「移除网址」工具。
 
 ## 「获取联系」页与 404 浮窗
 

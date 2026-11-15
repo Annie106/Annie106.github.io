@@ -2876,6 +2876,17 @@
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
+        /* 标题里的 <a> 是真链接（href 指向 /posts/<id>/，给爬虫和「在新标签打开」）。
+           视觉上要**完全**透明：颜色跟随、任何状态都没有下划线 —— 有下划线会让人
+           以为这一行是「可点的说明文字」，而且和卡片整体的圆角风格打架。
+           两行截断仍由上面的 .task-title 负责，这里不能再套 display:box。 */
+        .task-title a,
+        .task-title a:hover,
+        .task-title a:focus,
+        .task-title a:visited {
+            color: inherit;
+            text-decoration: none;
+        }
         .task-excerpt {
             font-size: 0.875rem;
             color: #78787f;
@@ -3915,6 +3926,75 @@
             gap: 12px;
             flex-wrap: wrap;
             margin: -5.76px 0;
+        }
+        /* 上一篇 / 下一篇：正文和评论区之间的一对跳转卡片。
+           grid + auto-fit：两篇时左右各一半，只有一篇时自动铺满，
+           窄屏自动落成上下两行。空着时 :empty 直接不占位。 */
+        .article-adjacent {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 12px;
+            max-width: 860px;
+            margin-top: 40px;
+        }
+        .article-adjacent:empty {
+            display: none;
+        }
+        /* 只有一篇时（最新一篇没有「下一篇」、最早一篇没有「上一篇」），
+           别让它拉满整行 —— 一条短标题铺在 860px 的框里显得空。
+           收成半宽，并贴着它本来该在的那一侧。 */
+        .article-adjacent.is-single {
+            grid-template-columns: minmax(0, 1fr);
+        }
+        .article-adjacent.is-single .article-adjacent-link {
+            width: min(100%, 420px);
+        }
+        .article-adjacent.is-single .is-prev {
+            justify-self: start;
+        }
+        .article-adjacent.is-single .is-next {
+            justify-self: end;
+        }
+        .article-adjacent-link {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding: 14px 16px;
+            border: 1px solid var(--color-border-light);
+            border-radius: 12px;
+            background: var(--color-surface);
+            text-decoration: none;
+            transition: border-color 0.18s ease;
+        }
+        .article-adjacent-link:hover {
+            border-color: var(--color-border);
+        }
+        /* 「下一篇」右对齐，标签里的箭头也跟着翻到右侧 —— 视觉上指明方向，
+           和「读完了接着往后翻」的直觉一致 */
+        .article-adjacent-link.is-next {
+            text-align: right;
+            align-items: flex-end;
+        }
+        .article-adjacent .adj-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.74rem;
+            color: var(--color-text-tertiary);
+        }
+        .article-adjacent .is-next .adj-label {
+            flex-direction: row-reverse;
+        }
+        .article-adjacent .adj-title {
+            font-size: 0.94rem;
+            font-weight: 600;
+            line-height: 1.5;
+            color: var(--color-text-primary);
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .article-adjacent-link {
+                transition: none;
+            }
         }
         /* 反馈入口：外观和尺寸都跟顶部的「分享」按钮完全一致（同款胶囊描边、
            同样 6px / 14px 内距），多出来的高度由上面 .article-bottombar 的负外边距抵消。
