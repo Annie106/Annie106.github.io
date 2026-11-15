@@ -274,7 +274,14 @@ function loadTemplate() {
     if (!fs.existsSync(TEMPLATE_FILE)) {
         throw new Error('dist/index.html 不存在。先跑 node tools/build-site.js 再跑这个脚本。');
     }
-    return fs.readFileSync(TEMPLATE_FILE, 'utf8');
+    const raw = fs.readFileSync(TEMPLATE_FILE, 'utf8');
+    /* 统一成 LF 再动刀。仓库里的 index.html 在 Windows 检出后是 CRLF，
+       而下面删站点标题那条正则结尾要求 `</title>\n` —— 遇到 `\r\n` 就匹配不上，
+       于是文章页会同时留下「站点标题」和「文章标题」两个 <title>。
+       这个错只有逐字节比对产物才看得见（浏览器取第一个，所以本地看还像对的），
+       而 CI 跑在 Linux、拿到的是 LF，线上一直是正常的 —— 正好掩盖了它。
+       归一化之后本地产物与 CI 产物逐字节相同。 */
+    return raw.replace(/\r\n/g, '\n');
 }
 
 /* 精确替换一次，少一处或多一处都算错。

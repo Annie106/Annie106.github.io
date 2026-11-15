@@ -33,18 +33,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 拉取仓库
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: 准备 Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '22'
 
       # 图标是「按源码里用到的图标裁出来的子集」。贡献者本地不必装 Python：
       # 这里在构建前重新裁一遍，保证产物里的字体和图标用法一致。
       # 如果谁写了一个不存在的图标名，这一步会失败并指出是哪个文件第几行。
       - name: 准备 Python（图标子集用）
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
@@ -72,10 +72,10 @@ jobs:
         run: node tools/minify.js
 
       - name: 配置 Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: 上传产物
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
@@ -88,4 +88,4 @@ jobs:
     steps:
       - name: 部署到 GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

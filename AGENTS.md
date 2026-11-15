@@ -171,6 +171,7 @@
 
 - **必须在 `build-site.js` 之后跑**（后者清空 `dist/`）。本地：`node tools/build-site.js && node tools/build-posts.js`；CI 是 `deploy.yml` 的两个连续步骤。
 - 文章页不是另写模板，而是**拿 `dist/index.html` 改出来**：换 head、把正文塞进 `#articleContent`、隐藏 `#view-home`。所以 `index.html` 改了这里不用跟着改；但**几个锚点字符串（`MARK_*` 常量）改了就一定得同步**，对不上时构建会直接失败并点名（`replaceOnce`），不会静默生成坏页面。
+- **模板读进来先统一成 LF**（`loadTemplate()` 里的 `replace(/\r\n/g, '\n')`）。Windows 检出的 `index.html` 是 CRLF，而删除站点标题那条正则结尾要求 `</title>\n`，遇到 `\r\n` 会静默失配 —— 本地产物会多出一个 `<title>`。CI 在 Linux 上拿到 LF，正好掩盖了它，只有逐字节比对产物才看得见。
 - 文章页带一条**静态** `<base href="/">`：它永远在 `dist/` 里、永远由服务器提供，`/` 是对的。别改成相对值。
 - 只发布 `isPublic !== false` 的文章，口径必须和 `script.js` 的 `isArticlePublic` 一致。
 - 产出全是产物：`dist/posts/<id>/index.html`、`dist/sitemap.xml`、`dist/robots.txt`，不要手改、不要提交、别加进 `build-site.js` 的白名单。
