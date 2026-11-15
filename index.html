@@ -831,6 +831,10 @@
                     ></iframe>
                 </div>
             </div>
+            <!-- 上一篇 / 下一篇：内容由 script.js 的 renderAdjacentArticles 填。
+                 放在正文和评论区之间 —— 读完顺手翻页，不用滚回顶部找导航。
+                 空着时不留高度（:empty），没有兄弟文章也不会多出一条空隙。 -->
+            <nav class="article-adjacent" id="articleAdjacent" aria-label="相邻文章"></nav>
             <hr class="divider-thin article-comments-divider" id="articleCommentsDivider">
             <section class="article-comments" id="articleCommentsSection" aria-labelledby="articleCommentsTitle">
                 <div class="comments-stage" id="articleCommentsStage">

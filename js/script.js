@@ -87,6 +87,7 @@
             const articleTitle = $('#articleTitle');
             const articleMeta = $('#articleMeta');
             const articleContent = $('#articleContent');
+            const articleAdjacent = $('#articleAdjacent');
             const articleUnavailableNotice = $('#articleUnavailableNotice');
             const articleUnavailableMount = $('#articleUnavailableMount');
             const articleCommentsDivider = $('#articleCommentsDivider');
@@ -2994,6 +2995,54 @@
                 }
             }
 
+            /* 按「发布日期倒序」排出前后篇。置顶不参与排序 —— 它是展示策略，
+               不该改变「哪篇更早写」这个事实。同一天的两篇按 id 倒序，
+               和列表、时间线、feed 用的是同一套规则。
+               只收能正常站内打开的文章：未开放的和「跳到站外」的那几篇不参与。 */
+            function getAdjacentPosts(post) {
+                const ordered = blogPosts
+                    .filter(item => isArticlePublic(item) && (!item.externalPage || item.embeddedPage))
+                    .slice()
+                    .sort(function (a, b) {
+                        const diff = postDisplayDate(b).localeCompare(postDisplayDate(a));
+                        return diff !== 0 ? diff : (b.id || 0) - (a.id || 0);
+                    });
+                const index = ordered.findIndex(item => item.id === post.id);
+                if (index < 0) return { prev: null, next: null };
+                /* ordered 是新的在前，所以：
+                     下标 +1 = 更早写的（上一篇）
+                     下标 -1 = 更晚写的（下一篇） */
+                return {
+                    prev: ordered[index + 1] || null,
+                    next: ordered[index - 1] || null,
+                };
+            }
+
+            /* 正文下面那对翻页卡片。标签里带日期，避免读者对「上一篇 / 下一篇」
+               到底朝哪个方向有歧义。href 是真实地址（/posts/<id>/），
+               点击由 document 上的委托拦下交给 openArticle，不整页刷新。 */
+            function renderAdjacentArticles(post, isUnavailableArticle) {
+                if (!articleAdjacent) return;
+                if (isUnavailableArticle) {
+                    articleAdjacent.innerHTML = '';
+                    return;
+                }
+                const { prev, next } = getAdjacentPosts(post);
+                const itemMarkup = (target, className, label, icon) => {
+                    if (!target) return '';
+                    return `
+                        <a class="article-adjacent-link ${className}" href="posts/${target.id}/" data-adjacent-article="${target.id}">
+                            <span class="adj-label"><i class="${icon}" aria-hidden="true"></i> ${label} · ${postDisplayDate(target)}</span>
+                            <span class="adj-title">${escapeHtml(target.title)}</span>
+                        </a>`;
+                };
+                articleAdjacent.classList.toggle('is-single', Boolean(prev) !== Boolean(next));
+                articleAdjacent.innerHTML = [
+                    itemMarkup(prev, 'is-prev', '上一篇', 'ri-arrow-left-line'),
+                    itemMarkup(next, 'is-next', '下一篇', 'ri-arrow-right-line'),
+                ].join('');
+            }
+
             function renderArticle(post) {
                 const isUnavailableArticle = !isArticlePublic(post);
                 /* 同一篇文章重新进入时正文可以原样复用：
@@ -3052,6 +3101,7 @@
                 }
                 renderedArticleId = post.id;
                 renderedArticleUnavailable = isUnavailableArticle;
+                renderAdjacentArticles(post, isUnavailableArticle);
                 renderArticleComments(post, isUnavailableArticle);
                 // 换了文章就重新开始量高度，否则会沿用上一篇记下的旧值
                 embeddedFrameHeight = 0;
@@ -5053,6 +5103,17 @@
                 if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
                 e.preventDefault();
                 openArticle(Number(link.getAttribute('data-archive-article')));
+            });
+
+            /* 文章底部的「上一篇 / 下一篇」同理：href 是真地址（爬虫和
+               「在新标签打开」都靠它），有 JS 就站内切换，别整页重载 ——
+               整页重载会绕开视图历史，返回键就回不到刚才那一屏。 */
+            document.addEventListener('click', function(e) {
+                const link = e.target.closest('[data-adjacent-article]');
+                if (!link) return;
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                e.preventDefault();
+                openArticle(Number(link.getAttribute('data-adjacent-article')));
             });
 
             document.addEventListener('click', function(e) {
