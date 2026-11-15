@@ -7,33 +7,34 @@
 
 ---
 
-## 一、依赖（两样都要有）
+## 一、依赖
+
+站点**运行时零依赖**（`dist/js/` 里全是仓库自己的文件），下面这些只在「本地构建 / 部署」时需要。
 
 | 依赖 | 版本 | 用来干什么 | 缺了会怎样 |
 | --- | --- | --- | --- |
-| **Node.js** | 18 或更高 | 构建产物、图标校验、git 钩子 | `node tools/build-site.js` 直接跑不起来 |
-| **Python** | 3.9 或更高 | 裁剪图标字体（需要 `fonttools` + `brotli`） | **提交被钩子拦下、本地构建中止** |
+| **Node.js** | 18 或更高（CI 用 20） | 跑所有 `tools/*.js`：构建、图标校验、git 钩子 | `node tools/build-site.js` 直接跑不起来 |
+| **npm** | 随 Node 附带 | 只用来装 `esbuild` | 压缩那步跳过，其它照常 |
+| **esbuild** | 0.28.x | 压缩 `dist/` 里的 JS/CSS（gzip 约省一半） | `minify.js` 报错退出；不压也能上线，只是产物大 |
+| **Python** | 3.9 或更高 | 裁剪图标字体 | **提交被钩子拦下、本地构建中止** |
+| **fonttools** | 4.x | 读 / 写字体文件（裁子集用） | 同上 |
+| **brotli** | 1.x | 生成 woff2 的压缩算法 | 同上 |
 
-另有一个**只用于压缩**的 npm 依赖（`esbuild`），在仓库根跑一次即可：
+一次装完：
 
 ```
 npm install
-```
-
-它只在 `tools/minify.js` 里用，不进产物、运行时不需要。没装也不影响别的事，只是压缩那一步会明确报错。
-
-Python 装好后还要装两个包（`setup.bat` 会自动装）：
-
-```
 python -m pip install fonttools brotli
 ```
 
-> 用的是 `py` 命令的话，把上面的 `python` 换成 `py`。
+> 用的是 `py` 命令的话，把上面的 `python` 换成 `py`。`setup.bat` 会把 Python 那两个包、图标子集、git 钩子一次办完。
 
 ### 怎么确认装好了
 
 ```
 node --version          # 应该打印 v18.x / v20.x / v22.x
+npm --version
+npm ls --depth=0        # 应该只有一行 esbuild@0.28.x（出现 "extraneous" 说明 package.json 没记上）
 python --version        # 应该打印 Python 3.9+
 python -c "import fontTools, brotli"    # 没有任何输出 = 装好了
 ```

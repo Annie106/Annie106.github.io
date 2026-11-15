@@ -1821,7 +1821,7 @@ git push</code></pre>
                     <i class="ri-terminal-line"></i>
                     本地看「真正会上线的那一份」
                 </h3>
-                <p>线上跑的是 <code>dist/</code> 里的内容，不是仓库根目录。想确认发布后的样子，或者排查「本地好好的、线上却不对」，先构建一次（<strong>两条命令，顺序不能反</strong>）：</p>
+                <p>线上跑的是 <code>dist/</code> 里的内容，不是仓库根目录。想确认发布后的样子，或者排查「本地好好的、线上却不对」，先构建一次（<strong>三步，顺序不能反</strong>）：</p>
                 <pre><code>npm install                    # 只需一次
 node tools/build-site.js
 node tools/build-posts.js
@@ -1829,7 +1829,66 @@ node tools/minify.js</code></pre>
                 <p>第一条按白名单把文件复制进 <code>dist/</code>（会先清空它），第二条给每篇文章生成 <code>dist/posts/&lt;id&gt;/</code> 静态页并写出 <code>sitemap.xml</code> 和 <code>robots.txt</code>，第三条把产物里的 JS/CSS 压掉注释和空白（gzip 大约省一半）。</p>
                 <p><strong>顺序不能变</strong>：第一条会清空 <code>dist/</code>，所以文章页必须排在它后面；压缩必须排最后，否则压完又被复制覆盖。嫌麻烦就 <code>npm run build</code>，它按顺序跑完这三条。</p>
                 <p>然后把静态服务器<strong>指向 <code>dist/</code> 这个文件夹</strong>（不是仓库根目录）再预览。这一点比以前重要：文章页只存在于 <code>dist/</code> 里，对着仓库根起服务器点进文章会 404。</p>
-                <p>这一步要装 <b>Node.js</b>；如果改过图标，还要装 <b>Python 3.9+</b>（裁字体用），否则构建会在图标检查那一步中止。没装这两样也不影响写文章——推送后 GitHub 会替你构建。</p>
+                <p>这一步要装的东西列在这儿。<strong>访客的浏览器什么都不用装</strong>（站点是纯静态文件，运行时零依赖），只有「要在本地构建或部署」的人才需要下面这些：</p>
+
+                <div class="guide-table-wrap">
+                    <table class="guide-table">
+                        <thead>
+                            <tr>
+                                <th>要装什么</th>
+                                <th>版本</th>
+                                <th>用来做什么</th>
+                                <th>缺了会怎样</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Node.js</strong></td>
+                                <td>18+</td>
+                                <td>跑 <code>tools/</code> 里的构建脚本、图标校验、git 钩子</td>
+                                <td>构建命令直接跑不起来</td>
+                            </tr>
+                            <tr>
+                                <td><strong>esbuild</strong><br>（npm 包）</td>
+                                <td>0.28.x</td>
+                                <td>压缩 <code>dist/</code> 里的 JS 和 CSS</td>
+                                <td>压缩那步报错退出；不压也能上线，只是体积大一倍</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Python</strong></td>
+                                <td>3.9+</td>
+                                <td>裁剪图标字体：用到哪些图标就只保留哪些字形</td>
+                                <td><strong>提交会被钩子拦下，构建也会中止</strong>（故意的，免得线上缺图标）</td>
+                            </tr>
+                            <tr>
+                                <td><strong>fonttools</strong><br><strong>brotli</strong></td>
+                                <td>4.x / 1.x</td>
+                                <td>上一条用到的两个 Python 包</td>
+                                <td>同上</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p>一次装完（第一条在仓库根跑，后面那条只要能跑 <code>python</code> 就行）：</p>
+                <pre><code>npm install
+python -m pip install fonttools brotli</code></pre>
+                <p>Windows 上 <code>python</code> 不认就换成 <code>py</code>。也可以双击 <code>tools/setup.bat</code>，它会把 Python 那两个包、图标子集、git 钩子一次办完。</p>
+
+                <div class="guide-tip">
+                    <div class="guide-tip-title">
+                        <i class="ri-checkbox-circle-line"></i>
+                        怎么确认装好了
+                    </div>
+                    <p>每条都能打印出版本号才算数：</p>
+                    <pre><code>node --version
+npm ls --depth=0                       # 应该只有一行 esbuild
+python --version
+python -c "import fontTools, brotli"    # 没有任何输出就是装好了</code></pre>
+                    <p><strong>不要用 <code>where python</code> 判断。</strong> Windows 自带一个「应用商店占位符」，<code>where</code> 找得到，真运行报 <code>9009</code>。装 Python 时记得在第一屏勾上 <b>Add python.exe to PATH</b>。</p>
+                </div>
+
+                <p>没装这些也不影响写文章——推送后 GitHub 会替你构建：它按 <code>package-lock.json</code> 装 esbuild、按 <code>deploy.yml</code> 里的命令装 fonttools 和 brotli，版本跟你本地无关。</p>
 
                 <div class="guide-warning">
                     <div class="guide-warning-title">

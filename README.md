@@ -2,7 +2,7 @@
 
 > 由 AI 辅助构建
 
-原生 HTML + CSS + JavaScript 的静态博客，**没有 npm 依赖、没有后端**。构建是三步：`build-site.js`（校验图标 + 按白名单复制到 `dist/`）→ `build-posts.js`（每篇文章的 `/posts/<id>/` 静态页 + `sitemap.xml` + `robots.txt`）→ `minify.js`（压缩产物里的 JS/CSS）。一键：`npm run build`。
+原生 HTML + CSS + JavaScript 的静态博客，**运行时零依赖、没有后端**（构建期只有一个 npm 包）。构建是三步：`build-site.js`（校验图标 + 按白名单复制到 `dist/`）→ `build-posts.js`（每篇文章的 `/posts/<id>/` 静态页 + `sitemap.xml` + `robots.txt`）→ `minify.js`（压缩产物里的 JS/CSS）。一键：`npm run build`。
 
 本地开发另需 **Node 18+** 和 **Python 3.9+**（Python 只用来裁图标子集），压缩那步还要 `npm install`（只有一个 esbuild）。依赖与常见报错见 [`tools/README.md`](tools/README.md)。
 
@@ -108,6 +108,46 @@ node tools/check-icons.js
 - 改文章 `id` 会让已分享的链接失效。
 - 首页标签：`最新` / `全部` 由 `renderTagPills` 固定，其余由 `HOME_TAGS` 决定；分页每页 8 篇（`HOME_PAGE_SIZE`）或 6 篇（`HOME_POST_LIMIT`），超过一页才出现控件。
 - 移动或重命名子页面后，同步 `embeddedPage` 与 `articleMenus` 的路径。
+
+## 依赖
+
+分两层，别混在一起：
+
+- **访客的浏览器**：什么都不用装。站点是纯静态文件，`dist/js/` 里全是仓库自己的代码，**运行时零 npm 包**。
+- **要本地构建 / 部署的人**（包括 CI）：需要下面这些。
+
+| 依赖 | 版本 | 用途 | 缺了会怎样 | 怎么装 |
+| --- | --- | --- | --- | --- |
+| **Node.js** | 18+（CI 用 20） | 跑 `tools/*.js`：构建、图标校验、git 钩子 | 任何构建命令都跑不起来 | [nodejs.org](https://nodejs.org/) 装 LTS |
+| **npm** | 随 Node 附带 | 只用来装那一个 esbuild | 压缩那步会被跳过（站点仍能构建上线） | 装 Node 就有 |
+| **esbuild** | 0.28.x | 压缩 `dist/` 里的 JS/CSS（gzip 约省一半） | `minify.js` 报错退出，产物偏大但功能正常 | `npm install` |
+| **Python** | 3.9+ | 裁图标子集：源码里用到哪些 `ri-*` 就只保留哪些字形 | **提交被 git 钩子拦下，`build-site.js` 也中止** | [python.org](https://www.python.org/) |
+| **fonttools** | 4.x | 读 / 写字体文件（上一条的实现） | 同上 | `python -m pip install fonttools` |
+| **brotli** | 1.x | 生成 woff2 需要的压缩算法 | 同上 | `python -m pip install brotli` |
+
+一次装完：
+
+```bash
+# Node 装好之后，在仓库根跑一次
+npm install
+
+# Python 装好之后
+python -m pip install fonttools brotli
+```
+
+> Windows 上 `python` 不认就换成 `py`。也可以双击 `tools/setup.bat`，它会把 Python 那两个包装好、生成图标子集、再把 git 钩子挂上。
+
+确认都到位：
+
+```bash
+node --version                        # v18.x 以上
+npm --version
+python --version                      # 3.9 以上
+python -c "import fontTools, brotli"  # 没有任何输出 = 装好了
+npm ls --depth=0                      # 应该只有一行 esbuild
+```
+
+为什么只留一个 npm 包：这个站的全部价值在于「双击就能改、推送就能上」。每多一个包就多一份版本升级、供应链风险和传输体积。判断标准和踩过的坑见 `AGENTS.md` 开头「这个站是什么」一节。
 
 ## 本地预览
 
