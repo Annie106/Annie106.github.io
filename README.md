@@ -4,11 +4,9 @@
 
 原生 HTML + CSS + JavaScript 的静态博客，**运行时零依赖、没有后端**（构建期只有一个 npm 包）。构建是三步：`build-site.js`（校验图标 + 按白名单复制到 `dist/`）→ `build-posts.js`（每篇文章的 `/posts/<id>/` 静态页 + `sitemap.xml` + `robots.txt`）→ `minify.js`（压缩产物里的 JS/CSS）。一键：`npm run build`。
 
-**构建前请先看下一节「依赖」**——本地要装 Node 18+ 和 Python 3.9+，压缩那步还要跑一次 `npm install`。缺 Python 会直接卡住构建，不是可选项。
-
 完整配置教程在站内「使用指南」文章（`project_subpage/blog/guide.html`），本文件只做速查。让 AI 改这个仓库之前，先让它读 `AGENTS.md`。
 
-## 依赖（构建前先看这节）
+## 依赖
 
 分两层，别混在一起：
 
@@ -144,6 +142,7 @@ node tools/check-icons.js
 几个注意点：
 
 - 分享封面必须写绝对地址，如 `https://annie106.github.io/share_cover.jpg`；相对路径抓不到，带 Referer 鉴权的 CDN 也抓不到。
+- **全站 `noindex`**：页面能访问、能分享（卡片正常），但不出现在搜索结果里。开关在 `tools/build-posts.js` 顶部的 `ALLOW_SEARCH_INDEXING`，改回 `true` 时记得同步 `index.html` 里那条 robots 标签
 - 每篇文章有独立的静态页 `/posts/<id>/`，微信和爬虫抓得到标题、摘要、正文；封面默认仍共用 `share_cover.jpg`，想换就在文章数据里加 `cover`。
 - 改文章 `id` 会让已分享的链接失效。
 - 首页标签：`最新` / `全部` 由 `renderTagPills` 固定，其余由 `HOME_TAGS` 决定；分页每页 8 篇（`HOME_PAGE_SIZE`）或 6 篇（`HOME_POST_LIMIT`），超过一页才出现控件。

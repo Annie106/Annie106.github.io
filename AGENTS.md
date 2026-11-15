@@ -176,6 +176,17 @@
 - 产出全是产物：`dist/posts/<id>/index.html`、`dist/sitemap.xml`、`dist/robots.txt`，不要手改、不要提交、别加进 `build-site.js` 的白名单。
 - **本地预览要指向 `dist/`**（`/posts/<id>/` 只在产物里存在）。对着仓库根起服务器，点进文章会 404。
 
+## 搜索引擎收录：默认全站 noindex
+
+2026-11-15 起**全站不让搜索引擎收录**：页面能访问、能分享（微信/Telegram 的预览卡片照常），但不会出现在搜索结果里。
+
+- 开关在 `tools/build-posts.js` 顶部的 `ALLOW_SEARCH_INDEXING`（管文章页）。**改回 `true` 时还要同步 `index.html` 第 5 行那条 robots 标签**，因为首页那份是源码里手写的，没有代码去替换它。
+- 其余页面（`movie.html`、`404.html`、`project_subpage/**`、`archive/**`、`_template.html`）各自 head 里都有一条 `<meta name="robots" content="noindex,follow">`。新建页面照 `_template.html` 复制就自带。
+- 文章页的标签是**整条替换** `MARK_ROBOTS`，不是追加。两条互相矛盾的 robots 标签，抓取器取哪条全看运气。
+- ⚠️ **`robots.txt` 里绝对不能写 Disallow。** 这是最容易做错的一步：Disallow 让爬虫进不来 → 读不到页面里的 noindex → 已经收录的页面**永远删不掉**（搜索结果里只剩标题和「此页面无法访问」）。正确姿势是「允许抓取 + 页面声明 noindex」，所以 `Allow: /` 和 `Sitemap:` 都要留着。
+- 保留 `sitemap.xml` 是刻意的：它让爬虫更快抓到页面、更快看到 noindex、更快退出索引。等全站彻底从搜索结果消失，才可以把 `Sitemap:` 那行删掉。
+- 已经收录的内容不会立刻消失，一般 1～4 周。要快，去 Search Console 用「移除网址」工具。
+
 ## 「获取联系」页与 404 浮窗
 
 `project_subpage/blog/contact.html` 是一张**双形态**的页面，`404.html` 里的浮窗是它的第二个入口。改这两处前先读这一节。

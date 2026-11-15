@@ -55,6 +55,19 @@ const SITE_DESC = '思考 · 记录 · 创造 —— 记录阅读、成长和日
 /* 没配封面的文章共用这张。和 build-feed.js 保持一致。 */
 const FALLBACK_COVER = SITE + 'share_cover.jpg';
 
+/* 是否允许搜索引擎收录文章页。2026-11-15 起改成 false（全站 noindex）：
+   页面照常能打开、能分享、分享卡片正常，只是不会出现在搜索结果里。
+
+   ⚠️ 改回 true 时还要改 `index.html` 里那条 robots 标签（文章页的标签是
+   从它替换出来的，index 自己那份没人替换）。两处一起改，否则首页仍被排除。
+   ⚠️ 无论 true 还是 false，`robots.txt` 里都**不要**写 Disallow：
+   爬虫进不来就读不到 noindex，已经收录的页面会永远留在搜索结果里。 */
+const ALLOW_SEARCH_INDEXING = false;
+
+/* 页面里那条 robots 标签的原文（index.html 第 5 行）。文章页把它整条替换掉，
+   而不是再插一条 —— 两条互相矛盾的 robots 标签，抓取器取哪条全看运气。 */
+const MARK_ROBOTS = '<meta name="robots" content="noindex,follow">';
+
 /* 描述兜底长度：中文一句话大约 40～60 字，120 足够放两句，
    再长会在搜索结果里被截断，反而把后半句切成半个词。 */
 const DESC_MAX = 120;
@@ -349,7 +362,6 @@ function articleHead(post) {
         '    <meta name="description" content="' + escapeHtml(desc) + '">',
         '    <meta name="author" content="' + escapeHtml(AUTHOR) + '">',
         keywords ? '    <meta name="keywords" content="' + escapeHtml(keywords) + '">' : '',
-        '    <meta name="robots" content="index,follow">',
         '    <link rel="canonical" href="' + escapeHtml(url) + '">',
 
         '    <meta property="og:type" content="article">',
@@ -391,6 +403,18 @@ function buildPage(post, template, ordered) {
         '<meta charset="UTF-8">',
         '<meta charset="UTF-8">\n' + articleHead(post),
         'head 插入点'
+    );
+
+    /* 收录开关落在这一条上。整条替换而不是追加：两条 robots 标签会让
+       抓取器自己挑一条，"别收录"就可能被忽略。 */
+    html = replaceOnce(
+        html,
+        MARK_ROBOTS,
+        MARK_ROBOTS.replace(
+            'noindex,follow',
+            ALLOW_SEARCH_INDEXING ? 'index,follow' : 'noindex,follow'
+        ),
+        'robots 标签'
     );
 
     /* ⚠️ 这里**不用**改 <base>：index.html 里的那段内联脚本会按
@@ -459,9 +483,14 @@ function buildSitemap(posts) {
 }
 
 function buildRobots() {
-    /* 只写最必要的两行意图：全部可以抓 + sitemap 在哪。
-       不 Disallow 任何目录 —— 少写一条规则，就少一次「手滑挡掉文章」的机会。 */
+    /* 这个站是「能访问、不收录」：页面里带 noindex。
+       所以这里必须 **Allow**，不能 Disallow —— 爬虫被拦住就进不来，
+       读不到页面里的 noindex，已经收录的页面反而永远从搜索结果里删不掉。
+       Sitemap 也保留：它让爬虫更快抓到页面、更快看到 noindex、更快退出索引。
+       等全站彻底从搜索结果里消失之后，想省事可以把 Sitemap 那行删掉。 */
     return [
+        '# 允许抓取。不要改成 Disallow：爬虫进不来就读不到页面里的 noindex，',
+        '# 已经收录的页面会一直留在搜索结果里。',
         'User-agent: *',
         'Allow: /',
         '',

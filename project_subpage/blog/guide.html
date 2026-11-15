@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="robots" content="noindex,follow">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>使用指南</title>
     <link rel="icon" type="image/svg+xml" href="../../favicon.svg">
@@ -988,8 +989,8 @@
 │
 ├── dist/                    ← 发布产物，由两个 build 脚本生成，不提交
 │   ├── posts/&lt;id&gt;/          ← 每篇文章的静态页（构建时生成）
-│   ├── sitemap.xml          ← 告诉搜索引擎有哪些页面
-│   └── robots.txt           ← 允许抓取 + 指向 sitemap
+│   ├── sitemap.xml          ← 全部文章地址（本站 noindex，只用来让爬虫快点看到「别收录」）
+│   └── robots.txt           ← 允许抓取 + 指向 sitemap（不能写 Disallow，原因见 AGENTS.md）
 │
 ├── images/                  ← 图片都放这里
 │   └── manor_photos/        ← 第五人格归宿照（manor_01.jpg / manor_02.jpg）
@@ -1305,6 +1306,7 @@
                     <p><code>/posts/10/</code> 里的 <code>10</code> 就是文章数据里的 <code>id</code>。所以<strong>改 id 会让已经发出去的链接失效</strong>——想改文章内容就改标题和正文，别动 <code>id</code>。</p>
                     <p>如果链接里的 id 不存在（文章被删了），页面会自动回到首页并清掉地址栏里的路径；如果文章设为未开放，则会显示未开放提示。</p>
                     <p>以前的老链接长这样：<code>你的网址/?article=10</code>。它<strong>仍然能用</strong>，打开后地址栏会自动换回 <code>/posts/10/</code>，所以早就发出去的链接不会失效。</p>
+                    <p><strong>本站默认不让搜索引擎收录</strong>（全站 noindex）：链接照常能打开、微信和 QQ 的分享卡片也照常显示标题封面，只是搜不到。想让某个页面重新被收录，改 <code>tools/build-posts.js</code> 顶部的 <code>ALLOW_SEARCH_INDEXING</code>，并同步 <code>index.html</code> 里那条 robots 标签。</p>
                 </div>
 
                 <div class="guide-warning">
@@ -2026,7 +2028,7 @@ rm -rf "$TMP"</code></pre>
                             </tr>
                             <tr>
                                 <td><code>tools/build-posts.js</code></td>
-                                <td>站内看文章一切正常，但每篇文章的专属地址 <code>/posts/&lt;id&gt;/</code> 不会生成，<code>sitemap.xml</code> 也不再更新 —— 搜索引擎收录不到新文章，分享出去的链接会 404。</td>
+                                <td>站内看文章一切正常，但每篇文章的专属地址 <code>/posts/&lt;id&gt;/</code> 不会生成，<code>sitemap.xml</code> 也不再更新 —— 分享出去的链接会 404，刷新后也拿不到正确的标题和封面。</td>
                             </tr>
                             <tr>
                                 <td><code>.github/workflows/deploy.yml</code></td>
