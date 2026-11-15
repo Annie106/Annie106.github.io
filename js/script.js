@@ -4048,7 +4048,31 @@
                 closeSearch({ restoreFocus: false });
             }
 
-            function openArticle(id) {
+            /* 文章之间翻页的过渡。
+               用 Web Animations API 而不是给 .article-detail 加一个动画类：
+               那个元素本身挂着 `animation: fadeSlideIn`，加类再删类会让它重播
+               一次（表现为淡入两遍、中间闪一下）。脚本动画优先级更高，只在
+               这 300ms 盖住它，播完自动交还，不碰任何样式状态。
+               方向跟点的是哪一侧一致：下一篇从右边进、上一篇从左边进。 */
+            let articleSwapAnimation = null;
+            function playArticleSwapAnimation(direction) {
+                if (!viewArticle || !direction) return;
+                if (prefersReducedMotion()) return;
+                if (typeof viewArticle.animate !== 'function') return;
+                const offset = direction === 'prev' ? -28 : 28;
+                if (articleSwapAnimation) articleSwapAnimation.cancel();
+                articleSwapAnimation = viewArticle.animate(
+                    [
+                        { opacity: 0, transform: `translate3d(${offset}px, 0, 0)` },
+                        { opacity: 1, transform: 'translate3d(0, 0, 0)' },
+                    ],
+                    { duration: 300, easing: 'cubic-bezier(0.22, 0.61, 0.36, 1)' }
+                );
+            }
+
+            /* options.direction：'prev' / 'next'，只有「上一篇 / 下一篇」会传，
+               决定翻页动画从哪一侧进来。其它入口不传，就等于没有额外动画。 */
+            function openArticle(id, options) {
                 const post = blogPosts.find(p => p.id === id);
                 if (!post) return;
                 /* 已经在读这篇了（比如连点两下卡片）：什么都不用做。
@@ -4061,31 +4085,58 @@
                     window.location.href = post.externalPage;
                     return;
                 }
-                articleReturnView = currentView === 'article' ? 'home' : currentView;
-                articleReturnScroll = window.scrollY;
-                const viewStateSnapshot = {
-                    view: currentView,
-                    articleId: currentArticleId,
-                    homeTag: homeTag,
-                    homePage: homePage,
-                    homeTagRev: 2,
-                    blogTag: blogTag,
-                    scroll: articleReturnScroll,
-                    scrollPositions: {
-                        ...viewScrollPositions,
-                        [currentView]: articleReturnScroll,
-                    },
-                    returnView: articleReturnView,
-                    returnScroll: articleReturnScroll,
-                };
-                history.replaceState({ annieViewSnapshot: viewStateSnapshot }, '', window.location.href);
+
+                /* 已经在读某一篇时又点了「上一篇 / 下一篇」：把**当前这条**历史记录
+                   改掉，不新增一条。这样页面里的「返回」和浏览器返回都直接回到
+                   进文章之前的那个页面，而不是一篇一篇往回翻 —— 长文章里翻十篇
+                   就要按十次返回才出得去。 */
+                const isSwitchingArticle = currentView === 'article' && currentArticleId !== null;
+
+                if (isSwitchingArticle) {
+                    /* 返回落点沿用原来那条记录里存的（首页 / 文章列表 / 归档…），
+                       不要因为「当前正在读文章」就把它覆盖成 home。 */
+                    const previous = history.state || {};
+                    if (typeof previous.annieReturnView === 'string') {
+                        articleReturnView = previous.annieReturnView;
+                    }
+                    if (typeof previous.annieReturnScroll === 'number') {
+                        articleReturnScroll = previous.annieReturnScroll;
+                    }
+                } else {
+                    articleReturnView = currentView;
+                    articleReturnScroll = window.scrollY;
+                    const viewStateSnapshot = {
+                        view: currentView,
+                        articleId: currentArticleId,
+                        homeTag: homeTag,
+                        homePage: homePage,
+                        homeTagRev: 2,
+                        blogTag: blogTag,
+                        scroll: articleReturnScroll,
+                        scrollPositions: {
+                            ...viewScrollPositions,
+                            [currentView]: articleReturnScroll,
+                        },
+                        returnView: articleReturnView,
+                        returnScroll: articleReturnScroll,
+                    };
+                    history.replaceState({ annieViewSnapshot: viewStateSnapshot }, '', window.location.href);
+                }
+
                 const articleHistoryState = {
                     annieArticleId: post.id,
                     annieReturnView: articleReturnView,
                     annieReturnScroll: articleReturnScroll,
                 };
-                history.pushState(articleHistoryState, '', window.location.href);
-                articleHistoryEntryActive = true;
+                if (isSwitchingArticle) {
+                    history.replaceState(articleHistoryState, '', window.location.href);
+                } else {
+                    history.pushState(articleHistoryState, '', window.location.href);
+                    articleHistoryEntryActive = true;
+                }
+
+                // 动画先起、内容紧接着渲染，两者落在同一帧，不会先闪一下旧正文
+                playArticleSwapAnimation(options && options.direction);
                 renderArticle(post);
                 switchView('article');
                 /* 直接落到顶部，不要平滑滚动。
@@ -5113,7 +5164,10 @@
                 if (!link) return;
                 if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
                 e.preventDefault();
-                openArticle(Number(link.getAttribute('data-adjacent-article')));
+                openArticle(Number(link.getAttribute('data-adjacent-article')), {
+                    // 动画方向跟着点的那一侧走，别一律从右边进
+                    direction: link.classList.contains('is-prev') ? 'prev' : 'next',
+                });
             });
 
             document.addEventListener('click', function(e) {

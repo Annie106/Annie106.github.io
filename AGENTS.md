@@ -159,6 +159,14 @@
 2. **`body` 末尾那些相对路径的 `<script src="js/…">` 必须排在 `script.js` 前面。** 它们是在解析到标签那一刻才解析路径的，排在 `script.js` 后面（那时地址已被改写）就是 `/posts/<id>/js/…`。
 3. **运行时拼地址一律走 `siteBaseUrl()`**（启动时算一次的 `SITE_BASE_URL`），不要用 `location.href` 当基准 —— 任何用当前地址拼相对路径的地方，在文章页上都会拼错。`setFrameSource()` 和正文注入（`absolutizeHtml()`）已经按这个改了。
 
+### 文章之间翻页（上一篇 / 下一篇）
+
+- **用 `replaceState`，不 `pushState`。** 已经在读文章时再点翻页，是把当前那条历史记录改掉，不是新增一条。否则从首页进 A → 翻到 B → 再翻到 C，按三次返回才出得去。
+- 返回落点沿用原来那条记录里存的 `annieReturnView` / `annieReturnScroll`，**不要**因为「当前在文章视图」就覆盖成 `home` —— 从归档翻页进去的，返回还要回归档。
+- 过渡动画用 **Web Animations API**（`playArticleSwapAnimation`），不要给 `.article-detail` 加动画类：那个元素自带 `animation: fadeSlideIn`，加类/删类会让它重播，表现为淡入两遍中间闪一下。脚本动画优先级更高，播完自动交还。
+- `openArticle(id, { direction })` 的第二个参数只给翻页用（`prev` 从左边进、`next` 从右边进）；其它入口不传，就没有额外动画。方向由链接上的 `is-prev` / `is-next` 类决定。
+- 记得留 `prefersReducedMotion()` 的早退，动画库不会自动尊重那个设置。
+
 ### `tools/build-posts.js`
 
 - **必须在 `build-site.js` 之后跑**（后者清空 `dist/`）。本地：`node tools/build-site.js && node tools/build-posts.js`；CI 是 `deploy.yml` 的两个连续步骤。
