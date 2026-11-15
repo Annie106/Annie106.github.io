@@ -112,6 +112,56 @@ function publicNewestFirst(posts) {
     });
 }
 
+/* ==================== 上一篇 / 下一篇 ====================
+
+   ⚠️ 这里的排序和 script.js 的 getAdjacentPosts() 必须**逐字一致**：
+   发布日期倒序、同日期按 id 倒序、置顶不参与。
+   两边一旦不一致，静态页里给的翻页链接和 JS 渲染出来的会换人 ——
+   表现是「点进去看到的上一篇，和刚才卡片上写的不是同一篇」。改一处就要改两处。
+
+   预渲染这一栏的意义：静态页是给爬虫和分享预览用的，里面有真实的
+   <a href> 才能让爬虫顺着文章之间的链接爬，而不是只靠 sitemap 一张清单。 */
+function navigableNewestFirst(posts) {
+    return posts.filter(function (post) {
+        // 口径同 script.js 的 openArticle：未开放的、纯跳站外的不参与翻页
+        return isPublic(post) && (!post.externalPage || post.embeddedPage);
+    }).slice().sort(function (a, b) {
+        const diff = sortKey(b).localeCompare(sortKey(a));
+        return diff !== 0 ? diff : (b.id || 0) - (a.id || 0);
+    });
+}
+
+function adjacentNav(post, ordered) {
+    const index = ordered.findIndex(function (item) { return item.id === post.id; });
+    if (index < 0) return MARK_ADJACENT;
+
+    // ordered 是新的在前：下标 +1 是更早写的，-1 是更晚写的
+    const prev = ordered[index + 1] || null;
+    const next = ordered[index - 1] || null;
+    if (!prev && !next) return MARK_ADJACENT;
+
+    const itemMarkup = function (target, className, label, icon) {
+        if (!target) return '';
+        /* href 写的是 siteBasePath() 那种「站内相对」形式。文章页 head 里有
+           <base href="/">，所以 posts/16/ 会解析成 /posts/16/ —— 和站内 JS
+           渲染出来的那套完全一样。 */
+        return (
+            '\n                <a class="article-adjacent-link ' + className + '" href="posts/' + target.id + '/" data-adjacent-article="' + target.id + '">' +
+            '<span class="adj-label"><i class="' + icon + '" aria-hidden="true"></i> ' + label + ' · ' + escapeHtml(dateOf(target)) + '</span>' +
+            '<span class="adj-title">' + escapeHtml(target.title) + '</span>' +
+            '</a>'
+        );
+    };
+
+    // 只有一篇可翻时收成半宽（和 script.js 里 toggle 的类名保持一致）
+    const singleClass = (Boolean(prev) !== Boolean(next)) ? ' is-single' : '';
+    const items = itemMarkup(prev, 'is-prev', '上一篇', 'ri-arrow-left-line') +
+        itemMarkup(next, 'is-next', '下一篇', 'ri-arrow-right-line');
+
+    return '<nav class="article-adjacent' + singleClass + '" id="articleAdjacent" aria-label="相邻文章">' +
+        items + '\n            </nav>';
+}
+
 /* ==================== 转义 / 取字段 ==================== */
 
 function escapeHtml(value) {
@@ -205,6 +255,7 @@ const MARK_VIEW_ARTICLE = '<div id="view-article" class="article-detail" style="
 const MARK_TITLE = '<h1 class="article-full-title" id="articleTitle"></h1>';
 const MARK_META = '<div class="article-full-meta" id="articleMeta"></div>';
 const MARK_CONTENT = '<div class="article-content" id="articleContent"></div>';
+const MARK_ADJACENT = '<nav class="article-adjacent" id="articleAdjacent" aria-label="相邻文章"></nav>';
 
 function loadTemplate() {
     if (!fs.existsSync(TEMPLATE_FILE)) {
@@ -322,7 +373,7 @@ function articleHead(post) {
     }).join('\n');
 }
 
-function buildPage(post, template) {
+function buildPage(post, template, ordered) {
     const title = post.title || '文章 ' + post.id;
     let html = template;
 
@@ -368,6 +419,10 @@ function buildPage(post, template) {
     html = replaceOnce(html, MARK_CONTENT,
         '<div class="article-content" id="articleContent">' + contentMarkup(post) + '</div>',
         '正文挂载点');
+
+    /* 翻页卡片也预渲染一份：爬虫不跑 JS，只有真实 <a href> 才爬得到相邻文章。
+       脚本跑起来之后 renderAdjacentArticles 会用同样的内容再写一遍，不会闪。 */
+    html = replaceOnce(html, MARK_ADJACENT, adjacentNav(post, ordered), '翻页挂载点');
 
     return html;
 }
@@ -427,12 +482,15 @@ function main() {
         throw new Error('dist/ 不存在。先跑 node tools/build-site.js 再跑这个脚本。');
     }
 
-    const posts = publicNewestFirst(loadPosts());
+    const allPosts = loadPosts();
+    const posts = publicNewestFirst(allPosts);
+    // 翻页顺序要按「能站内打开」那一批来算，和 script.js 同口径
+    const ordered = navigableNewestFirst(allPosts);
     // 模板只读一次，14 篇共用同一份 DOM 结构
     const template = loadTemplate();
 
     posts.forEach(function (post) {
-        writeFile(path.join(OUT_DIR, 'posts', String(post.id), 'index.html'), buildPage(post, template));
+        writeFile(path.join(OUT_DIR, 'posts', String(post.id), 'index.html'), buildPage(post, template, ordered));
     });
 
     writeFile(path.join(OUT_DIR, 'sitemap.xml'), buildSitemap(posts));
