@@ -6,21 +6,18 @@
 
 完整配置教程在站内「使用指南」文章（`project_subpage/blog/guide.html`），本文件只做速查。让 AI 改这个仓库之前，先让它读 `AGENTS.md`。
 
-## 依赖
+## 依赖（本地构建）
 
-分两层，别混在一起：
-
-- **访客的浏览器**：什么都不用装。站点是纯静态文件，`dist/js/` 里全是仓库自己的代码，**运行时零 npm 包**。
-- **要本地构建 / 部署的人**（包括 CI）：需要下面这些。
+在本地跑 `npm run build` 需要下面这些。
 
 | 依赖 | 版本 | 用途 | 缺了会怎样 | 怎么装 |
 | --- | --- | --- | --- | --- |
-| **Node.js** | 18+（CI 用 20） | 跑 `tools/*.js`：构建、图标校验、git 钩子 | 任何构建命令都跑不起来 | [nodejs.org](https://nodejs.org/) 装 LTS |
-| **npm** | 随 Node 附带 | 只用来装那一个 esbuild | 压缩那步会被跳过（站点仍能构建上线） | 装 Node 就有 |
-| **esbuild** | 0.28.x | 压缩 `dist/` 里的 JS/CSS（gzip 约省一半） | `minify.js` 报错退出，产物偏大但功能正常 | `npm install` |
-| **Python** | 3.9+ | 裁图标子集：源码里用到哪些 `ri-*` 就只保留哪些字形 | **提交被 git 钩子拦下，`build-site.js` 也中止** | [python.org](https://www.python.org/) |
+| **Node.js** | 18+ | 跑 `tools/*.js`：构建、图标校验、git 钩子 | 任何构建命令都跑不起来 | [nodejs.org](https://nodejs.org/) 装 LTS |
+| **npm** | 随 Node 附带 | 装下面那个 esbuild | 压缩那步会被跳过，其余步骤照常 | 装 Node 就有 |
+| **esbuild** | 0.28.x | 压缩 `dist/` 里的 JS/CSS（gzip 约省一半） | `minify.js` 报错退出，产物偏大一倍 | `npm install` |
+| **Python** | 3.9+ | 裁图标子集：用到哪些 `ri-*` 就只保留哪些字形 | **提交被钩子拦下，`build-site.js` 也中止** | [python.org](https://www.python.org/) |
 | **fonttools** | 4.x | 读 / 写字体文件（上一条的实现） | 同上 | `python -m pip install fonttools` |
-| **brotli** | 1.x | 生成 woff2 需要的压缩算法 | 同上 | `python -m pip install brotli` |
+| **brotli** | 1.x | 生成 woff2 的压缩算法 | 同上 | `python -m pip install brotli` |
 
 一次装完：
 
@@ -43,8 +40,6 @@ python --version                      # 3.9 以上
 python -c "import fontTools, brotli"  # 没有任何输出 = 装好了
 npm ls --depth=0                      # 应该只有一行 esbuild
 ```
-
-为什么只留一个 npm 包：这个站的全部价值在于「双击就能改、推送就能上」。每多一个包就多一份版本升级、供应链风险和传输体积。判断标准和踩过的坑见 `AGENTS.md` 开头「这个站是什么」一节。
 
 ## 目录
 
