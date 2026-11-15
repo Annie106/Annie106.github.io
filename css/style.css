@@ -2876,6 +2876,17 @@
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
+        /* 标题里的 <a> 是真链接（href 指向 /posts/<id>/，给爬虫和「在新标签打开」）。
+           视觉上要**完全**透明：颜色跟随、任何状态都没有下划线 —— 有下划线会让人
+           以为这一行是「可点的说明文字」，而且和卡片整体的圆角风格打架。
+           两行截断仍由上面的 .task-title 负责，这里不能再套 display:box。 */
+        .task-title a,
+        .task-title a:hover,
+        .task-title a:focus,
+        .task-title a:visited {
+            color: inherit;
+            text-decoration: none;
+        }
         .task-excerpt {
             font-size: 0.875rem;
             color: #78787f;

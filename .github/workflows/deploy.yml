@@ -57,6 +57,11 @@ jobs:
       - name: 生成发布产物 dist/
         run: node tools/build-site.js
 
+      # 每篇公开文章烤一份静态页（/posts/<id>/），外加 sitemap.xml 和 robots.txt。
+      # 必须在 build-site.js 之后：那一步会清空 dist/。
+      - name: 生成文章静态页
+        run: node tools/build-posts.js
+
       - name: 配置 Pages
         uses: actions/configure-pages@v5
 

@@ -130,7 +130,18 @@ function sortKey(post) {
     return String(post.updated || post.date || '');
 }
 
+/* 文章地址：2026-11-15 起是 /posts/<id>/ 目录形式（tools/build-posts.js 生成的
+   静态页，站内点进去也是这个地址）。feed 里的 link 跟着改成新地址，
+   订阅者点开拿到的是带完整 head 的那一份。 */
 function articleUrl(post) {
+    return `${SITE}posts/${post.id}/`;
+}
+
+/* ⚠️ guid 必须保持老样子（?article=<id>），不要跟着改成新地址。
+   guid 是阅读器判断「这篇是不是已经推送过」的唯一依据，一改就等于把
+   全部历史文章重新推一遍，订阅者的列表会被刷满。老地址仍然能打开
+   （script.js 会把它收敛成 /posts/<id>/），所以不存在死链。 */
+function guidUrl(post) {
     return `${SITE}?article=${post.id}`;
 }
 
@@ -142,8 +153,8 @@ function itemXml(post) {
     const lines = ['    <item>'];
     lines.push(`      <title>${escapeXml(title)}</title>`);
     lines.push(`      <link>${escapeXml(url)}</link>`);
-    // guid 用文章地址本身：链接不随标题改名而失效，阅读器也不会重复推送
-    lines.push(`      <guid isPermaLink="true">${escapeXml(url)}</guid>`);
+    // guid 用旧地址：链接不随标题改名而失效，阅读器也不会重复推送
+    lines.push(`      <guid isPermaLink="true">${escapeXml(guidUrl(post))}</guid>`);
     if (date) lines.push(`      <pubDate>${date}</pubDate>`);
     /* 摘要版：只有一句话摘要。正文留在站点上 —— 阅读器里的排版永远不如
        站内完整（评论、图片懒加载、代码块都在那边），想读点标题回来。

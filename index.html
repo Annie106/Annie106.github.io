@@ -2,6 +2,14 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <!-- 这里故意**不放** <base>：文章页的地址是 /posts/<id>/，而资源引用要按站点根
+         解析，两者靠 <base> 统一是行不通的 —— 脚本里设 <base href> 也没用，
+         浏览器的预加载扫描器在脚本执行前就会先按当前地址把 <link>/<script> 解析掉
+         （实测：/posts/<id>/css/style.css 全部 404）。
+         所以这里保持「没有 base」，由 script.js 里的 SITE_BASE_URL 负责运行时
+         拼绝对地址，body 末尾那几个相对路径的 script 也挪到了 script.js 前面，
+         保证它们在地址被改写之前就解析完。 -->
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Annie · 个人博客</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
@@ -1205,11 +1213,16 @@
     <script src="js/image-loading.js"></script>
     <script src="js/posts-data.js"></script>
     <script src="js/tweaks-data.js"></script>
-    <script src="js/script.js"></script>
     <!-- 电影板块的停服公告在 movie.html 内部实现（阴影 + 卡片同一文档，
          滚动时不会错位），父页面不再挂浮层 -->
+
+    <!-- ⚠️ 这两个必须排在 script.js **前面**。地址栏会在 init() 里被改写成
+         /posts/<id>/，而相对路径的 <script src="js/…"> 是在解析到它的那一刻
+         才解析路径的 —— 排在后面就会变成 /posts/<id>/js/… 然后 404。
+         它们都不依赖 script.js（各自只往 window 上挂一个对象）。 -->
     <script src="js/copyToClipboard.js"></script>
     <script src="js/background-music.js"></script>
+    <script src="js/script.js"></script>
     <script>
         (function () {
             const url = new URL(window.location.href);
