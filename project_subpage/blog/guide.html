@@ -972,6 +972,7 @@
 ├── tools/                   ← 构建与检查脚本（不会发布到线上）
 │   ├── build-site.js        ← 先校验图标，再按白名单生成 dist/
 │   ├── build-posts.js       ← 给每篇文章生成 /posts/&lt;id&gt;/ 静态页 + sitemap + robots
+│   ├── minify.js            ← 压缩 dist/ 里的 JS 和 CSS（需要 npm install）
 │   ├── build-feed.js        ← 从文章数据生成 feed.xml
 │   ├── check-icons.js       ← 检查图标名写错、CDN 残留
 │   ├── subset-icons.py      ← 裁图标字体：只保留站内用到的图标
@@ -1799,7 +1800,7 @@ git push</code></pre>
                         <tbody>
                             <tr>
                                 <td><strong>GitHub Actions</strong><br>（本仓库用的）</td>
-                                <td>推送后由 <code>.github/workflows/deploy.yml</code> 依次跑 <code>tools/build-site.js</code> 和 <code>tools/build-posts.js</code>，只把 <code>dist/</code> 里的文件发出去。上线内容由白名单决定，<code>AGENTS.md</code>、<code>tools/</code> 这些开发文件天然不在网上。</td>
+                                <td>推送后由 <code>.github/workflows/deploy.yml</code> 依次跑 <code>build-site.js</code>、<code>build-posts.js</code>、<code>minify.js</code>，只把 <code>dist/</code> 里的文件发出去。上线内容由白名单决定，<code>AGENTS.md</code>、<code>tools/</code> 这些开发文件天然不在网上。</td>
                             </tr>
                             <tr>
                                 <td><strong>Deploy from a branch</strong><br>（老方式）</td>
@@ -1821,9 +1822,12 @@ git push</code></pre>
                     本地看「真正会上线的那一份」
                 </h3>
                 <p>线上跑的是 <code>dist/</code> 里的内容，不是仓库根目录。想确认发布后的样子，或者排查「本地好好的、线上却不对」，先构建一次（<strong>两条命令，顺序不能反</strong>）：</p>
-                <pre><code>node tools/build-site.js
-node tools/build-posts.js</code></pre>
-                <p>第一条按白名单把文件复制进 <code>dist/</code>（会先清空它），第二条再给每篇文章生成 <code>dist/posts/&lt;id&gt;/</code> 静态页，顺带写出 <code>sitemap.xml</code> 和 <code>robots.txt</code>。<strong>顺序反了，文章页会被第一条清掉。</strong></p>
+                <pre><code>npm install                    # 只需一次
+node tools/build-site.js
+node tools/build-posts.js
+node tools/minify.js</code></pre>
+                <p>第一条按白名单把文件复制进 <code>dist/</code>（会先清空它），第二条给每篇文章生成 <code>dist/posts/&lt;id&gt;/</code> 静态页并写出 <code>sitemap.xml</code> 和 <code>robots.txt</code>，第三条把产物里的 JS/CSS 压掉注释和空白（gzip 大约省一半）。</p>
+                <p><strong>顺序不能变</strong>：第一条会清空 <code>dist/</code>，所以文章页必须排在它后面；压缩必须排最后，否则压完又被复制覆盖。嫌麻烦就 <code>npm run build</code>，它按顺序跑完这三条。</p>
                 <p>然后把静态服务器<strong>指向 <code>dist/</code> 这个文件夹</strong>（不是仓库根目录）再预览。这一点比以前重要：文章页只存在于 <code>dist/</code> 里，对着仓库根起服务器点进文章会 404。</p>
                 <p>这一步要装 <b>Node.js</b>；如果改过图标，还要装 <b>Python 3.9+</b>（裁字体用），否则构建会在图标检查那一步中止。没装这两样也不影响写文章——推送后 GitHub 会替你构建。</p>
 

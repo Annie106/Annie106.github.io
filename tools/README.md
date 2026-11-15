@@ -14,6 +14,14 @@
 | **Node.js** | 18 或更高 | 构建产物、图标校验、git 钩子 | `node tools/build-site.js` 直接跑不起来 |
 | **Python** | 3.9 或更高 | 裁剪图标字体（需要 `fonttools` + `brotli`） | **提交被钩子拦下、本地构建中止** |
 
+另有一个**只用于压缩**的 npm 依赖（`esbuild`），在仓库根跑一次即可：
+
+```
+npm install
+```
+
+它只在 `tools/minify.js` 里用，不进产物、运行时不需要。没装也不影响别的事，只是压缩那一步会明确报错。
+
 Python 装好后还要装两个包（`setup.bat` 会自动装）：
 
 ```
@@ -143,6 +151,8 @@ fonts/icons.css + remixicon.woff2     ← 子集（发布，页面实际加载�
 | --- | --- |
 | `build-site.js` | 按白名单复制到 `dist/`；开头先跑图标校验，不一致就中止 |
 | `build-feed.js` | 从 `js/posts-data.js` 生成 `feed.xml` |
+| `build-posts.js` | 给每篇公开文章生成 `/posts/<id>/` 静态页，并写出 `sitemap.xml` + `robots.txt`（必须在 `build-site.js` 之后） |
+| `minify.js` | 压缩 `dist/` 里的 JS 和 CSS（删注释/空白，**不重命名**）。需要 `npm install`，必须最后跑 |
 | `check-icons.js` | 查 CDN 残留 / 图标名是否存在 / 页面是否漏引 `style.css` |
 | `subset-icons.py` | 图标子集生成器（扫全站 `ri-*` → 裁字体 → 重写 `icons.css` → 复核 cmap） |
 | `precommit-icons.js` | git 钩子的实际逻辑：暂存区有 `.html/.js` 就先重生成并 `git add` 字体 |

@@ -2,9 +2,9 @@
 
 > 由 AI 辅助构建
 
-原生 HTML + CSS + JavaScript 的静态博客，**没有 npm 依赖、没有后端**。构建 = `node tools/build-site.js && node tools/build-posts.js`：前者校验图标子集、按白名单把文件复制到 `dist/`，后者给每篇文章生成 `/posts/<id>/` 静态页并写出 `sitemap.xml` + `robots.txt`。
+原生 HTML + CSS + JavaScript 的静态博客，**没有 npm 依赖、没有后端**。构建是三步：`build-site.js`（校验图标 + 按白名单复制到 `dist/`）→ `build-posts.js`（每篇文章的 `/posts/<id>/` 静态页 + `sitemap.xml` + `robots.txt`）→ `minify.js`（压缩产物里的 JS/CSS）。一键：`npm run build`。
 
-本地开发另需 **Node 18+** 和 **Python 3.9+**（Python 只用来裁图标子集），依赖与常见报错见 [`tools/README.md`](tools/README.md)。
+本地开发另需 **Node 18+** 和 **Python 3.9+**（Python 只用来裁图标子集），压缩那步还要 `npm install`（只有一个 esbuild）。依赖与常见报错见 [`tools/README.md`](tools/README.md)。
 
 完整配置教程在站内「使用指南」文章（`project_subpage/blog/guide.html`），本文件只做速查。让 AI 改这个仓库之前，先让它读 `AGENTS.md`。
 
@@ -34,6 +34,8 @@ tools/remixicon-src.*       图标全量源（不发布，别删）
 tools/build-feed.js         从 js/posts-data.js 生成 feed.xml
 tools/build-site.js         校验图标 + 按白名单生成 dist/（构建第一步）
 tools/build-posts.js        生成每篇文章的静态页 + sitemap.xml + robots.txt（第二步）
+tools/minify.js             压缩 dist/ 里的 JS 和 CSS（第三步，需要 npm install）
+package.json                唯一的 devDependency：esbuild（只给 minify 用）
 tools/README.md             上面这些怎么用、报错怎么修
 dist/                       发布产物，已 gitignore，由上面两个脚本生成
 AGENTS.md                   给 AI 工具的项目约定，跨工具生效
@@ -122,7 +124,7 @@ python -m http.server 8000
 **② 看线上那一份（含文章专属地址 `/posts/<id>/`）** —— 先构建，再指向 `dist/`：
 
 ```bash
-node tools/build-site.js && node tools/build-posts.js
+npm run build
 cd dist && python -m http.server 8000
 ```
 
@@ -170,8 +172,10 @@ cd dist && python -m http.server 8000
 自己构建，GitHub 只负责托管。
 
 ```bash
+npm install                 # 只需一次：装 esbuild（压缩用）
 node tools/build-site.js    # 第一步：生成 dist/，白名单在脚本顶部
 node tools/build-posts.js   # 第二步：生成文章静态页 + sitemap + robots
+node tools/minify.js        # 第三步：压缩 dist/ 里的 JS 和 CSS
 ```
 
 - 该发布的文件由 `tools/build-site.js` 的白名单决定，开发文件（`AGENTS.md`、`README.md`、`tools/`、`check-icons.bat`）不会进入产物 —— 线上访问它们是 404。
