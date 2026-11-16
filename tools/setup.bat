@@ -28,6 +28,20 @@ if not defined PY (
 echo [OK] Python found
 
 echo.
+echo ---- Installing build dependency (esbuild, for minify) ----
+where npm >nul 2>nul
+if errorlevel 1 (
+  echo [X] npm not found. Reinstall Node.js and tick npm in the installer.
+  goto end
+)
+call npm install --no-audit --no-fund
+if errorlevel 1 (
+  echo [X] npm install failed. Check the network and retry.
+  goto end
+)
+echo [OK] esbuild installed
+
+echo.
 echo ---- Installing icon tools (fonttools + brotli) ----
 %PY% -m pip install --quiet --upgrade fonttools brotli
 if errorlevel 1 (

@@ -360,8 +360,8 @@ window.BLOG_POSTS = [{
                     <h2>文件在这</h2>
                     <p>两个文件打包好了，两个网盘互为备份，内容一样，下一个就行：</p>
                     <ul>
-                        <li><a href="https://1837491863.share.123pan.cn/123pan/WNqITd-Au6hh?pwd=5200#" target="_blank" rel="noopener noreferrer" data-confirm-leave="123 云盘" data-confirm-title="前往 123 云盘" data-confirm-desc="将打开 123 云盘的分享页下载本地服务器文件，提取码 5200。">123 云盘（提取码 5200）</a></li>
-                        <li><a href="https://pan.baidu.com/s/1oRPmETkAHg4x91f9mSL_Rg?pwd=5200" target="_blank" rel="noopener noreferrer" data-confirm-leave="百度网盘" data-confirm-title="前往百度网盘" data-confirm-desc="将打开百度网盘的分享页下载本地服务器文件，提取码 5200。">百度网盘（提取码 5200）</a></li>
+                        <li><a href="https://1837491863.share.123pan.cn/123pan/WNqITd-Au6hh?pwd=5200#" target="_blank" rel="noopener noreferrer" data-confirm-leave="123 云盘" data-confirm-title="前往 123 云盘" data-confirm-desc="将打开 123 云盘的分享页下载本地服务器文件">123 云盘</a></li>
+                        <li><a href="https://pan.baidu.com/s/1oRPmETkAHg4x91f9mSL_Rg?pwd=5200" target="_blank" rel="noopener noreferrer" data-confirm-leave="百度网盘" data-confirm-title="前往百度网盘" data-confirm-desc="将打开百度网盘的分享页下载本地服务器文件">百度网盘</a></li>
                     </ul>
                     <p>下载后解压，让 <code>annie106</code> 和这两个文件在同一层，保持上面的位置关系，再双击 <code>.cmd</code>。位置错了脚本会找不到仓库：<code>cd /d</code> 失败没有明显提示，只是后面每一步都跑在错的目录里，报出来的错会误导人。</p>
                     <p>最后一句：这套东西的作用是「看到真相」，不是「看起来更专业」。哪次它给出的结果和线上不一样，先怀疑构建，别怀疑服务器。</p>

@@ -2,9 +2,9 @@
 
 > 由 AI 辅助构建
 
-原生 HTML + CSS + JavaScript 的静态博客，**运行时零依赖、没有后端**（构建期只有一个 npm 包）。构建是三步：`build-site.js`（校验图标 + 按白名单复制到 `dist/`）→ `build-posts.js`（每篇文章的 `/posts/<id>/` 静态页 + `sitemap.xml` + `robots.txt`）→ `minify.js`（压缩产物里的 JS/CSS）。一键：`npm run build`。
+原生 HTML + CSS + JavaScript 的静态博客）。构建是三步：`build-site.js`（校验图标 + 按白名单复制到 `dist/`）→ `build-posts.js`（每篇文章的 `/posts/<id>/` 静态页 + `sitemap.xml` + `robots.txt`）→ `minify.js`（压缩产物里的 JS/CSS）。一键：`npm run build`。
 
-完整配置教程在站内「使用指南」文章（`project_subpage/blog/guide.html`），本文件只做速查。让 AI 改这个仓库之前，先让它读 `AGENTS.md`。
+完整配置教程在站内「使用指南」文章（`project_subpage/blog/guide.html`），本文件只做速查。
 
 ## 依赖（本地构建）
 
@@ -29,8 +29,6 @@ npm install
 python -m pip install fonttools brotli
 ```
 
-> Windows 上 `python` 不认就换成 `py`。也可以双击 `tools/setup.bat`，它会把 Python 那两个包装好、生成图标子集、再把 git 钩子挂上。
-
 确认都到位：
 
 ```bash
@@ -49,12 +47,12 @@ movie.html                  独立视频页（列表见 VIDEO_LIST）
 404.html                    找不到页面时的提示 + 旧链接兜底；「获取联系」浮窗也在这里
 favicon.svg                 站点图标
 share_cover.jpg             分享卡片封面，1080×1080
-images/manor_photos/        归宿照图集（文章 id 11 用）
+images/manor_photos/        照图集
 css/style.css               全部样式与响应式
 fonts/icons.css             图标字体样式（由 style.css 引入的生成物）
 fonts/remixicon.woff2       图标字体子集，约 7 KB（只含用到的图标）
 _template.html              新建页面时复制这份，head 已经引对了样式
-feed.xml                    RSS 订阅源，由 tools/build-feed.js 生成，别手改
+feed.xml                    RSS 订阅源，由 tools/build-feed.js 生成
 .github/workflows/feed.yml  push 文章数据时自动重建并提交 feed.xml
 .github/workflows/deploy.yml 跑构建并把 dist/ 发布到 GitHub Pages
 tools/check-icons.js        图标自检：CDN 残留、图标名是否存在、页面是否引了样式
@@ -163,43 +161,6 @@ cd dist && python -m http.server 8000
 ```
 
 ⚠️ `/posts/<id>/` 只存在于 `dist/` 里。对着仓库根起服务器，站内点进文章会 404 —— 这不是 bug，是产物没生成或服务器指错了目录。
-
-### 换一台机器 / 别人使用
-
-- 只是浏览站点：什么都不用装。
-- **要改内容（写文章、改样式、动图标）：Node.js + Python 3.9+ 两样都要装**，然后双击一次 **`tools/setup.bat`**——它会检查环境、装图标裁剪依赖（`fonttools` + `brotli`）、生成图标子集、装好 git 钩子。
-- 为什么必须装 Python：图标字体是按源码裁出来的子集，生成它需要 Python。**没有 Python 时，提交会被钩子拦下、`node tools/build-site.js` 也会中止**——这是刻意的，避免本地预览缺图标。
-- Python 是否装好的判断标准：命令行里 `python --version` 或 `py --version` 能打印版本号。只看 `where python` 不算——Windows 自带一个应用商店占位符，`where` 找得到但运行报 9009。
-- 各个脚本分别是干什么的，见 [`tools/README.md`](tools/README.md)。
-
-## RSS 订阅
-
-订阅地址：<https://annie106.github.io/feed.xml>
-
-`feed.xml` 是**生成物**，别手改。文章数据在 `js/posts-data.js`，改完推到 `main` 后，`/.github/workflows/feed.yml` 会自动重新生成并提交回来（只在 `js/posts-data.js`、`tools/build-feed.js` 或这个 workflow 自身有改动时触发），不用管。
-
-**写文章永远不用碰 `tools/build-feed.js`** —— 它只是「打印机」，读 `posts-data.js` 输出 XML，一篇新文章只加在 `posts-data.js` 里就够了。
-
-本地那份 `feed.xml` 会**暂时落后**于仓库里的版本（push 之后 CI 重印才会更新），这不影响任何线上行为，也不会造成 git 冲突——你本地那份在你的提交里没被改过，下次 `git pull` 就是 fast-forward，直接覆盖成最新版。
-
-只有一种情况会让 pull 被挡住：**你在本地跑了脚本但没提交**，`feed.xml` 变成「已修改」，git 不敢覆盖（提示 `Your local changes would be overwritten`）。所以按需求挑一种：
-
-| 想干什么 | 怎么做 |
-| --- | --- |
-| 不想操心（推荐） | 什么都不做。push 后等 Actions，下次 `git pull` 自动带上新版 |
-| 只想本地看一眼 | `node tools/build-feed.js`，看完 `git checkout -- feed.xml` 还原 |
-| 想让本地和仓库立刻一致 | 跑完把 `feed.xml` 一起 commit。输出幂等，CI 跑完会发现没变化、跳过提交，不会多一个 commit |
-
-输出确定性（幂等）的意义：同一份文章数据，本地和 CI 生成的文件逐字节相同。所以「本地跑过一次」和「CI 生成过一次」不会是两个不同的文件，最多是新旧两版内容。
-
-万一 `feed.xml` 真的冲突了（`git status` 里是 `UU`）：**别手工选边**，跑一次 `node tools/build-feed.js` 覆盖，再 `git add feed.xml` 就行。它是生成物，重印一遍就是正确答案。
-
-脚本按 `updated || date` 倒序取最新 20 篇，**只输出摘要版**：每篇一个标题 + 一句话 `description` + 缩略图，正文留在站点上，读者点标题回来读（站内的排版、评论、图片都比阅读器完整）。
-
-- 现在 15 篇约 8.4 KB（全文版是 23.6 KB）
-- 想改回全文：把 `tools/build-feed.js` 里 `itemXml()` 的 `description` 换回 `content:encoded`，同时把 `xmlns:content` 加回 `<rss>`，否则 XML 非法
-
-列表页缩略图取 `media:thumbnail`，三级兜底：文章自己的 `cover` 字段 → 正文里第一张 `<img>` → 站点封面 `share_cover.jpg`。要给某篇单独配图，就在 `posts-data.js` 里那篇加 `cover: 'images/xxx.jpg'`（这字段只喂给 feed，页面上不显示）。
 
 ## 部署
 
