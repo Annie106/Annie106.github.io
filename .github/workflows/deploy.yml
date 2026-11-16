@@ -62,6 +62,12 @@ jobs:
       - name: 生成发布产物 dist/
         run: node tools/build-site.js
 
+      # 抓每篇文章在 giscus 的真实评论数，写进 dist/js/comment-counts.js。
+      # 必须在 build-site.js 之后（要覆盖复制过去的空表占位）、minify 之前。
+      # 脚本内部对失败做了兜底（记 0），网络抖一下不会让部署失败。
+      - name: 抓真实评论数
+        run: node tools/build-comment-counts.js
+
       # 每篇公开文章烤一份静态页（/posts/<id>/），外加 sitemap.xml 和 robots.txt。
       # 必须在 build-site.js 之后：那一步会清空 dist/。
       - name: 生成文章静态页

@@ -446,7 +446,6 @@
                             </div>
                             <div class="home-skeleton-row home-skeleton-row--foot">
                                 <span class="sk-block sk-meta"></span>
-                                <span class="sk-block sk-meta sk-meta--sm"></span>
                             </div>
                         </article>
                         <article class="home-skeleton-card">
@@ -465,7 +464,6 @@
                             </div>
                             <div class="home-skeleton-row home-skeleton-row--foot">
                                 <span class="sk-block sk-meta"></span>
-                                <span class="sk-block sk-meta sk-meta--sm"></span>
                             </div>
                         </article>
                         <article class="home-skeleton-card">
@@ -484,7 +482,6 @@
                             </div>
                             <div class="home-skeleton-row home-skeleton-row--foot">
                                 <span class="sk-block sk-meta"></span>
-                                <span class="sk-block sk-meta sk-meta--sm"></span>
                             </div>
                         </article>
                         <article class="home-skeleton-card">
@@ -503,7 +500,6 @@
                             </div>
                             <div class="home-skeleton-row home-skeleton-row--foot">
                                 <span class="sk-block sk-meta"></span>
-                                <span class="sk-block sk-meta sk-meta--sm"></span>
                             </div>
                         </article>
                         <article class="home-skeleton-card">
@@ -522,7 +518,6 @@
                             </div>
                             <div class="home-skeleton-row home-skeleton-row--foot">
                                 <span class="sk-block sk-meta"></span>
-                                <span class="sk-block sk-meta sk-meta--sm"></span>
                             </div>
                         </article>
                         <article class="home-skeleton-card">
@@ -541,7 +536,6 @@
                             </div>
                             <div class="home-skeleton-row home-skeleton-row--foot">
                                 <span class="sk-block sk-meta"></span>
-                                <span class="sk-block sk-meta sk-meta--sm"></span>
                             </div>
                         </article>
                     </div>
@@ -800,7 +794,7 @@
             </section>
 
             <!-- 版本号：从页脚挪到这里，收在关于页右下角 -->
-            <p class="about-version">版本 0.4.25.018</p>
+            <p class="about-version">版本 0.4.25.025</p>
         </div>
 
         <!-- ==================== 文章详情视图 ==================== -->
@@ -1117,8 +1111,8 @@
                                 <button class="search-quick-item" type="button" data-search-view="blog">
                                     <i class="ri-file-list-3-line" aria-hidden="true"></i>全部文章
                                 </button>
-                                <button class="search-quick-item" type="button" data-search-view="movie">
-                                    <i class="ri-movie-line" aria-hidden="true"></i>电影
+                                <button class="search-quick-item" type="button" data-search-view="archive">
+                                    <i class="ri-archive-line" aria-hidden="true"></i>归档
                                 </button>
                                 <button class="search-quick-item" type="button" data-search-view="about">
                                     <i class="ri-information-line" aria-hidden="true"></i>关于
@@ -1218,6 +1212,9 @@
     <script src="js/image-loading.js"></script>
     <script src="js/posts-data.js"></script>
     <script src="js/tweaks-data.js"></script>
+    <!-- 卡片上的真实评论数：构建时由 tools/build-comment-counts.js 写入。
+         仓库里那份是空表占位，所以本地不跑构建也不会 404。 -->
+    <script src="js/comment-counts.js"></script>
     <!-- 电影板块的停服公告在 movie.html 内部实现（阴影 + 卡片同一文档，
          滚动时不会错位），父页面不再挂浮层 -->
 

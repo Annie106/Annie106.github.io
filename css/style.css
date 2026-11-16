@@ -632,6 +632,92 @@
         .tag-pill.active .tag-pill-count {
             color: rgba(255, 255, 255, 0.62);
         }
+        /* 全部文章页的标签行：默认只露两行，第三行往后由 JS 打上 .is-extra
+           先藏起来，下面给一个「展示更多」。折叠/展开只控制那批胶囊的显隐，
+           行数判断在 script.js 的 updateTagFilterCollapse() 里按真实位置量。 */
+        .tag-filter .tag-pill.is-extra {
+            display: none;
+        }
+        .tag-filter.is-expanded .tag-pill.is-extra {
+            display: inline-block;
+        }
+        /* 折叠动画期间（script.js 的 animateTagCollapse 加的类）：
+           待藏的胶囊继续占位、只淡出，外层 overflow:hidden 跟着高度动画
+           把它裁掉。少了这条，display:none 会先把内容抽走，
+           看到的就只是底部一段空白在缩。 */
+        .tag-filter.is-animating {
+            overflow: hidden;
+        }
+        .tag-filter.is-animating .tag-pill.is-extra {
+            display: inline-block;
+            pointer-events: none;
+            animation: tagPillFoldOut 0.18s ease forwards;
+        }
+        @keyframes tagPillFoldOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+        /* 「展示更多」分两层：外层 row 只负责换行（flex-basis:100%），
+           自己不可点；里面那个按钮才是热区，宽度按内容收，
+           只含文字 + 左右 8px 内距。撑满整行会让点击范围虚大 ——
+           点标签行下方的空白不该展开。 */
+        .tag-filter-more-row {
+            flex: 0 0 100%;
+            order: 99;
+            display: flex;
+            justify-content: flex-start;
+        }
+        .tag-filter-more-row[hidden] {
+            display: none;
+        }
+        /* 左侧负外边距抵掉内边距，文字仍和第一个胶囊左边缘对齐。
+           悬停/按下只变文字颜色，不给底色或阴影 —— 这块是文字链接的观感，
+           出现一块灰底盯着看很重。 */
+        .tag-filter-more {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            margin: 0 0 0 -8px;
+            padding: 6px 8px;
+            border: 0;
+            background: transparent;
+            /* 部分 WebView（微信 X5 等）给 <button> 带默认的圆角灰底和内阴影，
+               必须显式关掉外观，否则会多出一块「阴影」 */
+            -webkit-appearance: none;
+            appearance: none;
+            color: var(--color-text-tertiary);
+            font-family: inherit;
+            font-size: 0.76rem;
+            line-height: 1.4;
+            text-align: left;
+            cursor: pointer;
+            box-shadow: none;
+            transition: color var(--transition-fast);
+        }
+        html:not(.is-touch-input) .tag-filter-more:hover {
+            color: var(--color-text-primary);
+        }
+        /* 触屏没有 hover，按下时也只提亮文字，不加底色 */
+        html.is-touch-input .tag-filter-more:active {
+            color: var(--color-text-primary);
+        }
+        .tag-filter-more i {
+            font-size: 0.95rem;
+            transition: transform 0.18s ease;
+        }
+        .tag-filter.is-expanded .tag-filter-more i {
+            transform: rotate(180deg);
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .tag-filter-more,
+            .tag-filter-more i {
+                transition: none;
+            }
+            /* 减少动态偏好：胶囊直接显隐，不做淡出 */
+            .tag-filter.is-animating .tag-pill.is-extra {
+                animation: none;
+            }
+        }
         .home-tag-filter {
             gap: 16px;
             /* 标签再多也不能把整行撑出屏幕：超出部分改为横向滚动，
@@ -2447,7 +2533,6 @@
         .sk-text { width: 100%; height: 10px; }
         .sk-text--short { width: 74%; }
         .sk-meta { width: 34px; height: 9px; }
-        .sk-meta--sm { width: 26px; }
         /* 骨架对读屏软件没有意义，但「正在加载」要留给它听 */
         .home-skeleton-status {
             position: absolute;
@@ -2941,15 +3026,6 @@
             stroke: currentColor;
             fill: none;
             flex-shrink: 0;
-        }
-        .stats-main svg[fill="#000000"] {
-            fill: #000000;
-            stroke: none;
-        }
-        /* 点赞图标内联了 fill="#000000"（写在 path 上），深色模式下会变成看不见的黑点。
-           必须落到 path 上才能盖掉行内的表现属性，跟统计行文字色走 */
-        [data-theme="dark"] .stats-main svg[fill="#000000"] path {
-            fill: currentColor;
         }
         /* 小屏：卡片内边距和字号各收一档，
            元信息行允许换行（日期 + 分类 + 标签在 320px 宽下仍能读） */
@@ -3928,11 +4004,12 @@
             margin: -5.76px 0;
         }
         /* 上一篇 / 下一篇：正文和评论区之间的一对跳转卡片。
-           grid + auto-fit：两篇时左右各一半，只有一篇时自动铺满，
-           窄屏自动落成上下两行。空着时 :empty 直接不占位。 */
+           固定两列：两篇时永远左右并排，不随容器变窄落成上下两行
+           （窄屏宁可让标题自己换行）。只有一篇时才由下面的 .is-single
+           收成一列。空着时 :empty 直接不占位。 */
         .article-adjacent {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 12px;
             max-width: 860px;
             margin-top: 40px;
@@ -3985,11 +4062,35 @@
         .article-adjacent .is-next .adj-label {
             flex-direction: row-reverse;
         }
+        /* 标题最多两行，超出省略：卡片并排后每张只有一半宽，长标题
+           不封顶的话两张卡片会被撑得很高，翻页区的上下留白会失控。 */
         .article-adjacent .adj-title {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
             font-size: 0.94rem;
             font-weight: 600;
             line-height: 1.5;
             color: var(--color-text-primary);
+        }
+        /* 两列并排在窄屏上每张只剩一半宽，靠压内距和字号换回可读性，
+           而不是重新落成上下两张（2026-11-16 用户要求始终一行）。 */
+        @media (max-width: 480px) {
+            .article-adjacent {
+                gap: 8px;
+            }
+            .article-adjacent-link {
+                padding: 12px 12px;
+                border-radius: 10px;
+            }
+            .article-adjacent .adj-label {
+                font-size: 0.7rem;
+                gap: 4px;
+            }
+            .article-adjacent .adj-title {
+                font-size: 0.88rem;
+            }
         }
         @media (prefers-reduced-motion: reduce) {
             .article-adjacent-link {

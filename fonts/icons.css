@@ -41,6 +41,7 @@
 
 .ri-alert-line:before { content: "\ea21"; }
 .ri-apps-2-line:before { content: "\ea42"; }
+.ri-archive-line:before { content: "\ea48"; }
 .ri-arrow-down-s-line:before { content: "\ea4e"; }
 .ri-arrow-left-line:before { content: "\ea60"; }
 .ri-arrow-left-s-line:before { content: "\ea64"; }
@@ -98,7 +99,6 @@
 .ri-menu-2-line:before { content: "\ef32"; }
 .ri-moon-line:before { content: "\ef75"; }
 .ri-more-fill:before { content: "\ef78"; }
-.ri-movie-line:before { content: "\ef81"; }
 .ri-music-2-line:before { content: "\ef83"; }
 .ri-music-line:before { content: "\ef85"; }
 .ri-palette-line:before { content: "\efc5"; }

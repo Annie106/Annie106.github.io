@@ -1381,8 +1381,167 @@
                         if (isHome) scrollHomeListToTop(scrollTarget);
                     });
                 });
+                /* 全部文章页：标签只露两行，其余折叠起来。
+                   首页不参与——它只有「最新 / 全部 / 置顶 / 随笔」几个固定标签，
+                   而且是横向滚动，不存在折行的问题。 */
+                if (!isHome) updateTagFilterCollapse();
                 // 标签数量和文字长度都变了，重新判断搜索入口放不放得下
                 scheduleSearchTriggerFit();
+            }
+
+            /* ==================== 全部文章页：标签行折叠 ====================
+               标签是从所有文章里收集的，越写越多，手机上能铺四五轮。
+               默认只露前两行，剩下的先藏起来，下面给一个「展示更多」。
+               判断方式是真的量位置（按 top 聚成行），不写死高度：
+               字号、间距、屏宽怎么变都跟得上。
+               首页那一行不受影响，见上面的调用条件。 */
+            const TAG_COLLAPSE_ROWS = 2;
+            /* 展开状态记在内存里：切换文章页视图会重建这一行，
+               用户点过「展示更多」就别让他每次进来重点一遍。
+               刷新页面重置（存 localStorage 反而会让新读者看到一堆标签）。 */
+            let tagCollapseExpanded = false;
+
+            /* 「展示更多」拆成两层：一行占位容器 + 里面一个按内容宽的按钮。
+               容器只负责把它挤到新的一行（flex-basis:100%），自己不接点击；
+               按钮的盒子就是热区，收在「文字 + 左右 8px、上下 6px」以内。
+               这样点行里的空白处不会有任何反应，也不会误伤旁边的元素。 */
+            function ensureTagMoreRow(container) {
+                let row = container.querySelector('.tag-filter-more-row');
+                if (row) return row;
+                row = document.createElement('div');
+                row.className = 'tag-filter-more-row';
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'tag-filter-more';
+                btn.innerHTML = '<span class="tag-filter-more-label">展示更多</span>'
+                    + '<i class="ri-arrow-down-s-line" aria-hidden="true"></i>';
+                btn.addEventListener('click', function() {
+                    // 本来就只有两行时整行是 hidden 的，挡住脚本/键盘的误触发
+                    if (row.hidden) return;
+                    const next = !container.classList.contains('is-expanded');
+                    animateTagCollapse(container, function() {
+                        tagCollapseExpanded = next;
+                        syncTagCollapseState(container);
+                        /* 收起时要按当前选中项重算截断点：展开期间用户可能选了
+                           折叠区里的标签。forceCollapse 表示这是用户主动要两行，
+                           此时不再为选中项破例（见 updateTagFilterCollapse）。 */
+                        if (!next) updateTagFilterCollapse(true);
+                    }, 300);
+                });
+                row.appendChild(btn);
+                container.appendChild(row);
+                return row;
+            }
+
+            // 只切类和文案，不重建节点（重建会让按钮上的过渡失效）
+            function syncTagCollapseState(container) {
+                const btn = container.querySelector('.tag-filter-more');
+                container.classList.toggle('is-expanded', tagCollapseExpanded);
+                if (!btn) return;
+                btn.setAttribute('aria-expanded', tagCollapseExpanded ? 'true' : 'false');
+                const label = btn.querySelector('.tag-filter-more-label');
+                if (label) label.textContent = tagCollapseExpanded ? '收起' : '展示更多';
+            }
+
+            function updateTagFilterCollapse(forceCollapse) {
+                const container = document.getElementById('tagFilterBlog');
+                if (!container) return;
+                const pills = Array.from(container.querySelectorAll('.tag-pill'));
+                if (!pills.length) return;
+                // 视图隐藏时所有位置都是 0，量不出行数；
+                // 等它真的显示出来（switchView → scheduleSearchTriggerFit）再算
+                if (!container.offsetParent) return;
+
+                const row = ensureTagMoreRow(container);
+                // 先把上次的折叠痕迹清掉，才能量到完整分布
+                pills.forEach(pill => pill.classList.remove('is-extra'));
+
+                const tops = [];
+                pills.forEach(pill => {
+                    const top = Math.round(pill.getBoundingClientRect().top);
+                    if (!tops.some(t => Math.abs(t - top) <= 1)) tops.push(top);
+                });
+                tops.sort((a, b) => a - b);
+
+                // 两行以内：不需要按钮，展开状态也一并清掉
+                if (tops.length <= TAG_COLLAPSE_ROWS) {
+                    row.hidden = true;
+                    tagCollapseExpanded = false;
+                    container.classList.remove('is-expanded');
+                    return;
+                }
+
+                row.hidden = false;
+                const limitTop = tops[TAG_COLLAPSE_ROWS - 1];
+                /* 当前选中的标签落在折叠区时，默认自动展开：否则会出现
+                   「正在按某个标签筛选，却找不到它」。用户自己点「收起」是
+                   明确要看两行，那时（forceCollapse）不再破例。 */
+                const activePill = pills.find(pill => pill.classList.contains('active'));
+                if (!forceCollapse && activePill
+                    && Math.round(activePill.getBoundingClientRect().top) > limitTop + 1) {
+                    tagCollapseExpanded = true;
+                    syncTagCollapseState(container);
+                    return;
+                }
+                pills.forEach(pill => {
+                    if (Math.round(pill.getBoundingClientRect().top) > limitTop + 1) {
+                        pill.classList.add('is-extra');
+                    }
+                });
+                syncTagCollapseState(container);
+            }
+
+            /* 展开 / 收起做一段高度过渡。
+               容器高度是 flex-wrap 自然决定的，CSS transition 管不到 auto，
+               所以用 WAAPI 在容器上补 height 动画；同时两个方向各补一点内容效果：
+                 · 收起：待藏的胶囊先别 display:none，继续占位、只淡出，
+                   由外层 overflow:hidden 跟着高度把它裁掉。否则内容一瞬间
+                   被抽走，看到的是「底部一段空白在缩」。
+                 · 展开：新露出来的胶囊从上方 4px 落下来，跟高度一起长开。 */
+            let tagCollapseAnim = null;
+
+            function animateTagCollapse(container, mutate, duration) {
+                // 连点：先收掉上一段，否则两段 height 动画会叠着跑
+                if (tagCollapseAnim) {
+                    tagCollapseAnim.cancel();
+                    tagCollapseAnim = null;
+                }
+                container.classList.remove('is-animating');
+
+                const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                const before = container.getBoundingClientRect().height;
+
+                mutate();
+
+                const after = container.getBoundingClientRect().height;
+                if (reduce || Math.abs(after - before) < 1) return;
+
+                if (after < before) {
+                    // 收起方向：保留占位（display 由 .is-animating 覆盖回 inline-block）
+                    container.classList.add('is-animating');
+                } else {
+                    container.querySelectorAll('.tag-pill.is-extra').forEach(pill => {
+                        pill.animate(
+                            [{ opacity: 0, transform: 'translateY(-4px)' },
+                             { opacity: 1, transform: 'none' }],
+                            { duration: 200, delay: 60, easing: 'ease-out', fill: 'backwards' }
+                        );
+                    });
+                }
+
+                container.style.overflow = 'hidden';
+                const anim = container.animate(
+                    [{ height: before + 'px' }, { height: after + 'px' }],
+                    { duration, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' }
+                );
+                tagCollapseAnim = anim;
+                const done = function() {
+                    if (tagCollapseAnim === anim) tagCollapseAnim = null;
+                    container.classList.remove('is-animating');
+                    container.style.overflow = '';
+                    container.style.height = '';
+                };
+                anim.finished.then(done).catch(done);
             }
 
             /* 把某一行的选中态同步到当前 tag，只切 class、不重建节点。
@@ -1479,6 +1638,8 @@
                     // 桌面端：标签放不下时独占一行、左对齐标题，
                     // 放得下时紧跟标题靠右。用实测决定用哪种形态。
                     updateBlogTagWrap(blogHeader);
+                    // 标签行宽窄变了，重新算「只露两行」的截断位置
+                    updateTagFilterCollapse();
                 }
 
                 // 首页：始终不换行，空间不够时收起搜索文字
@@ -1910,8 +2071,10 @@
                     const visibleTags = allTags.filter(t => t !== '置顶');
                     const firstTag = visibleTags[0] || '文章';
                     const restTags = visibleTags.slice(1);
-                    const commentCount = 12 + (p.id % 9);
-                    const likeCount = 7 + (p.id % 6);
+                    /* 真实评论数：由 tools/build-comment-counts.js 在构建时从
+                       giscus（GitHub Discussions）抓下来，写进 js/comment-counts.js。
+                       查不到的（还没人评论、discussion 尚未创建）一律是 0。 */
+                    const commentCount = (window.BLOG_COMMENT_COUNTS || {})[p.id] || 0;
                 // ================ 二级菜单默认选项 ================
                     // url 里可以用占位符：{id} 换成文章 id，{title} 换成文章标题。
                     // 「问题反馈」和「查看评论」用 type: 'feedback' / 'comments'：
@@ -1971,7 +2134,6 @@
                             <div class="stats">
                                 <div class="stats-main">
                                     <div><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><g stroke-width="0" id="SVGRepo_bgCarrier"></g><g stroke-linejoin="round" stroke-linecap="round" id="SVGRepo_tracerCarrier"></g><g id="SVGRepo_iconCarrier"><path stroke-linejoin="round" stroke-linecap="round" stroke-width="1.5" d="M16 10H16.01M12 10H12.01M8 10H8.01M3 10C3 4.64706 5.11765 3 12 3C18.8824 3 21 4.64706 21 10C21 15.3529 18.8824 17 12 17C11.6592 17 11.3301 16.996 11.0124 16.9876L7 21V16.4939C4.0328 15.6692 3 13.7383 3 10Z"></path></g></svg>${commentCount}</div>
-                                    <div><svg fill="#000000" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="-2.5 0 32 32"><g stroke-width="0" id="SVGRepo_bgCarrier"></g><g stroke-linejoin="round" stroke-linecap="round" id="SVGRepo_tracerCarrier"></g><g id="SVGRepo_iconCarrier"><g id="icomoon-ignore"></g><path fill="#000000" d="M0 10.284l0.505 0.36c0.089 0.064 0.92 0.621 2.604 0.621 0.27 0 0.55-0.015 0.836-0.044 3.752 4.346 6.411 7.472 7.060 8.299-1.227 2.735-1.42 5.808-0.537 8.686l0.256 0.834 7.63-7.631 8.309 8.309 0.742-0.742-8.309-8.309 7.631-7.631-0.834-0.255c-2.829-0.868-5.986-0.672-8.686 0.537-0.825-0.648-3.942-3.3-8.28-7.044 0.11-0.669 0.23-2.183-0.575-3.441l-0.352-0.549-8.001 8.001zM1.729 10.039l6.032-6.033c0.385 1.122 0.090 2.319 0.086 2.334l-0.080 0.314 0.245 0.214c7.409 6.398 8.631 7.39 8.992 7.546l-0.002 0.006 0.195 0.058 0.185-0.087c2.257-1.079 4.903-1.378 7.343-0.836l-13.482 13.481c-0.55-2.47-0.262-5.045 0.837-7.342l0.104-0.218-0.098-0.221-0.031 0.013c-0.322-0.632-1.831-2.38-7.498-8.944l-0.185-0.215-0.282 0.038c-0.338 0.045-0.668 0.069-0.981 0.069-0.595 0-1.053-0.083-1.38-0.176z"></path></g></svg>${likeCount}</div>
                                 </div>
                                 ${restTags.length ? `<div class="post-card-tags">${restTags.map(t => `<span class="tag">#${escapeHtml(t)}</span>`).join('')}</div>` : ''}
                             </div>

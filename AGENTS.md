@@ -127,7 +127,8 @@
 
 2026-11-13 之前是「Pages 直接吃仓库根目录 + 用 `_config.yml` 的 `exclude` 挡开发文件」。现在改成自己构建。
 
-- **构建是三步，顺序固定**：`build-site.js`（复制）→ `build-posts.js`（文章静态页）→ `minify.js`（压缩产物）。第一条会清空 `dist/`，所以不能乱；第三条必须在最后，否则压缩结果被复制覆盖。CI 里是 `deploy.yml` 的三个连续步骤。
+- **构建是四步，顺序固定**：`build-site.js`（复制）→ `build-comment-counts.js`（抓评论数）→ `build-posts.js`（文章静态页）→ `minify.js`（压缩产物）。第一条会清空 `dist/`，所以不能乱；第二条必须在第一条之后（要覆盖复制过去的占位文件）、在最后一条之前（要被压缩）；`minify` 必须在最后，否则压缩结果被复制覆盖。CI 里是 `deploy.yml` 的四个连续步骤。
+- **评论数在构建时抓**，不是页面里 fetch：`giscus.app/api/discussions` 的 CORS 只放行 `giscus.app` 自己，浏览器里请求会被拦；构建机用 node 请求没这个限制，也不需要 token（GitHub Discussions 只在 GraphQL 里，放 token 到前端等于公开）。`js/comment-counts.js` 仓库里那份是**空表占位**（保证不跑构建也不 404），真实数据是 `dist/js/` 里的产物，别手改、也别把抓下来的数字提交回来。接口失败/超时会退回全 0，**不能因此让部署失败**。
 - **`tools/build-site.js` 是发布入口**，决定哪些文件上线。它按**白名单**把该发布的文件复制到 `dist/`，开发文件一个都进不去。用白名单而不是黑名单：漏发一个页面会立刻 404、当场发现；误发一个开发文件（`AGENTS.md`、`tools/`）往往没人察觉。
 - 开头先跑**图标校验**（`check-icons.js`），字体和源码不一致就直接中止 —— 因为缺字形只会显示空白、不会报错。所以本地构建需要 Node + Python（见「图标」一节）。
   - 白名单在脚本顶部：`PUBLISH_FILES`（根级文件）+ `PUBLISH_DIRS`（目录）。新页面只要落在 `project_subpage/`、`archive/` 这些已列目录里就**自动带上，不用改脚本**；只有新增**根级文件**（`robots.txt`、`sitemap.xml`、根目录的 `about.html`）或**根级新目录**（`assets/`）才需要加。

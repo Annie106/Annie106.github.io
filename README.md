@@ -2,7 +2,7 @@
 
 > 由 AI 辅助构建
 
-原生 HTML + CSS + JavaScript 的静态博客）。构建是三步：`build-site.js`（校验图标 + 按白名单复制到 `dist/`）→ `build-posts.js`（每篇文章的 `/posts/<id>/` 静态页 + `sitemap.xml` + `robots.txt`）→ `minify.js`（压缩产物里的 JS/CSS）。一键：`npm run build`。
+原生 HTML + CSS + JavaScript 的静态博客）。构建是四步：`build-site.js`（校验图标 + 按白名单复制到 `dist/`）→ `build-comment-counts.js`（抓每篇文章的真实评论数）→ `build-posts.js`（每篇文章的 `/posts/<id>/` 静态页 + `sitemap.xml` + `robots.txt`）→ `minify.js`（压缩产物里的 JS/CSS）。一键：`npm run build`。
 
 完整配置教程在站内「使用指南」文章（`project_subpage/blog/guide.html`），本文件只做速查。
 
@@ -64,11 +64,12 @@ tools/install-hooks.bat     只装 git 钩子（setup.bat 已包含）
 tools/remixicon-src.*       图标全量源（不发布，别删）
 tools/build-feed.js         从 js/posts-data.js 生成 feed.xml
 tools/build-site.js         校验图标 + 按白名单生成 dist/（构建第一步）
-tools/build-posts.js        生成每篇文章的静态页 + sitemap.xml + robots.txt（第二步）
-tools/minify.js             压缩 dist/ 里的 JS 和 CSS（第三步，需要 npm install）
+tools/build-comment-counts.js 抓 giscus 的真实评论数写进 dist/js/（第二步）
+tools/build-posts.js        生成每篇文章的静态页 + sitemap.xml + robots.txt（第三步）
+tools/minify.js             压缩 dist/ 里的 JS 和 CSS（第四步，需要 npm install）
 package.json                唯一的 devDependency：esbuild（只给 minify 用）
 tools/README.md             上面这些怎么用、报错怎么修
-dist/                       发布产物，已 gitignore，由上面两个脚本生成
+dist/                       发布产物，已 gitignore，由上面几个脚本生成
 AGENTS.md                   给 AI 工具的项目约定，跨工具生效
 js/posts-data.js            全部文章数据（首页与归档页共用）
 js/script.js                筛选、搜索、路由、页面状态
@@ -167,10 +168,11 @@ cd dist && python -m http.server 8000
 自己构建，GitHub 只负责托管。
 
 ```bash
-npm install                 # 只需一次：装 esbuild（压缩用）
-node tools/build-site.js    # 第一步：生成 dist/，白名单在脚本顶部
-node tools/build-posts.js   # 第二步：生成文章静态页 + sitemap + robots
-node tools/minify.js        # 第三步：压缩 dist/ 里的 JS 和 CSS
+npm install                        # 只需一次：装 esbuild（压缩用）
+node tools/build-site.js           # 第一步：生成 dist/，白名单在脚本顶部
+node tools/build-comment-counts.js # 第二步：抓真实评论数（会联网，失败按 0 处理）
+node tools/build-posts.js          # 第三步：生成文章静态页 + sitemap + robots
+node tools/minify.js               # 第四步：压缩 dist/ 里的 JS 和 CSS
 ```
 
 - 该发布的文件由 `tools/build-site.js` 的白名单决定，开发文件（`AGENTS.md`、`README.md`、`tools/`、`check-icons.bat`）不会进入产物 —— 线上访问它们是 404。

@@ -69,10 +69,12 @@ python -c "import fontTools, brotli"    # 没有任何输出 = 装好了
 ### 2. 日常只用一个命令：出产物
 
 ```
-node tools/build-site.js
+npm run build
 ```
 
-产物在 `dist/`，本地预览指向它即可（`python -m http.server` 或 Live Server）。
+一条命令跑完四步：`build-site.js`（复制 + 校验图标）→ `build-comment-counts.js`（上网抓真实评论数）→ `build-posts.js`（文章静态页 + sitemap）→ `minify.js`（压缩）。产物在 `dist/`，本地预览指向它即可（`python -m http.server` 或 Live Server）。
+
+只想看样式改动、不关心评论数时，单独跑 `node tools/build-site.js` 也够。
 
 ### 3. 发布
 
