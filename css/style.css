@@ -4637,7 +4637,10 @@
         /* 图标做成小圆片：成功绿 / 失败红，是整条提示唯一的颜色锚点。
            文字保持正文色，所以不会破坏全站的黑白基调 */
         .feedback-success-toast > i,
-        .site-toast > i {
+        /* 图标既可能是图标字体的 <i>（feedback-success-toast 还在用），
+           也可能是内联 .site-toast-icon（复制提示，见 copyToClipboard.js），
+           两种都按同一套圆形底片排。 */
+        .site-toast > :is(i, .site-toast-icon) {
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -4650,9 +4653,16 @@
             font-size: 0.95rem;
             line-height: 1;
         }
+        /* 内联 SVG 按 15px 画，和原来 font-size: 0.95rem 的字形大小对齐 */
+        .site-toast > .site-toast-icon svg {
+            display: block;
+            width: 15px;
+            height: 15px;
+            fill: currentColor;
+        }
 
         [data-theme="dark"] .feedback-success-toast > i,
-        [data-theme="dark"] .site-toast > i {
+        [data-theme="dark"] .site-toast > :is(i, .site-toast-icon) {
             background: rgba(104, 199, 145, 0.16);
             color: #68c791;
         }
@@ -4692,7 +4702,7 @@
             border-color: rgba(248, 81, 73, 0.35);
         }
 
-        .site-toast.is-error > i {
+        .site-toast.is-error > :is(i, .site-toast-icon) {
             background: rgba(178, 43, 43, 0.12);
             color: #b22b2b;
         }
@@ -4701,7 +4711,7 @@
             border-color: rgba(248, 81, 73, 0.42);
         }
 
-        [data-theme="dark"] .site-toast.is-error > i {
+        [data-theme="dark"] .site-toast.is-error > :is(i, .site-toast-icon) {
             background: rgba(240, 138, 132, 0.16);
             color: #f08a84;
         }

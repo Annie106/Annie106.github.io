@@ -10,6 +10,21 @@
     var copyToastTimer = null;
     var copyToastCleanupTimer = null;
 
+    /* 成功 / 失败两个图标都用内联 SVG，不用图标字体。
+       原因：fonts/icons.css 是 font-display: swap —— 字体没下完时浏览器先拿
+       兜底字体渲染，而私用区字符在系统字体里没有字形，显示成一个空白方框。
+       404 浮窗里最容易撞上：iframe 刚加载完、woff2 还在路上，用户已经点了复制，
+       提示只亮 3.6 秒，这期间就是「一个圆圈里什么都没有」。
+       path 取自 Remix Icon 4.3.0 的 checkbox-circle-line / error-warning-line。 */
+    var TOAST_ICONS = {
+        ok: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C22 17.5228 17.5228 22 12 22ZM12 20C16.4183 20 20 16.4183 20 12C20 7.58172 16.4183 4 12 4C7.58172 4 4 7.58172 4 12C4 16.4183 7.58172 20 12 20ZM11.0026 16L6.75999 11.7574L8.17421 10.3431L11.0026 13.1716L16.6595 7.51472L18.0737 8.92893L11.0026 16Z"/></svg>',
+        error: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C22 17.5228 17.5228 22 12 22ZM12 20C16.4183 20 20 16.4183 20 12C20 7.58172 16.4183 4 12 4C7.58172 4 4 7.58172 4 12C4 16.4183 7.58172 20 12 20ZM11 15H13V17H11V15ZM11 7H13V13H11V7Z"/></svg>'
+    };
+
+    /* 首页的 showToast() 和这里共用 .site-toast 这个壳，它加载得比本文件晚，
+       把它要的图标从这里挂出去，免得同样的 path 抄两遍。 */
+    window.AnnieToastIcons = TOAST_ICONS;
+
     function ensureCopyToast() {
         var toast = document.getElementById('siteToast');
         if (toast) return toast;
@@ -21,9 +36,10 @@
         toast.setAttribute('aria-live', 'polite');
         toast.hidden = true;
 
-        var icon = document.createElement('i');
-        icon.className = 'ri-checkbox-circle-line';
+        var icon = document.createElement('span');
+        icon.className = 'site-toast-icon';
         icon.setAttribute('aria-hidden', 'true');
+        icon.innerHTML = TOAST_ICONS.ok;
 
         var text = document.createElement('span');
         text.id = 'siteToastText';
@@ -43,9 +59,9 @@
         toast.classList.toggle('is-error', !!isError);
         // 图标要跟着结果换：成功是勾，失败是感叹号
         //（只靠 .is-error 改颜色的话，失败还挂着一个勾，语义是反的）
-        var icon = toast.querySelector('i');
+        var icon = toast.querySelector('.site-toast-icon');
         if (icon) {
-            icon.className = isError ? 'ri-error-warning-line' : 'ri-checkbox-circle-line';
+            icon.innerHTML = isError ? TOAST_ICONS.error : TOAST_ICONS.ok;
         }
 
         clearTimeout(copyToastTimer);

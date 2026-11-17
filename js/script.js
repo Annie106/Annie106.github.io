@@ -593,10 +593,12 @@
                 text.textContent = message;
                 // 图标跟结果走：成功是勾、失败是感叹号。
                 // 只在 CSS 里给 .is-error 换色不够，图标本身也得换，
-                // 不然「复制失败」配一个勾会自相矛盾
-                const icon = toast.querySelector('i');
-                if (icon) {
-                    icon.className = isError ? 'ri-error-warning-line' : 'ri-checkbox-circle-line';
+                // 不然「复制失败」配一个勾会自相矛盾。
+                // 图标是内联 SVG（见 copyToClipboard.js 顶部的注释：图标字体
+                // 在没下完时会渲染成空白方框），所以换的是 innerHTML 不是类名。
+                const icon = toast.querySelector('.site-toast-icon');
+                if (icon && window.AnnieToastIcons) {
+                    icon.innerHTML = isError ? window.AnnieToastIcons.error : window.AnnieToastIcons.ok;
                 }
                 toast.classList.toggle('is-error', !!isError);
                 clearTimeout(toastHideTimer);
