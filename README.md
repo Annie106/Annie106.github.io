@@ -81,7 +81,7 @@ js/copyToClipboard.js       联系方式复制
 js/image-loading.js         图片占位、清晰化与高速/慢速直链（每张图每天 1 次高速）
 project_subpage/blog/       站点页：contact / guide / submission / thanks / 文章内嵌页 ...
 project_subpage/projects/   项目页：appeal-guide ...
-archive/                    归档，不参与显示
+archive/                    留档的旧文件，不进产物（构建白名单里没有这个目录）
 ```
 
 ## 功能
@@ -176,7 +176,7 @@ node tools/minify.js               # 第四步：压缩 dist/ 里的 JS 和 CSS
 ```
 
 - 该发布的文件由 `tools/build-site.js` 的白名单决定，开发文件（`AGENTS.md`、`README.md`、`tools/`、`check-icons.bat`）不会进入产物 —— 线上访问它们是 404。
-- 新页面放在 `project_subpage/` 或 `archive/` 里会自动带上；放在根目录或新建根级目录才要加白名单。**忘了加不会静默放过**：脚本会比对仓库里的 `.html` 和产物，发现有源码没产物的页面就报错退出。
+- 新页面放在 `project_subpage/` 里会自动带上；放在根目录、新建根级目录、或者 `archive/` 这种**故意不发布**的目录才要动白名单。**忘了加不会静默放过**：脚本会比对仓库里的 `.html` 和产物，发现有源码没产物的页面就报错退出。
 - push 到 main 后 `.github/workflows/deploy.yml` 自动构建并发布 `dist/`。
 - ⚠️ 仓库设置的 Pages → Source 必须是「GitHub Actions」。改成网页上那一步只能人工做；如果源还是分支发布，站点会由旧的 Jekyll 流程提供，新产物不会生效。
 - `dist/` 是产物、已 gitignore，不要提交。

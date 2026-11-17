@@ -61,14 +61,16 @@ const PUBLISH_FILES = [
     'feed.xml',
 ];
 
-/* 根级目录，按整份递归复制。列在这里的目录内部加文件、加子目录都不用再改脚本。 */
+/* 根级目录，按整份递归复制。列在这里的目录内部加文件、加子目录都不用再改脚本。
+   ⚠️ archive/ 故意不在这里：它是留档的旧文件（旧版反馈页、旧版播放器），
+   页面上没有任何链接指向它们，发上去只是白占站点体积、还多几个能被搜到的旧页面。
+   文件仍留在仓库里随时可查，只是不进 dist/ —— 见 IGNORE_HTML 里对应的三条。 */
 const PUBLISH_DIRS = [
     'css',
     'js',
     'fonts',
     'images',
     'project_subpage',
-    'archive',
 ];
 
 /* 产物里必须存在的文件。少了任何一个都说明白名单或源文件出了问题，
@@ -106,7 +108,15 @@ const SCAN_SKIP = new Set(['.git', '.workbuddy', '.github', 'node_modules', 'dis
  *     'project_subpage/blog/draft.html'    ✓ 带子目录
  *     './draft.html'   'blog\draft.html'   ✗ 匹配不上，等于没加
  */
-const IGNORE_HTML = new Set(['_template.html']);
+const IGNORE_HTML = new Set([
+    '_template.html',
+    /* archive/ 整个目录不发布（不在 PUBLISH_DIRS 里），但目录名带不了下划线 ——
+       guide.html、404.html、script.js 的注释里都明确写着 archive/ 这个路径，
+       改名要同步改一圈。所以直接在这里点名三个旧页面。 */
+    'archive/comments.html',
+    'archive/feedback.html',
+    'archive/feedback-tx.html',
+]);
 
 /* 不进产物的命名约定。这一条比 IGNORE_HTML 更常用 —— 写草稿不用改脚本，
    名字加下划线就行。

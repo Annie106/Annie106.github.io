@@ -1347,14 +1347,14 @@
                         { tag: HOME_TAG_ALL, label: '全部' },
                         ...HOME_TAGS.map(t => ({ tag: t, label: t })),
                     ].map(item =>
-                        `<span class="tag-pill${item.tag === tag ? ' active' : ''}" data-tag="${escapeHtml(item.tag)}">${escapeHtml(item.label)}</span>`
+                        `<button type="button" class="tag-pill${item.tag === tag ? ' active' : ''}" data-tag="${escapeHtml(item.tag)}">${escapeHtml(item.label)}</button>`
                     ).join('');
                 } else {
                     /* 标签后面跟篇数，但只在 2 篇以上才显示：大部分标签只有一篇，
                        每个都挂个「1」既啰嗦又把标签栏撑成两行。
                        数字前面加 #，和标签名拉开一眼能分清的层次。 */
                     const withCount = (tagName, label, count, isActive) =>
-                        `<span class="tag-pill${isActive ? ' active' : ''}" data-tag="${escapeHtml(tagName)}">${escapeHtml(label)}${count >= 2 ? `<span class="tag-pill-count">#${count}</span>` : ''}</span>`;
+                        `<button type="button" class="tag-pill${isActive ? ' active' : ''}" data-tag="${escapeHtml(tagName)}">${escapeHtml(label)}${count >= 2 ? `<span class="tag-pill-count">#${count}</span>` : ''}</button>`;
                     container.innerHTML = [
                         withCount('all', '全部', blogPosts.length, tag === 'all'),
                         ...getTagStats().map(item => withCount(item.name, item.name, item.count, item.name === tag)),
@@ -2349,7 +2349,7 @@
                 if (!top.length) { mount.innerHTML = ''; return; }
 
                 mount.innerHTML = top.map(item =>
-                    `<span class="tag-pill" data-cloud-tag="${escapeHtml(item.name)}">${escapeHtml(item.name)}<span class="tag-pill-count">#${item.count}</span></span>`
+                    `<button type="button" class="tag-pill" data-cloud-tag="${escapeHtml(item.name)}">${escapeHtml(item.name)}<span class="tag-pill-count">#${item.count}</span></button>`
                 ).join('');
 
                 mount.querySelectorAll('[data-cloud-tag]').forEach(pill => {

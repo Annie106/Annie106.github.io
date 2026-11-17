@@ -229,6 +229,11 @@
 </head>
 <body>
 
+    <!-- 键盘用户的第一个可聚焦元素：Tab 一下就直接跳到正文，
+         不用一路 Tab 过导航、标签行和卡片。平时视觉隐藏，聚焦时滑下来。
+         目标是 #app（导航之外的整块内容），它带 tabindex="-1" 才能接住焦点。 -->
+    <a class="skip-link" href="#app">跳到主要内容</a>
+
     <!-- 首屏加载提示。结构写在 HTML 里而不是由 JS 创建：
          它要赶在 posts-data.js / script.js 下载完之前就出现。
          默认是隐藏的（CSS 里 opacity:0 + visibility:hidden），
@@ -304,7 +309,7 @@
         </nav>
     </header>
 
-    <div class="main-container" id="app">
+    <div class="main-container" id="app" tabindex="-1">
 
 
         <!-- ==================== 首页视图 ==================== -->
@@ -327,14 +332,15 @@
                         <span><i class="ri-calendar-line"></i> 博客始于 2026</span>
                     </div>
                     <div class="social-links">
-                        <!-- ★ 微信：点击复制微信号 -->
-                        <a href="javascript:void(0);" onclick="copyToClipboard('sossil', '微信号已复制')" title="微信"><i class="ri-wechat-fill"></i></a>
+                        <!-- ★ 微信：点击复制微信号。用 button 而不是 a：
+                             它不导航、只执行复制，读屏该念成「按钮」而不是「链接」 -->
+                        <button type="button" class="social-link" onclick="copyToClipboard('sossil', '微信号已复制')" aria-label="复制微信号" title="微信"><i class="ri-wechat-fill" aria-hidden="true"></i></button>
 
                         <!-- QQ：点击复制QQ号 -->
-                        <a href="javascript:void(0);" onclick="copyToClipboard('3810710631', 'QQ号已复制')" title="QQ"><i class="ri-qq-fill"></i></a>
+                        <button type="button" class="social-link" onclick="copyToClipboard('3810710631', 'QQ号已复制')" aria-label="复制 QQ 号" title="QQ"><i class="ri-qq-fill" aria-hidden="true"></i></button>
 
                         <!-- 邮箱：点击复制邮箱 -->
-                        <a href="javascript:void(0);" onclick="copyToClipboard('anniedv106@gmail.com', '邮箱地址已复制')" title="邮箱"><i class="ri-mail-line"></i></a>
+                        <button type="button" class="social-link" onclick="copyToClipboard('anniedv106@gmail.com', '邮箱地址已复制')" aria-label="复制邮箱地址" title="邮箱"><i class="ri-mail-line" aria-hidden="true"></i></button>
 
                         <!-- 外链按钮：点它先弹确认（「即将前往 GitHub，是否继续」），
                              确认后才按原来的 href / target 开新标签。
@@ -416,8 +422,8 @@
                 <!-- 「最新」= 最近 6 篇，「全部」= 完整列表 + 分页，两个都是站内筛选。
                      这里先写死两项兜底，JS 还会补上「置顶」「随笔」。 -->
                 <div class="tag-filter home-tag-filter" id="tagFilterHome">
-                    <span class="tag-pill active" data-tag="latest">最新</span>
-                    <span class="tag-pill" data-tag="all">全部</span>
+                    <button type="button" class="tag-pill active" data-tag="latest">最新</button>
+                    <button type="button" class="tag-pill" data-tag="all">全部</button>
                 </div>
             </div>
             <div class="posts-list" id="postsListHome">
@@ -702,7 +708,7 @@
                     </button>
                 </div>
                 <div class="tag-filter" id="tagFilterBlog">
-                    <span class="tag-pill active" data-tag="all">全部</span>
+                    <button type="button" class="tag-pill active" data-tag="all">全部</button>
                 </div>
             </div>
             <div class="posts-list" id="postsListBlog"></div>

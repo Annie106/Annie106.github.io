@@ -36,7 +36,19 @@
     const audio = new Audio();
     audio.volume = 0.3; // 设置较低的音量作为背景音乐
     audio.loop = true; // 单曲循环
-    audio.preload = 'auto';
+    /* 不预加载：默认 preload='auto' + 进页面就赋值，会让每个访客先拉一遍音频
+       （实测首页两个音频请求），而真正要听的人才会按下播放。
+       改成第一次要播时才设 src —— 见 ensureAudioSrc()。 */
+    audio.preload = 'none';
+
+    /* 第一次播之前必须调一次：没有 src 直接 play() 会抛 NotSupportedError。
+       已经有 src 就什么都不做（切歌走 playNext，那里自己会换）。 */
+    function ensureAudioSrc() {
+        if (audio.getAttribute('src')) return;
+        const track = musicList[currentIndex];
+        if (!track) return;
+        audio.src = track.src;
+    }
 
     // 初始化后台音乐
     function initBackgroundMusic() {
@@ -60,8 +72,8 @@
         syncVolumeUI();
         applyCollapseState();
 
-        // 设置音频源
-        audio.src = musicList[currentIndex].src;
+        // 注意：这里**不**设 audio.src。音频推迟到真要播的时候才加载，
+        // 由 ensureAudioSrc() 负责（tryAutoPlay / 首次交互 / 点播放三处）。
 
         // 设置事件监听器
         setupEventListeners();
@@ -178,19 +190,16 @@
         if (message) message.remove();
     }
 
-    // 尝试自动播放（处理浏览器自动播放策略）
+    /* 页面加载时不再主动起播。
+       原因有两层：① 没有用户手势，play() 一定被浏览器拒绝；
+       ② 只要给 audio 设了 src，浏览器立刻开始下载整首歌 —— 首屏白拉一遍流量。
+       所以这里只亮出「点一下就能听」的提示，真正的加载和起播交给
+       handleUserInteraction（首次点击/按键）和播放按钮。
+       注意不要在这里设 hasUserInteracted，否则首次交互会被那句守卫提前 return 掉。 */
     function tryAutoPlay() {
         if (!isEnabled) return;
-
-        hasUserInteracted = true;
-        audio.muted = false;
-        audio.play().then(() => {
-            console.log('🎵 自动播放已开启');
-            hideMusicEnableHint();
-        }).catch(() => {
-            showMusicEnableHint();
-            console.log('🎵 浏览器阻止了自动播放，等待用户交互后再播放');
-        });
+        showMusicEnableHint();
+        updateToggleButtons();
     }
 
     // 显示音乐启用提示
@@ -219,6 +228,7 @@
         if (isEnabled && !isPlaying) {
             // 用户首次交互后开始播放
             audio.muted = false;
+            ensureAudioSrc();
             audio.play().then(() => {
                 console.log('🎵 用户交互后成功开始播放');
             }).catch(e => {
@@ -239,6 +249,7 @@
 
             if (!isPlaying) {
                 audio.muted = false;
+                ensureAudioSrc();
                 audio.play().then(() => {
                     console.log('🎵 音乐开启成功');
                 }).catch(e => {
@@ -412,6 +423,7 @@
             saveUserPreference();
             if (!isPlaying) {
                 audio.muted = false;
+                ensureAudioSrc();
                 audio.play().then(() => {
                     console.log('🎵 音乐播放成功');
                 }).catch(handleAudioError);

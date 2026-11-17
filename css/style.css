@@ -515,24 +515,63 @@
             transform: translateY(-1px);
             box-shadow: 0 14px 28px rgba(0, 0, 0, 0.12);
         }
+        /* ==================== 跳到主要内容 ==================== */
+        /* 键盘用户的第一个 Tab 落点。平时移出视口但**保留可聚焦**
+           （不能用 display:none / visibility:hidden，那样它进不了 Tab 序列）。 */
+        .skip-link {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 10000;
+            padding: 10px 16px;
+            border-radius: 10px;
+            background: var(--color-text-primary);
+            color: var(--color-bg);
+            font-size: 0.86rem;
+            font-weight: 600;
+            text-decoration: none;
+            transform: translateY(-200%);
+            transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .skip-link:focus {
+            transform: translateY(0);
+        }
+        /* 跳过去之后焦点落在整个主容器上，没必要给它描一圈大边框 */
+        #app:focus {
+            outline: none;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .skip-link {
+                transition: none;
+            }
+        }
+
         .social-links {
             display: flex;
             gap: 10px;
             margin-top: 16px;
         }
-        .social-links a {
+        /* 三个「复制」入口是 <button>（只复制、不导航），GitHub / RSS 仍是链接，
+           所以选择器用 :is() 一份样式覆盖两种标签。 */
+        .social-links :is(a, button) {
             display: flex;
             align-items: center;
             justify-content: center;
             width: 32px;
             height: 32px;
+            padding: 0;
             border-radius: 50%;
             background: var(--color-surface);
             color: var(--color-text-secondary);
             text-decoration: none;
             transition: var(--transition-fast);
             font-size: 1.1rem;
+            font-family: inherit;
+            line-height: 1;
             border: 1px solid transparent;
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
         }
         /* 只在真正支持悬停的设备上应用 hover 效果：
            移动端点击后浏览器会把 :hover 一直"粘"在元素上，
@@ -540,7 +579,7 @@
            html:not(.is-touch-input) 进一步排除「报告支持悬停、
            但用户其实是手指触摸」的设备（iPad、桌面版网站模式等）。 */
         @media (hover: hover) {
-            html:not(.is-touch-input) .social-links a:hover {
+            html:not(.is-touch-input) .social-links :is(a, button):hover {
                 background: var(--color-text-primary);
                 color: #fff;
                 border-color: var(--color-text-primary);
@@ -548,13 +587,13 @@
         }
         /* 触屏设备上改用 :active，按下时才有反馈，松手即恢复 */
         @media (hover: none) {
-            .social-links a:active {
+            .social-links :is(a, button):active {
                 background: var(--color-text-primary);
                 color: #fff;
                 border-color: var(--color-text-primary);
             }
         }
-        html.is-touch-input .social-links a:active {
+        html.is-touch-input .social-links :is(a, button):active {
             background: var(--color-text-primary);
             color: #fff;
             border-color: var(--color-text-primary);
@@ -595,11 +634,16 @@
             flex-wrap: wrap;
             gap: 8px;
         }
+        /* 标签是 <button>，不是 <span>：它可点、要能被 Tab 聚焦、回车/空格触发，
+           用 span 的话键盘和读屏都够不到。这里把 UA 给 button 的默认外观清掉，
+           line-height 必须显式继承 —— 否则 button 的 normal 会让胶囊矮一截。 */
         .tag-pill {
             padding: 5px 14px;
             border-radius: 20px;
+            font-family: inherit;
             font-size: 0.78rem;
             font-weight: 500;
+            line-height: inherit;
             cursor: pointer;
             border: 1px solid var(--color-border);
             background: #fff;
@@ -607,6 +651,15 @@
             transition: var(--transition-fast);
             white-space: nowrap;
             user-select: none;
+            -webkit-appearance: none;
+            appearance: none;
+            box-shadow: none;
+        }
+        /* 焦点环用双层 box-shadow 而不是 outline：outline 不跟随 border-radius，
+           会在圆胶囊外面套一个方框，很突兀。内层拿背景色垫一圈留白，外层才是环。 */
+        .tag-pill:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-text-primary);
         }
         /* :not(.active) 不能省：选中项是「黑底白字」，
            悬停时如果再把字色压成主文字色，就成了黑底黑字，标签直接看不见 */
@@ -753,6 +806,14 @@
             background: transparent;
             color: var(--color-text-primary);
             border-color: transparent;
+        }
+        /* 首页这一行是「文字 tab」而不是胶囊，而且 .home-tag-filter 有
+           overflow-y: hidden —— 外扩的焦点环上下会被裁掉、只剩左右两条竖线。
+           所以这里的焦点环改成向内收的 outline，贴着文字走。 */
+        .home-tag-filter .tag-pill:focus-visible {
+            box-shadow: none;
+            outline: 2px solid var(--color-text-primary);
+            outline-offset: -3px;
         }
         /* 选中下划线用伪元素 + scaleX 做「从中间长出来」的过渡。
            原来是 box-shadow: inset 0 -1px —— 它只能整条淡入，没有方向感，
@@ -5224,7 +5285,7 @@
                (#e7e9ee)，拿它当圆底，六个小圆里就冒出一个发光的大白点，
                视线全被它拽走。改成「比常态亮一档的平涂 + 图标提白」，
                和卡片上三点按钮的悬停是同一套语言。 */
-            html:not(.is-touch-input)[data-theme="dark"] .social-links a:hover {
+            html:not(.is-touch-input)[data-theme="dark"] .social-links :is(a, button):hover {
                 /* 底色只提一档，主要反馈交给图标由灰转白；
                    再加一圈极淡的白边，让圆的边界浮起来，不至于像一个没变化的洞 */
                 background: var(--card-control-bg-hover);
@@ -5233,14 +5294,14 @@
             }
         }
         @media (hover: none) {
-            [data-theme="dark"] .social-links a:active {
+            [data-theme="dark"] .social-links :is(a, button):active {
                 background: var(--card-control-bg-active);
                 color: var(--color-text-primary);
                 border-color: rgba(255, 255, 255, 0.24);
             }
         }
         /* 触屏按下的那一下同理：原来是闪一个白圆，现在是再亮半档 */
-        html.is-touch-input[data-theme="dark"] .social-links a:active {
+        html.is-touch-input[data-theme="dark"] .social-links :is(a, button):active {
             background: var(--card-control-bg-active);
             color: var(--color-text-primary);
             border-color: rgba(255, 255, 255, 0.24);

@@ -1,236 +1,88 @@
 # AGENTS.md
 
-给在这个仓库里写代码的 AI 工具（Claude Code、Codex、Cursor、Copilot、WorkBuddy 等）看的约定。
-人看的速查是 `README.md`，完整教程是站内「使用指南」`project_subpage/blog/guide.html`。
-**动手前先读完这一页，尤其是「图标」和「新建页面」两节。**
+给在这个仓库里写代码的 AI 工具看的约定。人看的速查是 `README.md`，完整手册是站内 `project_subpage/blog/guide.html`。
+`CLAUDE.md` / `.cursorrules` 只是指向本文件的指针，规则一律写在这里，别在那边另开一套。
 
-> **这里是跨工具唯一的约定来源。** 换一个 AI 工具时，它读不到上一个工具留下的会话记忆（例如 WorkBuddy 的 `.workbuddy/memory/`，那是工具私有目录，别的 agent 不会去读）。所以凡是「以后换谁来写代码也得知道」的内容——选型决策、踩过的坑、不许改的地方、升级流程——都必须落到本文件，只写进某个工具的私有记忆等于没写。
->
-> `CLAUDE.md`、`.cursorrules`、`.github/copilot-instructions.md` 只是给各工具带路的**指针**（内容只有三条硬前提），规则一律写在本文件，别在那边另开一套。
+## 硬前提
 
-## 这个站是什么
+- 纯静态博客：原生 HTML + CSS + JS，**运行时零依赖、无后端**，托管在 GitHub Pages。不引框架、打包器、TypeScript、CSS 预处理器。
+- 唯一 npm 依赖 `esbuild`，只给 `tools/minify.js` 用。`minifyIdentifiers` 必须 `false`（三处内联 `onclick` 靠全局函数名），`charset` 必须 `utf8`。
+- 本地要 **Node 18+**（构建）和 **Python 3.9+**（裁图标子集，需 `fonttools` + `brotli`）。新机器先跑一次 `tools/setup.bat`。
+- `dist/` 是产物、已 gitignore，**不要提交**。源码保持「双击就能打开」的原样。
+- `js/script.js` 是 SPA 路由核心（视图切换、浏览器返回、滚动恢复），逻辑和历史强耦合。改动前先读相关注释，**不要顺手重构**。
 
-纯静态博客：原生 HTML + CSS + JavaScript，**运行时没有任何依赖、没有后端**，托管在 GitHub Pages 上。本地开发需要 **Node**（构建）和 **Python 3.9+**（裁图标子集，见「图标」一节）。
+## 五条一改就整页崩的坑
 
-- 不要引入打包器、框架、TypeScript、CSS 预处理器。`tools/build-site.js` 只做两件事：**先跑图标校验**（字体和源码不一致就中止），再按白名单把要发布的文件**复制**到 `dist/`。不要把它扩展成打包器（不编译、不转译、不哈希、不压缩）。
-- **唯一的 npm 依赖是 `esbuild`，只在 `tools/minify.js` 里用**，作用是删掉 `dist/` 里 JS/CSS 的注释和空白（gzip 约省一半）。它是 `devDependency`，不进产物、不影响运行时。加别的依赖前先想清楚：这个站的全部价值在于「双击就能改、推送就能上」。
-  - ⚠️ **`minifyIdentifiers` 必须是 `false`。** `index.html` 里那三处 `onclick="copyToClipboard(…)"` 靠的是顶层函数名是全局的，重命名一开就静默失效。`tools/minify.js` 末尾的 `ASSERTIONS` 在守这条，挂了就构建失败、不要绕过。
-  - `charset` 必须显式写 `utf8`：默认值会把中文转成 `\uXXXX`，`posts-data.js` 反而胖 10KB。
-- `dist/` 是产物目录，已在 `.gitignore` 里；页面源码仍然是「能直接打开就能看」的原样文件，产物只是同一批文件的副本。见「构建与部署」一节。
-- 所有路径都是相对路径（用户站部署在根路径，但本地也可能用 file:// 打开）。
+1. `index.html` **不能加 `<base>`**：预加载扫描器在脚本执行前就解析资源，加了全站 404。
+2. `body` 末尾的相对 `<script src="js/…">` **必须排在 `script.js` 前面**，否则在 `/posts/<id>/` 下会解析成 `/posts/<id>/js/…`。
+3. 运行时拼地址一律用 `siteBaseUrl()`，**不要拿 `location.href` 当基准**。
+4. 站内视图激活是 `.active-view`，文章详情才是 `.active`。写成 `.active` 不报错，只会静默不生效。
+5. 文章之间翻页用 `replaceState` 不用 `pushState`，否则读十篇要按十次返回。
 
-## 图标：本地子集字体，禁止 CDN
+## 图标：本地子集，禁止 CDN
 
-- `fonts/icons.css` + `fonts/remixicon.woff2` 是**从全量 Remix Icon 4.3.0 裁出来的子集**（只含站内用到的约 100 个图标，字体约 7 KB）。`css/style.css` 第一行 `@import` 引入，引了 style.css 的页面自动有图标。
-- **加 / 换图标只需写 `<i class="ri-xxx">` 然后提交**：pre-commit 钩子（`tools/precommit-icons.js`，装一次：`tools/setup.bat`）会自动重跑 `tools/subset-icons.py` 并把 `fonts/` 下两个生成物加进提交。**本地必须能跑 Python 3.9+**（生成子集用），没有 Python 时钩子和 `build-site.js` 都会中止——这是刻意的，不要改成"跳过放行"。换机器/重新克隆后要再装一次钩子；手动补跑用 `tools/update-icons.bat`。全量源在 `tools/remixicon-src.css` / `remixicon-src.woff2`，别删；`fonts/` 下两个文件是生成物，不要手改。
-- 图标名写错、或加了图标忘了重新生成，**都不会报错，只会渲染成空白**。所以改完必须 `node tools/check-icons.js`——`tools/build-site.js` 已把它设为构建前置，漏跑会直接构建失败。
-- **禁止**在任何页面引 CDN 图标字体（`cdn.jsdelivr.net`、`unpkg.com`、`fonts.googleapis.com`）。历史 bug：唯一来源是境外 CDN 时，网络一抖整站图标集体消失。
+- `fonts/icons.css` + `fonts/remixicon.woff2` 是从 Remix Icon 4.3.0 裁出来的子集（约 100 个字形、7KB）。`css/style.css` 首行 `@import`，引了 style.css 的页面自动有图标。
+- **加图标**：写 `<i class="ri-xxx">` 然后提交，pre-commit 钩子会自动重裁并暂存 `fonts/`；手动补跑 `tools/update-icons.bat`。
+- **改完必跑 `node tools/check-icons.js`**（构建已把它设为前置）。图标名写错或忘了重裁**不会报错，只会渲染成空白**。
+- **禁止**引 CDN 图标字体。版本刻意停在 4.3.0，别主动升级；真要升就替换 `tools/remixicon-src.*` 再跑 `tools/update-icons.bat`。
 
-### 版本状态：刻意停在 4.3.0，不要主动升级
+## 新建页面
 
-2026-11-12 核查过，结论是先不升：
-
-- 上游最新是 **4.9.1**，比本地多 338 个图标。
-- 但 4.3.0 **没有任何功能缺口**：全站用到的图标都在，`check-icons.js` 三项全绿。
-- 所以这**不是"版本太旧待升级"**，是评估后的选择。除非用户明确要求，或者确实要用某个 4.3.0 里没有的图标（比如 `ri-ai-*`），否则别动。
-
-要升级时：替换 `tools/remixicon-src.css` / `remixicon-src.woff2`（上游 css **只保留 woff2 一个 @font-face**，其余格式本地没有会刷 404）→ 跑 `tools/update-icons.bat` → 更新 `README.md` 和 `guide.html` 里的体积表述。
-
-## 新建 HTML 页面
-
-- 首选复制根目录的 `_template.html` 改名，head 已经写对，只需按层级改相对路径。
-- 页面 head 最少只要一行样式表：
-
-  ```html
-  <link rel="stylesheet" href="<层级>/css/style.css">
-  ```
-
-- 不要把 `style.css` 的内容抄进页面。页面专用样式可以在 `<head>` 里写一个 `<style>` 块（`guide.html`、`movie.html`、`thanks.html` 都是这个做法）。
-- 相对路径按页面所在目录写，别用根路径 `/css/style.css`（那样用 file:// 本地打开会失效）：
-
-  | 页面位置 | style.css | favicon.svg |
-  | --- | --- | --- |
-  | 根目录 `index.html` | `css/style.css` | `favicon.svg` |
-  | `project_subpage/blog/` | `../../css/style.css` | `../../favicon.svg` |
-  | `project_subpage/projects/xxx/` | `../../../css/style.css` | `../../../favicon.svg` |
-
-- 每个页面都要有 `<link rel="icon" type="image/svg+xml" href="<层级>/favicon.svg">`。**`404.html` 是唯一的例外**：它会被 GitHub Pages 兜到任意路径（`/foo/bar`）上渲染，相对写法会解析成 `/foo/bar/favicon.svg` 又 404 一次，所以必须用站点根路径 `/favicon.svg`（和它里面那个「获取联系」链接同一个道理），本地 `file://` 预览则靠页内脚本退回相对地址。2026-11-13 之前这一页整个漏了 favicon，标签页一直没图标。
+- 复制根目录 `_template.html` 改名，按层级改相对路径即可（模板自带 noindex 和 favicon）。
+- 只引一行样式表 `<link rel="stylesheet" href="<层级>/css/style.css">`；页面专用样式写页内 `<style>`。**别用根路径** `/css/style.css`（`file://` 打开会失效）。
+- `404.html` 是唯一例外：favicon 和内部链接必须用站点根路径（它会被兜到任意 URL 上渲染）。
+- 放 `project_subpage/` 里自动发布；根级新文件 / 新目录要加进 `tools/build-site.js` 的 `PUBLISH_FILES` / `PUBLISH_DIRS`。
+- 草稿和测试用 `_` 前缀（自动不发布）。不该上线但要正常命名的，写进脚本顶部的 `IGNORE_HTML`——`archive/` 就是这么处理的。
 
 ## 改样式
 
-- 全站样式在单文件 `css/style.css`（6000+ 行，按注释分节）。改之前先搜类名，沿用已有的类名前缀（`.article-*`、`.comments-*`、`.feedback-view`、`.home-skeleton` 等）。
-- **文章正文的基础字体必须是 `--font-sans`，别让里面任何子元素继承到 `--font-serif`。** `.article-content` 原来写的是 `var(--font-serif)`，而只有 `p` 和 `h2` 单独覆盖成了无衬线，于是 `ul / ol / li / blockquote` 全跟着落进 `SimSun` —— `--font-serif` 的前三顺位（Noto Serif SC / Songti SC / STSong）在 Windows 上都没有。表现就是正文是雅黑、一进列表和引用突然变成又细又虚的宋体，小字号下锯齿特别重。2026-11-13 已把基础字体改成 sans 修掉。**注意这是「基础值错了、靠个别元素打补丁」造成的**，以后加 `table`、`dl`、`figure` 之类的新块级元素，基础值对了才自动没问题；要是哪天把基础字体改回 serif，这些新元素会一起变宋体。
-- 同理，**`blockquote` 不要写 `font-style: italic`**：中文没有真正的斜体，浏览器是把整个字形斜着拉出来的，笔画会发糊、末端发虚，和正文字重也对不上。靠左边线 + `--color-text-secondary` 区分就够了（已改成 `normal`）。
-- 字体栈 `--font-sans` 的顺序是 `PingFang SC → HarmonyOS Sans SC → MiSans → Noto Sans SC → Microsoft YaHei`，前面几个字形更圆润，但 Windows 默认只会有雅黑。**这是「装了就用、没装就回落」，不是引入 web 字体** —— 中文 web font 动辄几 MB，纯静态站不现实，也别为了「圆一点」去引 CDN 字体。
-- **`index.html` 里那个 `.boot-loading` 的内联 `<style>` 是有意的，不要挪进 `style.css`**：它是首屏「正在加载博客数据…」提示条，要展示的时间正是 `style.css` 还在下载的时候；颜色也因此写死、不用 CSS 变量（那时变量还没定义）。深色靠 `[data-theme="dark"]` 覆盖。
-- `.boot-loading` 的行为：默认隐藏，**加载超过 3 秒**才由元素后面那段内联计时器加上 `.is-visible`（计时器必须在页面里，不能进 `script.js` —— 真慢的时候 `script.js` 正是还没到的东西）。收起由 `script.js` 的 `hideBootLoading()` 在 `init()` 之后加 `.is-leaving`（`@keyframes bootOut`），380ms 后把两个类一起摘掉；若刚露脸就加载完，会补足 700ms 最短展示，避免闪一下。另有 15s 兜底定时器。
-- 进出**都用 `@keyframes`（`bootIn` / `bootOut`），不要改回 `transition`**：退场是「加一个类 + 删另一个类」，两次样式变更可能落在同一帧被合并，transition 会被整个跳过——表现就是弹窗「啪」地消失、没有淡出。`.site-toast` 重播入场时踩过同一个坑。
-- 配色一律用 CSS 变量（`--color-bg`、`--color-text-primary`、`--color-border`、`--card-accent` 等），深色模式在 `[data-theme="dark"]` 里覆盖变量，**不要写死色值**，否则深色模式下会失效。
-- 新增基于位移/透明度的动画，请一并处理 `@media (prefers-reduced-motion: reduce)`。
-- ⚠️ **站内视图（`?view=xxx`）激活时挂的类是 `.active-view`，文章详情才是 `.active`。** 想按「当前在哪个视图」写规则，选择器必须是 `#view-comments.active-view ~ .site-footer` 这种；写成 `.active` 不会报错，只会**静默不生效**（2026-11-13 踩过一次，靠无头 Chrome 量 `getBoundingClientRect` 才发现）。
-- 「评论视图」（`?view=comments`）的底栏 `.comments-view-bottombar` 有两处特调，别顺手删：① 行里的 `.back-link` 要把自带的 24px `margin-bottom` 清 0，否则行盒被撑高 24px、文字顶到行首而按钮仍居中；② 视自身 `padding-bottom: 0`，底部间距由 `#view-comments.active-view ~ .site-footer { margin-top: 20px }` 统一给，保证分割线到这一行、这一行到页脚分割线**都是 20px**。
+- 全站样式在单文件 `css/style.css`。颜色一律用 CSS 变量，深色在 `[data-theme="dark"]` 里覆盖变量，**不要写死色值**。
+- 位移/透明度动画要处理 `@media (prefers-reduced-motion: reduce)`；进出场用 `@keyframes` 不用 `transition`（同一帧的两次样式变更会被合并、整个跳过）。
+- 标签胶囊 `.tag-pill` **必须是 `<button>`**，不能是 `<span>`（键盘和读屏要用）。`<body>` 首行的 skip link 和 `#app` 的 `tabindex="-1"` 也别删。
+- 文章正文基础字体是 `--font-sans`，别改回 serif（`ul`/`blockquote` 会掉进宋体）；`blockquote` 不要 italic。
+- 滚动条只在 `html` 上声明 `scrollbar-width` / `scrollbar-color`（都是继承属性），**不要写 `::-webkit-scrollbar`** —— 祖先非 `auto` 时 Chrome 会忽略它，写了是死代码。
+- `index.html` 里 `.boot-loading` 那段内联 `<style>` 不要挪进 `style.css`：它要展示的时刻正是样式表还没下载完的时候。
 
-### 滚动条：只在 html 上声明一次，不要写 `::-webkit-scrollbar`
+## 构建与部署
 
-- 两个变量管颜色（定义在 `:root`，深色在 `[data-theme="dark"]` 里覆盖）：`--scrollbar-thumb`（常态）/ `--scrollbar-thumb-hover`（鼠标进入滚动区）。都用 `rgba` 不用实色——滑块会压在纯白正文、浅灰代码块、半透明卡片上，实色在深色模式下会透出一块死板的长条。
-- `css/style.css`「滚动条」一节里有 `html { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent }`，**新写的滚动区不用再声明任何样式**，自动就是「透明轨道 + 半透明细滑块」。
-- ⚠️ 这两个属性都是**继承属性**，会一路传到所有滚动容器。也正因如此，**不要再写 `::-webkit-scrollbar` 那套**：只要祖先上是非 `auto` 的值，Chrome 就会忽略该元素的 webkit 伪元素，写了是死代码。想改宽度就改 `scrollbar-width`，想改颜色就改变量。
-- 需要「鼠标进入就提亮」的容器，在 `.search-body:hover` 那条规则后面按同样格式追加类名即可（`scrollbar-color: var(--scrollbar-thumb-hover) transparent`），别写成 `*:hover`——那会让整棵树重算继承值。
-- 别再给滚动条写 `background: var(--color-border)`：`#2a2e37` 压在 `#0f1115` 上几乎看不见，深色下等于没有滑块。这正是这次要修的 bug。
-- `[data-theme="dark"]` 上还声明了 `color-scheme: dark`，让原生控件（输入框、下拉、日期面板、复选框）和浏览器自带滚动条一起切到深色渲染。新增控件如果写了显式颜色，照旧用变量即可，不用管它。
+`npm run build` 四步，顺序固定：
 
-## 地址栏里不留 index.html
+1. `build-site.js` —— 图标校验 + 白名单复制（会先清空 `dist/`）
+2. `build-comment-counts.js` —— 抓 giscus 真实评论数（要覆盖第 1 步复制过去的空表占位）
+3. `build-posts.js` —— `/posts/<id>/` 静态页 + `sitemap.xml` + `robots.txt`
+4. `minify.js` —— 压缩，必须最后（否则被复制覆盖）
 
-用户明确要求主页地址就是 `https://annie106.github.io/`，不要出现 `/index.html`。2026-11-13 落地。
-
-- `script.js` 的 `normalizeHomeUrl()` 在 `init()` 第一行执行：把 `/index.html` 收敛成 `/`，`?article=` / `?view=` 等参数一个不动，`history.state` 也照旧。所以从站外链接、404 兜底、子页面跳回来，落地瞬间地址栏就是干净的。
-- ⚠️ **`file://` 下这个函数直接 return，别"顺手"删掉这个判断**：本地把 `index.html` 换成目录，浏览器会去列目录而不是渲染页面，预览反而打不开。
-- `syncUrlWithView()` 只改 query、**原样保留 pathname** —— 所以入口的 pathname 决定了之后所有地址栏形态。（唯一例外是文章视图：它写的是 `/posts/<id>/` 这条纯路径，见上一节。）
-- 其它视图新生成的 URL 仍用**查询串形式**（`?view=xxx`），让 pathname 停在站点根：
-  - `buildFeedbackUrl()` 返回 `siteBasePath() + '?' + params`（带上根路径，否则从 `/posts/<id>/` 点反馈会拼进文章目录）
-  - `404.html` 的兜底跳转写 `/?`，不是 `/index.html?`
-- 页面里现存的 `href="index.html?view=xxx"` **可以保留**：SPA 会拦下点击（不产生导航），真有整页跳转也会被 `normalizeHomeUrl` 收敛。但新建页面时优先写查询串，别主动加文件名。
-- `syncUrlWithView()` 只改 query、**原样保留 pathname** —— 所以入口的 pathname 决定了之后所有地址栏形态。别把它改成拼接死路径。
-- 验证手法：起本地 http server，用临时页 iframe 读 `contentWindow.location` 对比 `pathname + search`。**每个用例必须用独立的 `--user-data-dir`**，否则 `sessionStorage` 里的「上次所在视图」会污染下一个用例 —— 表现是 `/` 被改写成 `/?view=about`，看着像 bug，其实是视图记忆（`readViewState`）。
-
-## 图片加载：高速 / 慢速直链（每张图每天 1 次高速）
-
-`js/image-loading.js` 除了模糊占位和清晰化，还负责在 `data-fast-src`（高速直链）和 `data-slow-src`（慢速直链）之间选一条。**2026-11-14 按用户要求改成「每张图每天 1 次高速」的额度制**，别改回时间冷却（原来是 20 秒冷却，已废弃）：
-
-- 默认优先高速直链。每次用高速**成功**后，把这张图记进当天额度（`localStorage` 的 `annie-image-fast-daily`，结构 `{date:'YYYY-MM-DD', images:['<data-fast-src>']}`），当天再来就只走慢速。
-- 没配 `data-fast-src`、或当天额度已用完 → 直接慢速；高速加载失败 → 立即回退慢速。
-- **失败不占用额度**（用户明确选的）：`error` 时只回退、不写记录，下次进页面还会再试一次高速。所以高速链接长期挂着的话，每访问一次会有一个失败请求，这是刻意的取舍，不要"优化"成失败后当天禁用。
-- 额度是**每张图**（以 `data-fast-src` 的地址区分），不是全站共享；同页多张图各用各的。同一张图同页重复出现时，靠内存里的 `fastInFlight` 去重，后来的那张走慢速，避免一次额度打两次请求。
-- 日期用本地日期拼（`getFullYear/getMonth/getDate`），**不要用 `toISOString()`**：那是 UTC，东八区晚上 8 点后会把额度算到"明天"。
-- 存不了 `localStorage` 时依次退回 `sessionStorage`、内存，额度范围随之变成"当前标签页/当前页面"，控制台会有 warn 说明。
-- **控制台日志是需求的一部分**（用户明确要求"加载高速/慢速直链在控制台里体现"）：前缀分别是 `[图片加载·高速直链]`（绿）、`[图片加载·慢速直链]`（橙）、`[图片加载·回退]`（红 warn）、`[图片加载·失败]`。选链时一条、成功/回退时一条，别合并成一条，也别静音。
-- 调试：控制台敲 `AnnieImageLoading.getDailyQuota()` 看今天哪些图用过高速；`AnnieImageLoading.resetDailyQuota()` 清空重来（验证高速有没有生效时用）。
-- **头像和音乐不参与这套策略**：`EXCLUDED_SELECTOR`（`.avatar, .music-player-card, .music-enable-hint, [data-image-loading="off"], [data-fast-quota="off"]`）命中的图片直接跳过 —— 不占额度、也不打日志。音乐本身是 `<audio>`，压根不进 `image-loading.js`；以后若要给别的图挂"不受额度限制"，加 `data-fast-quota="off"` 即可，不用改 JS。
-- 头像的「主/备」链接是自己在 `index.html` 的 `<img class="avatar">` 上用内联 `onerror` 做的（它不属于高速/慢速那套）：`src` 失败 → 换成 `data-fallback-src`（PicGo Cloud 那张）→ 再失败才退回透明占位 gif。因为挂在 `.avatar` 上被排除在外，**别把它接进 `image-loading.js`**，否则会吃掉当天额度。改头像时三个值（`src`、`data-fallback-src`、`alt`）要一起看。
-- 低速预览预热只在**这次高速成功**时才做（回退慢速后再预热一次慢图是白跑一趟）。
-
-## 首页文章列表
-
-- `homeTag` 有两个虚拟值：`latest`（默认，每页 6 篇）/ `all`（每页 8 篇）。分页控件任何标签只要总页数 > 1 就出现（`renderHomePager`）。快照迁移看 `homeTagRev: 2`；新增存储位置要一并写 `homePage`。
-- 切筛选 / 翻页走 `swapPostsList()`（淡出 → 重画 → 容器高度过渡），别直接 `innerHTML`；标签选中态只切 class（`syncTagPillsActive`），下划线是 `::after + scaleX`。
-- **卡片尺寸保持原样**（约 174～199，文案多长就多高），不要做等比化。
-
-## 别乱动的地方
-
-- `js/script.js` 是 SPA 式路由核心（`/?article=N`、`?view=xxx`、浏览器返回键、滚动位置恢复）。这里的逻辑和历史记录强耦合，改动前先读相关注释，不要顺手重构。
-- 首页「最近折腾」三张卡是只读展示：不要加 `role="button"` / `tabindex` / 点击跳转 / hover 抬起。进完整列表走「全部折腾 →」。
-- `js/posts-data.js` / `js/tweaks-data.js` 是数据文件：可以增删条目，但不要改字段名，`script.js` 依赖它们。
-- `favicon.svg`、`share_cover.jpg` 被多个页面和分享卡片引用，改文件名要同步全站。
-- **发布走自建构建，不再让 Pages 跑 Jekyll。** 详见下面「构建与部署」一节。
-
-## 构建与部署：自己生成产物，GitHub 只负责托管
-
-2026-11-13 之前是「Pages 直接吃仓库根目录 + 用 `_config.yml` 的 `exclude` 挡开发文件」。现在改成自己构建。
-
-- **构建是四步，顺序固定**：`build-site.js`（复制）→ `build-comment-counts.js`（抓评论数）→ `build-posts.js`（文章静态页）→ `minify.js`（压缩产物）。第一条会清空 `dist/`，所以不能乱；第二条必须在第一条之后（要覆盖复制过去的占位文件）、在最后一条之前（要被压缩）；`minify` 必须在最后，否则压缩结果被复制覆盖。CI 里是 `deploy.yml` 的四个连续步骤。
-- **评论数在构建时抓**，不是页面里 fetch：`giscus.app/api/discussions` 的 CORS 只放行 `giscus.app` 自己，浏览器里请求会被拦；构建机用 node 请求没这个限制，也不需要 token（GitHub Discussions 只在 GraphQL 里，放 token 到前端等于公开）。`js/comment-counts.js` 仓库里那份是**空表占位**（保证不跑构建也不 404），真实数据是 `dist/js/` 里的产物，别手改、也别把抓下来的数字提交回来。接口失败/超时会退回全 0，**不能因此让部署失败**。
-- **`tools/build-site.js` 是发布入口**，决定哪些文件上线。它按**白名单**把该发布的文件复制到 `dist/`，开发文件一个都进不去。用白名单而不是黑名单：漏发一个页面会立刻 404、当场发现；误发一个开发文件（`AGENTS.md`、`tools/`）往往没人察觉。
-- 开头先跑**图标校验**（`check-icons.js`），字体和源码不一致就直接中止 —— 因为缺字形只会显示空白、不会报错。所以本地构建需要 Node + Python（见「图标」一节）。
-  - 白名单在脚本顶部：`PUBLISH_FILES`（根级文件）+ `PUBLISH_DIRS`（目录）。新页面只要落在 `project_subpage/`、`archive/` 这些已列目录里就**自动带上，不用改脚本**；只有新增**根级文件**（`robots.txt`、`sitemap.xml`、根目录的 `about.html`）或**根级新目录**（`assets/`）才需要加。
-  - **不想发布的内容，用下划线前缀。** 以 `_` 或 `.` 开头的文件和目录一律不进产物（`_draft.html`、`_notes/`、`.env`），`.md` / `.markdown` 也不进。这一条比改脚本重要：白名单里的目录是**整份递归复制**的，放在 `project_subpage/blog/` 下的任何文件都会被发出去 —— 包括草稿页和笔记，而 orphans 检查拦不住它们（在产物里确实存在）。静态站没有访问控制，进了 `dist/` 就等于公开，所以只能在「不发出去」这一层解决。
-  - **漏加会被拦下来。** 脚本会扫仓库里所有 `.html` 和产物逐一比对，发现「有源码、没进产物」的页面就直接报错退出并点名文件 —— 因为这种漏发在构建时不会暴露，只会在线上变成 404，是最难自己发现的一类问题。确实不该上线的页面优先用下划线前缀；不以下划线命名的例外写进脚本顶部的 `IGNORE_HTML`（目前只有 `_template.html`，其实已被 `_` 规则覆盖，留作示例）。
-  - 脚本末尾还有一组 `MUST_HAVE` 校验，产物缺关键文件同样直接报错退出，不会发出一份残站。
-- **`.github/workflows/deploy.yml`** 在 push 到 main 时执行构建（含 `npm ci` 装那个唯一的构建期依赖），再用 `upload-pages-artifact` + `deploy-pages` 发布 `dist/`。**Pages 的 Source 必须设成「GitHub Actions」**（Settings → Pages），否则部署步骤会失败 —— 这一步只能人工在网页上改，代码改不了。
-  - 推荐的切换顺序：① 先 push 代码（此时 Source 还是分支发布，站点照常由 Jekyll 提供，只是 Actions 部署那步会失败）→ ② 去 Settings 把 Source 改成「GitHub Actions」→ ③ 在 Actions 页面手动 Run 一次「部署站点」。反过来先改 Source 会出现一段「还没有任何产物」的 404 空窗。
-- **`dist/` 进 `.gitignore`，不要提交。** 它是产物不是源码。本地想看线上效果：`node tools/build-site.js`，然后起静态服务器指向 `dist/`。
-- ⚠️ **这台机器上 `fs.cpSync` 和 `fs.rmSync` 都不要用。**
-  - `cpSync`：Windows + Node 22.22 下会让 node 进程直接崩掉 —— **没有任何报错、退出码 127、stdout 全空**，只复制了前面几个文件，排查极费时间。
-  - `rmSync`：被工具链 shim 成「移到回收站」，回收站操作偶尔抛 `Some operations were aborted`，整个构建失败，而报错内容和站点毫无关系，极易误判成脚本逻辑错。
-  - 所以 `build-site.js` 里是手写递归复制 + 逐项 `unlinkSync` / `rmdirSync` 清空。别"优化"回这两个 API。
-- `_config.yml` **已于 2026-11-13 删除，别再加回来。** 它是分支发布时代用来挡开发文件的排除清单，现在挡人的是 `build-site.js` 的白名单。加回 `_config.yml` 不会生效（Pages 已不跑 Jekyll），只会让人误以为还有一层保护。如果哪天真要切回分支发布，得自己重新写一份 `exclude`，并且在切之前就想清楚它会立刻暴露什么。
-- 注意这是「构建规则由你定、执行交给 CI」，不是「本地整站打包上传」。GitHub Pages 没有手动上传产物的入口，只有分支发布或 Actions 发布两条路。如果哪天要求构建也完全在本地完成，做法是本地生成 `dist/` 再推到 `gh-pages` 分支、Source 选那个分支 —— 但那样容易漏跑脚本导致线上是旧内容，除非明确要求，别改。
-
-## 文章地址：`/posts/<id>/`
-
-2026-11-15 起，文章地址是 `https://annie106.github.io/posts/<id>/`（目录形式，不留 `.html`）。站内点文章也是这个地址，**不是** `?article=N`。
-
-- **为什么要改**：整站只有一个 HTML 时，爬虫和微信/Telegram 的预览抓取都不执行 JS，拿到的永远是首页那份 title 和空白正文。有了独立地址 + 预渲染正文，收录和分享卡片才成立。
-- `?article=<id>` 保留成**旧链接别名**，读完会自动收敛成 `/posts/<id>/`。feed 里的 `guid` 故意还是旧地址：guid 一改，订阅者会收到全部历史文章的重复推送。
-- 地址由 `syncUrlWithView()` 写：文章视图 → 纯路径；其它视图 → 站点根 + 查询串（离开文章时会把 `/posts/<id>/` 收回根，别让它变成 `/posts/<id>/?view=blog`）。
-- 卡片标题是**真链接** `<a href="posts/<id>/">`（爬虫要实际地址）。样式在 `css/style.css` 的 `.task-title a`：**任何状态都不要下划线**（`:hover`/`:focus`/`:visited` 都显式写了 `none`），否则整排卡片像一片可点说明文字。点击由卡片自己的监听拦下，别去掉那个 `preventDefault`。
-
-### ⚠️ 三条会整页崩掉的坑（都实测踩过）
-
-1. **`index.html` 里绝对不能加 `<base>`。** 地址栏会被改成 `/posts/<id>/`，相对地址若按它解析，`js/…`、`css/…`、正文配图、内嵌 iframe 全部 404。用脚本设 `<base href>` 也没用 —— 浏览器的预加载扫描器在脚本执行前就把 `<link>`/`<script>` 解析完了。
-2. **`body` 末尾那些相对路径的 `<script src="js/…">` 必须排在 `script.js` 前面。** 它们是在解析到标签那一刻才解析路径的，排在 `script.js` 后面（那时地址已被改写）就是 `/posts/<id>/js/…`。
-3. **运行时拼地址一律走 `siteBaseUrl()`**（启动时算一次的 `SITE_BASE_URL`），不要用 `location.href` 当基准 —— 任何用当前地址拼相对路径的地方，在文章页上都会拼错。`setFrameSource()` 和正文注入（`absolutizeHtml()`）已经按这个改了。
-
-### 文章之间翻页（上一篇 / 下一篇）
-
-- **用 `replaceState`，不 `pushState`。** 已经在读文章时再点翻页，是把当前那条历史记录改掉，不是新增一条。否则从首页进 A → 翻到 B → 再翻到 C，按三次返回才出得去。
-- 返回落点沿用原来那条记录里存的 `annieReturnView` / `annieReturnScroll`，**不要**因为「当前在文章视图」就覆盖成 `home` —— 从归档翻页进去的，返回还要回归档。
-- 过渡动画用 **Web Animations API**（`playArticleSwapAnimation`），不要给 `.article-detail` 加动画类：那个元素自带 `animation: fadeSlideIn`，加类/删类会让它重播，表现为淡入两遍中间闪一下。脚本动画优先级更高，播完自动交还。
-- `openArticle(id, { direction })` 的第二个参数只给翻页用（`prev` 从左边进、`next` 从右边进）；其它入口不传，就没有额外动画。方向由链接上的 `is-prev` / `is-next` 类决定。
-- 记得留 `prefersReducedMotion()` 的早退，动画库不会自动尊重那个设置。
-
-### `tools/build-posts.js`
-
-- **必须在 `build-site.js` 之后跑**（后者清空 `dist/`）。本地：`node tools/build-site.js && node tools/build-posts.js`；CI 是 `deploy.yml` 的两个连续步骤。
-- 文章页不是另写模板，而是**拿 `dist/index.html` 改出来**：换 head、把正文塞进 `#articleContent`、隐藏 `#view-home`。所以 `index.html` 改了这里不用跟着改；但**几个锚点字符串（`MARK_*` 常量）改了就一定得同步**，对不上时构建会直接失败并点名（`replaceOnce`），不会静默生成坏页面。
-- **模板读进来先统一成 LF**（`loadTemplate()` 里的 `replace(/\r\n/g, '\n')`）。Windows 检出的 `index.html` 是 CRLF，而删除站点标题那条正则结尾要求 `</title>\n`，遇到 `\r\n` 会静默失配 —— 本地产物会多出一个 `<title>`。CI 在 Linux 上拿到 LF，正好掩盖了它，只有逐字节比对产物才看得见。
-- 文章页带一条**静态** `<base href="/">`：它永远在 `dist/` 里、永远由服务器提供，`/` 是对的。别改成相对值。
-- 只发布 `isPublic !== false` 的文章，口径必须和 `script.js` 的 `isArticlePublic` 一致。
-- 产出全是产物：`dist/posts/<id>/index.html`、`dist/sitemap.xml`、`dist/robots.txt`，不要手改、不要提交、别加进 `build-site.js` 的白名单。
-- **本地预览要指向 `dist/`**（`/posts/<id>/` 只在产物里存在）。对着仓库根起服务器，点进文章会 404。
+- 评论数**在构建时抓**：`giscus.app/api/discussions` 的 CORS 只放行它自己，浏览器里请求会被拦。仓库里的 `js/comment-counts.js` 是空表占位，**别把抓下来的数字提交回来**；抓取失败按 0 处理，不能让部署失败。
+- `build-site.js` 是发布入口：白名单复制 + 孤儿页检查（有源码没产物就报错）+ `MUST_HAVE` 校验。用白名单是因为漏发会立刻 404，误发却没人察觉。
+- ⚠️ **别用 `fs.cpSync` / `fs.rmSync`**：这台机器上前者让 node 静默崩溃（退出码 127、无任何输出），后者被 shim 成回收站操作、偶发失败。脚本里是手写递归复制。
+- `.github/workflows/deploy.yml` 在 push 到 main 时构建并发布。**Pages 的 Source 必须是「GitHub Actions」**（只能人工在网页设置）。
+- **本地预览指向 `dist/`**：`/posts/<id>/` 只在产物里存在，对着仓库根起服务器点文章会 404。
 
 ## 搜索引擎收录：默认全站 noindex
 
-2026-11-15 起**全站不让搜索引擎收录**：页面能访问、能分享（微信/Telegram 的预览卡片照常），但不会出现在搜索结果里。
+- 开关在 `tools/build-posts.js` 顶部 `ALLOW_SEARCH_INDEXING`；改回 `true` 时还要同步 `index.html` 第 5 行的 robots 标签。
+- ⚠️ **`robots.txt` 绝不能写 Disallow**：爬虫进不来就读不到 noindex，已收录的页面永远删不掉。保持 `Allow: /` + `Sitemap:`。
 
-- 开关在 `tools/build-posts.js` 顶部的 `ALLOW_SEARCH_INDEXING`（管文章页）。**改回 `true` 时还要同步 `index.html` 第 5 行那条 robots 标签**，因为首页那份是源码里手写的，没有代码去替换它。
-- 其余页面（`movie.html`、`404.html`、`project_subpage/**`、`archive/**`、`_template.html`）各自 head 里都有一条 `<meta name="robots" content="noindex,follow">`。新建页面照 `_template.html` 复制就自带。
-- 文章页的标签是**整条替换** `MARK_ROBOTS`，不是追加。两条互相矛盾的 robots 标签，抓取器取哪条全看运气。
-- ⚠️ **`robots.txt` 里绝对不能写 Disallow。** 这是最容易做错的一步：Disallow 让爬虫进不来 → 读不到页面里的 noindex → 已经收录的页面**永远删不掉**（搜索结果里只剩标题和「此页面无法访问」）。正确姿势是「允许抓取 + 页面声明 noindex」，所以 `Allow: /` 和 `Sitemap:` 都要留着。
-- 保留 `sitemap.xml` 是刻意的：它让爬虫更快抓到页面、更快看到 noindex、更快退出索引。等全站彻底从搜索结果消失，才可以把 `Sitemap:` 那行删掉。
-- 已经收录的内容不会立刻消失，一般 1～4 周。要快，去 Search Console 用「移除网址」工具。
+## 文章地址与数据
 
-## 「获取联系」页与 404 浮窗
+- 站内文章地址是 `/posts/<id>/`，`?article=N` 只是旧链接别名（打开后自动收敛）。卡片标题是**真链接**（爬虫要实际地址），点击由 JS 拦截，**别去掉那个 `preventDefault`**。
+- `js/posts-data.js` / `js/tweaks-data.js`：可增删条目，**不要改字段名**（`script.js` 依赖）。
+- `feed.xml` 是生成物，不手改；冲突就重跑 `node tools/build-feed.js` 覆盖。加文章只动 `posts-data.js`。输出必须幂等（`lastBuildDate` 取最新文章日期，别改回 `new Date()`）。
+- 文章页由 `build-posts.js` 从 `dist/index.html` 改出来：`index.html` 改了不用跟，但 `MARK_*` 锚点常量改了必须同步（对不上会构建失败）。模板读入先统一成 LF。
 
-`project_subpage/blog/contact.html` 是一张**双形态**的页面，`404.html` 里的浮窗是它的第二个入口。改这两处前先读这一节。
+## 各模块一句话
 
-- 页面内容是四张联系方式卡片：**微信 `sossil`、QQ `3810710631`（这两张点了复制号码）+ 主邮箱 `anniedv106@gmail.com`、备用邮箱 `anniedv106@126.com`（这两张是 mailto）**，外加一行回复时效说明。版面是**两竖列**：左列微信 / QQ（`.contact-channel-group`），右列两个邮箱；窄屏时每列各自落下，顺序还是 微信 → QQ → 邮箱 → 备用邮箱，别再改回 2×2 那种「微信|QQ 一行、邮箱|备用 一行」。⚠️ 卡片是 `<button>`（微信/QQ）和 `<a>`（邮箱）混用的，**`.contact-channel` 上的 `line-height: 1.5` 不能删**：button 不继承 `body` 的 1.7、a 会继承，删掉两列卡片高度差 8px，右边整体比左边高一截。**`.contact-channel-group` 和 `.contact-channel` 上的 `min-width: 0` 也不能删**：栅格项默认 `min-width: auto`，邮箱那列会把容器顶宽几像素，手机底部就冒出一条横向滚动条（320px 宽实测会多出 4px）。复制走的是「谁带 `data-copy` 就复制谁、`data-copy-toast` 决定提示语」的委托写法，**加一条联系方式只要多写一张卡片，不用改 JS**。**不要再往里加表单**：2026-11-12 按用户要求删掉了原来的 web3forms 留言表单，投稿/反馈统一走站内的 `/?view=feedback`。
-- 独立访问 = 完整页面（带 `// Contact` 页头、“获取联系”大标题）。
-- 加 `?embedded=1` = 浮窗形态：JS 在 `<head>` 里就给 `<html>` 加上 `.is-embedded`，只做两件事——**隐藏 `.contact-hero`、收紧上下内边距**。标题由浮窗自己的标题栏给。
-- ⚠️ **这一页的 `<head>` 不要加 `<meta name="color-scheme" content="light dark">`，文档背景也不要设成 `transparent`。** 两个坑叠在一起出过一次真实的翻车：meta 让浏览器按**系统偏好**决定画布配色，而站内的深浅色是 `data-theme` 说了算，两边不一致时（系统深色 + 站内浅色）画布被涂成近黑、浅色内容直接画在深色底上，深色标题几乎看不见；再叠加透明底，连“自己的底色”都没有了。现在的写法是 `html { color-scheme: light }` 把 UA 层钉死在 `data-theme` 上（深色仍由 `style.css` 的 `[data-theme="dark"]` 接管），并让页面自己铺 `--color-bg`。404 的 `--panel-bg` 取值和它一致，所以照样无缝。
-- 404 的浮窗用 **iframe** 装它，不是把内容抄一份进 404。理由：那页要引 `css/style.css`、要带自己的复制逻辑，iframe 让两套东西互不干扰；代价是 **404 页不引 `style.css`，所以浮窗外壳里的图标一律不能用 `<i class="ri-*">`**（字体不在）。现有那个 × 是内联 SVG 画的。
-- 关闭有四条路：右上角 ×、点遮罩、Esc、浏览器返回。前三条走 `closeModal()`，最后一条靠打开时 `pushState` 撑的记录 + `popstate`。**别删那个 `pushState`**——否则手机上按返回键会直接离开 404 页，而不是关浮窗。
-- **框的高度按内容收，不是写死的**：`contact.html` 在浮窗形态下把 `document.documentElement` 的高度用 `postMessage({ type: 'annie-contact-height' })` 报给父页，父页写进 `iframe.style.height`；`.contact-panel` 只有 `max-height` 封顶。所以浮窗里 `body` 的 `min-height: 0` 不能删——留着 `style.css` 的 `100vh` 就永远量出「和 iframe 一样高」，框缩不回去。**也别给 `.contact-frame` 加 `opacity` 淡入**：起始帧卡住时整个框就是一片空白，现在用的是 `visibility` 一步切到位（实测见过卡帧）。
-- 主题：`contact.html` 自己读 `localStorage` 的 `annie-theme`，同时接受父页面 `postMessage({ type: 'annie-theme' })`，两处都在 `<head>` 里。
-- **浮窗底色用 `--panel-bg`（白 / `#0f1115`），不是 404 自己的 `--card`**：框里那页用的是 `style.css` 的变量，底色要是跟 `--card`（深色 `#1e1e23`）对齐，卡片会比背景更暗，观感是反的。
-- **加载态是骨架，不是转圈**（2026-11-13 换的）。`.contact-loading` 里铺了一层形状照 `contact.html` 抄来的骨架：两列四卡（卡高 77、图标圈 38、gap 12）+ 底部两行说明条，光带 1.4s 一轮。四个要点：
-  1. **数值是照 `contact.html` 抄的，改那页布局必须同步这里**，否则加载完会跳一下。`.contact-frame` 的占位高度也跟着骨架走（桌面 272 / 窄屏 450），**别改回写死的 420** —— 两列真实内容只有 283 高，420 会让面板加载完突然矮一大截。
-  2. **骨架是 `position: absolute`，高度靠 iframe 撑着**。没有 iframe 时会塌成 0 高（调试时把 `hidden` 去掉单独看骨架就会遇到），这不是样式没生效。
-  3. **撤骨架和加 `is-ready` 必须在同一帧**（都放进 `load` 后那 60ms 的 setTimeout）。拆成两步会有 60ms 白屏；以前转圈时看不出来，换成一整块骨架就很显眼。
-  4. 扫光只扫在卡片这一层（`::after` 盖过内部的圈和横条），底色比面板深一档才有对比度；深色下光带只给 `rgba(255,255,255,.07)`，再高就是一块刺眼的亮斑。
-- 404 里那个 `<a href="/project_subpage/blog/contact.html">` **必须是站点根路径**：404.html 会被 GitHub Pages 兜到任意路径（`/foo/bar`）上渲染，相对地址会跟着假路径走成 `/foo/project_subpage/...`，又是一次 404。只有 `file://` 预览才在 JS 里退回相对地址。
-- **这一页的图标是内联 SVG，刻意不用图标字体**（2026-11-13 改）。统一写成 `<svg class="ci" viewBox="0 0 24 24">`，`.ci` 给 `fill: currentColor` + `width/height: 1em`，颜色和尺寸自动跟随所在位置的 `color` / `font-size`，和原来 `<i class="ri-*">` 的表现一致。**别改回 `<i class="ri-*">`，也别在 `<head>` 里加回 `remixicon.woff2` 的 preload**。原因：web 字体在 Chrome 里会拖住窗口的 `load` 事件，而浮窗正是等 iframe 的 `load` 才露脸——本地把 woff2 延迟 2 秒，`DOMContentLoaded` 34ms、`loadEventEnd` 却是 2035ms，用户盯着转圈的全是那个 165 KB 字体。改完这页传输量 243 KB → 80 KB。⚠️ preload 是无条件下载的，当初改完 SVG 后发现字体还在被请求，就是漏了删那条 preload，别再装回去。加图标时从 `remixicon@4.3.0/icons/<分类>/<名字>.svg` 抄 `<path d="...">`：`wechat-fill` / `qq-fill` 在 `Logos/`、`mail-fill` / `mail-send-fill` 在 `Business/`、`file-copy-line` 在 `Document/`、`arrow-right-up-line` 在 `Arrows/`、`time-line` 在 `System/`。
-- **404 页 `load` 之后会预热这四个文件**（`PREFETCH` 数组，逐个列是因为 prefetch 不递归）。实测本地每响应延迟 200ms 模拟跨境 RTT：预热后 iframe 子资源 213ms → 5ms，整体 447ms → 234ms。⚠️ **只有子资源能命中，iframe 的 HTML 文档那一次请求复用不了缓存**——`prefetch`、`prefetch as="document"`、`fetch()` 三种都试过，结果一样，别指望点了是 0 等待。以后这一页新增外链脚本 / 样式，记得同步往上加，少一个就多一次往返。`navigator.connection.saveData` 为真时跳过预取。
+- **首页列表**：切筛选 / 翻页走 `swapPostsList()`，别直接 `innerHTML`；卡片高度保持自然（不固定、不等比化）。
+- **图片**：`data-fast-src` / `data-slow-src` 双直链，每张图每天 1 次高速额度。头像走内联 `onerror`，**别接进** `image-loading.js`。
+- **背景音乐**：`preload = 'none'`，第一次真要播才设 `src`（`ensureAudioSrc()`）。别在 init 里赋 src，也别在 `tryAutoPlay()` 里提前置 `hasUserInteracted`。
+- **评论**：giscus，term 是「文章 N：标题」。文章页和 `?view=comments` 两处配置要一起改。
+- **`contact.html` / 404 浮窗**：改动前先读这两个文件里的注释——行高、`min-width`、iframe、内联 SVG、高度上报这些坑都记在那儿了。
 
-## 订阅源（feed.xml）
-
-- `feed.xml` 是**生成物**，不要手改。源头是 `js/posts-data.js`，用 `node tools/build-feed.js` 生成。
-- 线上是自动的：`.github/workflows/feed.yml` 在 push 到 `main` 且改动了 `js/posts-data.js` / `tools/build-feed.js` / 这个 workflow 时，会重跑脚本并把新的 `feed.xml` 提交回来。**所以别再手工改 feed.xml，也别删这个 workflow**。
-- 本地改完文章顺手跑一次是好习惯（能立刻看 diff），但不是必须；忘了跑不影响线上。
-- 本地那份 `feed.xml` 落后于仓库是**正常状态**：它在你本地没被改过时，`git pull` 会 fast-forward 直接覆盖，不用管。
-- 但**别在本地跑完脚本又不提交** —— `feed.xml` 会变成「已修改」，`git pull` 会被 `Your local changes would be overwritten` 挡住。要么连着一起提交（输出幂等，CI 不会重复提交），要么 `git checkout -- feed.xml` 还原。
-- 脚本**不需要**跟着文章一起改：加文章只动 `js/posts-data.js`。它输出是幂等的——`lastBuildDate` 取最新文章日期而不是当前时间，同一份数据在本地和 CI 生成的文件逐字节相同，不会打架。别把它改回 `new Date()`。
-- 脚本只在沙箱里求值 `posts-data.js`（取 `window.BLOG_POSTS`），不依赖 `script.js`，所以别把文章数据挪到别处，也别改成需要运行时的写法（如 `fetch`）。
-- 内容策略是**摘要版**：每篇只有 `excerpt` 一句话 + `media:thumbnail`，不输出 `content:encoded`，正文留在站点上。`excerpt` 为空时退回用标题，别输出空 `description`。
-- 别把 `description` 改成塞全文或塞 HTML：纯文本最兼容，各阅读器对 HTML 的处理不一致。要全文得同时加回 `xmlns:content` 命名空间。
-- 封面 `media:thumbnail` 三级兜底：`cover` 字段 → 正文首张 `<img>` → 站点封面 `share_cover.jpg`（`tools/build-feed.js` 里的 `FALLBACK_COVER`，设成 `''` 可关）。`cover` 只喂给 feed，页面上不显示。
-- `feed.xml` 冲突了（`git status` 里显示 `UU`）**不要手工选边**，也不要用编辑器的「保留当前/传入更改」：直接跑 `node tools/build-feed.js` 覆盖掉带冲突标记的文件，再 `git add feed.xml` 完成合并。脚本输出是确定的，它跑出来的就是唯一正确答案。
-- 站内有 `index.html` 的 `<link rel="alternate">` 和页头社交区那个 RSS 图标两处入口，都指向 `feed.xml`，改地址要一起改。
-
-## 提交前自查
+## 提交前
 
 ```bash
-node tools/check-icons.js   # 图标
-node tools/build-feed.js    # 动过文章数据后跑，重新生成 feed.xml（CI 也会跑，本地跑能立刻看到 diff）
+node tools/check-icons.js   # 图标名、CDN 残留、页面是否引了 style.css
+node tools/build-feed.js    # 动过文章数据后跑（CI 也会跑，本地跑能立刻看 diff）
 ```
 
-`check-icons.js` 会检查三件事：有没有残留的 CDN 图标引用、HTML/JS 里用到的图标名是否都存在于本地字体、每个用了图标的页面是否引了 `style.css`。有输出就说明有问题。
+查不到的东西按这个顺序找：`README.md`（速查）→ `tools/README.md`（环境、脚本、报错对照）→ `guide.html`（完整手册）→ 相关文件里的注释。
