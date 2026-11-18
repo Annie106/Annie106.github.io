@@ -3,6 +3,8 @@
 给在这个仓库里写代码的 AI 工具看的约定。人看的速查是 `README.md`，完整手册是站内 `project_subpage/blog/guide.html`。
 `CLAUDE.md` / `.cursorrules` 只是指向本文件的指针，规则一律写在这里，别在那边另开一套。
 
+## 注意 非必要内容不要写进此文档内，以节省token和上下文占用
+
 ## 硬前提
 
 - 纯静态博客：原生 HTML + CSS + JS，**运行时零依赖、无后端**，托管在 GitHub Pages。不引框架、打包器、TypeScript、CSS 预处理器。
@@ -25,6 +27,7 @@
 - **加图标**：写 `<i class="ri-xxx">` 然后提交，pre-commit 钩子会自动重裁并暂存 `fonts/`；手动补跑 `tools/update-icons.bat`。
 - **改完必跑 `node tools/check-icons.js`**（构建已把它设为前置）。图标名写错或忘了重裁**不会报错，只会渲染成空白**。
 - **禁止**引 CDN 图标字体。版本刻意停在 4.3.0，别主动升级；真要升就替换 `tools/remixicon-src.*` 再跑 `tools/update-icons.bat`。
+- **换了 `favicon.svg` 必须跑 `node tools/make-app-icons.js`**，否则主屏图标还是旧的（同样不报错）。
 
 ## 新建页面
 
@@ -66,7 +69,9 @@
 ## 文章地址与数据
 
 - 站内文章地址是 `/posts/<id>/`，`?article=N` 只是旧链接别名（打开后自动收敛）。卡片标题是**真链接**（爬虫要实际地址），点击由 JS 拦截，**别去掉那个 `preventDefault`**。
-- `js/posts-data.js` / `js/tweaks-data.js`：可增删条目，**不要改字段名**（`script.js` 依赖）。
+- **正文和元信息在 `posts/*.md`**（每篇一个文件，`---` 里是元信息）。`js/posts-data.js` 是 `tools/build-posts-data.js` 生成的，**不要手改**；改完文章跑一次生成，`npm run build` 已经包含这一步。
+- 正文是 Markdown，渲染器是 `js/markdown.js`，**浏览器和构建脚本共用这一份**（构建时静态页也用它渲染）；动手改语法支持时两边会同时变，这是有意的。
+- `js/tweaks-data.js`：可增删条目，**不要改字段名**（`script.js` 依赖）。
 - `feed.xml` 是生成物，不手改；冲突就重跑 `node tools/build-feed.js` 覆盖。加文章只动 `posts-data.js`。输出必须幂等（`lastBuildDate` 取最新文章日期，别改回 `new Date()`）。
 - 文章页由 `build-posts.js` 从 `dist/index.html` 改出来：`index.html` 改了不用跟，但 `MARK_*` 锚点常量改了必须同步（对不上会构建失败）。模板读入先统一成 LF。
 

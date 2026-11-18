@@ -59,6 +59,8 @@ const PUBLISH_FILES = [
     'favicon.svg',
     'share_cover.jpg',
     'feed.xml',
+    // 主屏图标三件套：manifest 是根级新文件，PNG 放在 images/ 里（目录已整份复制）
+    'manifest.webmanifest',
 ];
 
 /* 根级目录，按整份递归复制。列在这里的目录内部加文件、加子目录都不用再改脚本。

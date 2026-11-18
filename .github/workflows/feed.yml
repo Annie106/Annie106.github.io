@@ -13,6 +13,7 @@ on:
     branches: [main]
     paths:
       - 'js/posts-data.js'
+      - 'posts/**'
       - 'tools/build-feed.js'
       - '.github/workflows/feed.yml'
   workflow_dispatch:
@@ -40,6 +41,10 @@ jobs:
         with:
           node-version: '22'
 
+      # posts/*.md 是正文的真身，先把文章数据合出来，feed 和站点才不会各说各的
+      - name: 由 Markdown 生成文章数据
+        run: node tools/build-posts-data.js
+
       - name: 生成 feed.xml
         run: node tools/build-feed.js
 
@@ -47,18 +52,18 @@ jobs:
         run: |
           # 用 porcelain 而不是 git diff：新加的 feed.xml 还是未跟踪文件时，
           # git diff 看不见它，会误判成「没有变化」而永远不提交
-          if [ -z "$(git status --porcelain -- feed.xml)" ]; then
-            echo "feed.xml 没有变化，跳过提交"
+          if [ -z "$(git status --porcelain -- feed.xml js/posts-data.js)" ]; then
+            echo "没有变化，跳过提交"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add feed.xml
+          git add feed.xml js/posts-data.js
           # 这里**故意不加** [skip ci]。
           # 加了会连「部署站点」workflow 一起跳过：以前的分支发布只认分支内容，
           # 提交一上去 Pages 就重建；现在走 Actions，部署要靠 push 事件触发，
           # 带 [skip ci] 的话新 feed.xml 要等下一次正常 push 才会真的上线。
           # 防自激仍然有效 —— 上面那句 `if: github.actor != 'github-actions[bot]'`
           # 保证这次机器人提交不会再跑一遍本 workflow。
-          git commit -m "chore: 重新生成 feed.xml"
+          git commit -m "chore: 由 posts/*.md 重新生成文章数据与 feed.xml"
           git push

@@ -15,6 +15,15 @@
     <title>Annie · 个人博客</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
 
+    <!-- ==================== 添加到主屏 ==================== -->
+    <!-- theme-color 由 js/theme.js 跟着实际主题改（手动切深色时系统偏好那套 media
+         查询不会跟着变，所以这里只留一个 meta，值交给脚本覆盖）。
+         不加 service worker：站点内容每次构建都在变，缓存策略写错就是白屏。 -->
+    <meta name="theme-color" id="themeColorMeta" content="#ffffff">
+    <link rel="manifest" href="manifest.webmanifest">
+    <!-- iOS 只认 PNG，而且不吃透明通道，所以这里用满幅方图，圆角交给系统自己裁 -->
+    <link rel="apple-touch-icon" sizes="180x180" href="images/apple-touch-icon.png">
+
     <!-- ==================== 分享卡片元信息 ==================== -->
     <!-- 微信 / QQ / 微博等抓取链接预览时，优先读这几条。
          没有 og:image 时微信只能显示一个灰色链接占位图标。
@@ -77,6 +86,10 @@
                 var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
                 var theme = (t === 'light' || t === 'dark') ? t : (dark ? 'dark' : 'light');
                 document.documentElement.setAttribute('data-theme', theme);
+                /* 地址栏颜色一并在这里定下来：theme.js 要等 DOM 就绪才跑，
+                   中间这一小段手机地址栏会先用白色，深色页看着像闪了一下。 */
+                var meta = document.getElementById('themeColorMeta');
+                if (meta) meta.setAttribute('content', theme === 'dark' ? '#0f1115' : '#ffffff');
             } catch (e) {}
         })();
     </script>
@@ -276,6 +289,13 @@
             }, 15000);
         })();
     </script>
+
+    <!-- 阅读进度：贴着视口最上沿的一条 2px 细线，只在文章视图、且正文确实
+         能滚动的时候出现（判断在 script.js 的 syncReadingUi）。用 scaleX 而不是
+         width，避免每一帧都触发重排。 -->
+    <div class="reading-progress" id="readingProgress" aria-hidden="true">
+        <span class="reading-progress-bar" id="readingProgressBar"></span>
+    </div>
 
     <!-- ==================== 头部导航 ==================== -->
     <header class="site-header">
@@ -675,6 +695,13 @@
             <section class="tagcloud-section" id="tagCloudSection" aria-labelledby="tagCloudTitle">
                 <div class="tweak-head">
                     <h2 class="tweak-title" id="tagCloudTitle">标签云</h2>
+                    <!-- 标签云只摊开前 4 个，而且点了是「原地筛选」。
+                         想拿一个能分享的标签页，从这里进总览页，
+                         每个标签点进去就是 /tags/<标签>/ 那个真页面。 -->
+                    <a class="tweak-all" id="tagAll" href="index.html?view=tags">
+                        <span>全部标签</span>
+                        <i class="ri-arrow-right-line" aria-hidden="true"></i>
+                    </a>
                 </div>
                 <div class="tag-cloud" id="tagCloud">
                     <!-- 骨架：四个胶囊，尺寸照着 .tag-pill（72×34、圆角 20） -->
@@ -736,6 +763,26 @@
                 <p class="tweaks-lead">来不及写成长文的，都以小记的形式堆在这里。短，但都是真的。</p>
             </header>
             <div class="tweaks-feed" id="tweaksFeed"></div>
+        </div>
+
+        <!-- ==================== 标签总览 ==================== -->
+        <!-- 不占导航栏。每个标签是一条指向 /tags/<标签>/ 的真链接：
+             点进去是构建时生成的独立页，地址可以直接发给别人。 -->
+        <div id="view-tags" class="view" style="display:none;">
+            <header class="tweaks-hero">
+                <p class="tweaks-eyebrow">// TAGS</p>
+                <h1 class="tweaks-title">标签</h1>
+                <p class="tweaks-lead">两篇以上的标签会单独生成一个页面。点进去就是那个地址，直接复制走即可。</p>
+            </header>
+            <div class="tag-landing" id="tagLandingList"></div>
+            <!-- 这个入口要「回到离开首页时的位置」，所以不能用 data-goto-home
+                 （那个委托会先把位置清零再滚到顶，是给「回首页顶部」用的）。
+                 href 只是 JS 没跑起来时的兜底。 -->
+            <p class="tag-hub-back">
+                <a class="back-link" id="tagsBackHome" href="index.html">
+                    <i class="ri-arrow-left-line" aria-hidden="true"></i> 回到首页
+                </a>
+            </p>
         </div>
 
         <!-- ==================== 电影视图 ==================== -->
@@ -800,17 +847,26 @@
             </section>
 
             <!-- 版本号：从页脚挪到这里，收在关于页右下角 -->
-            <p class="about-version">版本 0.4.25.028</p>
+            <p class="about-version">版本 0.4.26.019</p>
         </div>
 
         <!-- ==================== 文章详情视图 ==================== -->
         <div id="view-article" class="article-detail" style="display:none;">
         <div class="article-topbar">
             <span class="back-link" id="backBtn"><i class="ri-arrow-left-line"></i> 返回</span>
-            <button class="article-share" id="articleShare" type="button" title="复制这篇文章的链接">
-                <i class="ri-share-line" aria-hidden="true"></i>
-                <span>分享</span>
-            </button>
+            <!-- 右侧一组工具：正文字号 + 分享。字号只作用在 .article-content，
+                 标题和元信息不跟着放大，免得整页尺度失衡。 -->
+            <div class="article-actions">
+                <div class="article-fontsize" id="articleFontSize" role="group" aria-label="正文字号">
+                    <button type="button" class="fontsize-btn is-sm" data-fontscale="sm" aria-pressed="false" title="小字">A−</button>
+                    <button type="button" class="fontsize-btn is-md" data-fontscale="md" aria-pressed="true" title="标准字号">A</button>
+                    <button type="button" class="fontsize-btn is-lg" data-fontscale="lg" aria-pressed="false" title="大字">A+</button>
+                </div>
+                <button class="article-share" id="articleShare" type="button" title="复制这篇文章的链接">
+                    <i class="ri-share-line" aria-hidden="true"></i>
+                    <span>分享</span>
+                </button>
+            </div>
         </div>
 
             <section class="article-unavailable-notice" id="articleUnavailableNotice" aria-label="文章暂不开放提示" hidden>
@@ -818,7 +874,23 @@
             </section>
             <h1 class="article-full-title" id="articleTitle"></h1>
             <div class="article-full-meta" id="articleMeta"></div>
-            <div class="article-content" id="articleContent"></div>
+            <!-- 正文 + 右侧目录。目录在 DOM 里排在正文前面（手机上就是正文上方的
+                 一张可折叠卡片），桌面端再由网格把它摆到右列 —— 这样窄屏不用
+                 靠 order 调换，读屏和 Tab 顺序也是「先目录、后正文」。
+                 标题少于两篇时不显示（一个条目的目录只是噪音），由 renderArticleToc 控制。 -->
+            <div class="article-reader">
+                <nav class="article-toc" id="articleToc" aria-labelledby="articleTocTitle" hidden>
+                    <button type="button" class="article-toc-head" id="articleTocToggle"
+                            aria-expanded="false" aria-controls="articleTocList">
+                        <span class="article-toc-title" id="articleTocTitle">
+                            <i class="ri-file-list-3-line" aria-hidden="true"></i> 本文目录
+                        </span>
+                        <i class="ri-arrow-down-s-line article-toc-chevron" aria-hidden="true"></i>
+                    </button>
+                    <ol class="article-toc-list" id="articleTocList"></ol>
+                </nav>
+                <div class="article-content" id="articleContent"></div>
+            </div>
             <div id="embeddedArticleNormalMount">
                 <div class="embedded-article-wrap" id="embeddedArticleWrap" hidden>
                     <div class="embedded-article-loading" id="embeddedArticleLoading" role="status" aria-live="polite">
@@ -836,6 +908,9 @@
                  放在正文和评论区之间 —— 读完顺手翻页，不用滚回顶部找导航。
                  空着时不留高度（:empty），没有兄弟文章也不会多出一条空隙。 -->
             <nav class="article-adjacent" id="articleAdjacent" aria-label="相邻文章"></nav>
+            <!-- 相关文章：按标签重合度算，和「上一篇 / 下一篇」按时间排是两回事。
+                 没有重合标签就整块隐藏，不硬凑。静态页里它是空的，脚本跑起来才填。 -->
+            <nav class="article-related" id="articleRelated" aria-labelledby="articleRelatedTitle" hidden></nav>
             <hr class="divider-thin article-comments-divider" id="articleCommentsDivider">
             <section class="article-comments" id="articleCommentsSection" aria-labelledby="articleCommentsTitle">
                 <div class="comments-stage" id="articleCommentsStage">
@@ -1220,6 +1295,10 @@
     <script src="js/image-loading.js"></script>
     <script src="js/posts-data.js"></script>
     <script src="js/tweaks-data.js"></script>
+    <!-- 正文是 Markdown，渲染器必须在 script.js 之前就位。
+         构建静态页时用的是同一个文件（tools/build-posts.js 直接 require 它），
+         所以站内渲染和爬虫看到的 HTML 出自同一套规则。 -->
+    <script src="js/markdown.js"></script>
     <!-- 卡片上的真实评论数：构建时由 tools/build-comment-counts.js 写入。
          仓库里那份是空表占位，所以本地不跑构建也不会 404。 -->
     <script src="js/comment-counts.js"></script>

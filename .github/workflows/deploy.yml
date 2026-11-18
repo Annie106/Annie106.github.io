@@ -59,6 +59,11 @@ jobs:
       - name: 安装构建依赖（压缩用）
         run: npm ci
 
+      # 文章的正文和元信息在 posts/*.md，这一步把它们合成 js/posts-data.js。
+      # 仓库里那份是提交过的；这里再跑一次，是为了「只改了 md、忘了重新生成」时也能出正确的站。
+      - name: 由 Markdown 生成文章数据
+        run: node tools/build-posts-data.js
+
       - name: 生成发布产物 dist/
         run: node tools/build-site.js
 

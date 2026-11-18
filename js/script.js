@@ -4,6 +4,21 @@
             // 首页和归档页共用同一份，增删改只改那个文件。
             const blogPosts = Array.isArray(window.BLOG_POSTS) ? window.BLOG_POSTS : [];
 
+            /* 正文是 Markdown，渲染器在 js/markdown.js（要在本文件之前加载）。
+               这里留一个降级版：万一那个文件没加载成功，就把正文当纯文本显示，
+               总比整页空白好 —— 但这属于故障状态，正常构建不会出现。 */
+            const MARKDOWN = window.AnnieMarkdown || {
+                render: function (source) {
+                    return String(source == null ? '' : source);
+                },
+                toPlainText: function (source) {
+                    return String(source == null ? '' : source);
+                },
+                firstImage: function () {
+                    return '';
+                },
+            };
+
             // ==================== 统一管理文章卡片的二级菜单 ====================
             // 使用文章 id 对应菜单项；未配置的文章默认显示“评论”入口。
             // 菜单项支持这些类型：
@@ -49,6 +64,8 @@
             const viewBlog = $('#view-blog');
             const viewArchive = $('#view-archive');
             const viewTweaks = $('#view-tweaks');
+            const viewTags = $('#view-tags');
+            const tagLandingList = $('#tagLandingList');
             const viewMovie = $('#view-movie');
             const viewAbout = $('#view-about');
             const movieFrame = $('#movieFrame');
@@ -88,6 +105,13 @@
             const articleMeta = $('#articleMeta');
             const articleContent = $('#articleContent');
             const articleAdjacent = $('#articleAdjacent');
+            const articleRelated = $('#articleRelated');
+            const articleToc = $('#articleToc');
+            const articleTocToggle = $('#articleTocToggle');
+            const articleTocList = $('#articleTocList');
+            const articleFontSize = $('#articleFontSize');
+            const readingProgress = $('#readingProgress');
+            const readingProgressBar = $('#readingProgressBar');
             const articleUnavailableNotice = $('#articleUnavailableNotice');
             const articleUnavailableMount = $('#articleUnavailableMount');
             const articleCommentsDivider = $('#articleCommentsDivider');
@@ -136,9 +160,16 @@
                图片的「模糊 → 清晰」淡入也跟着重播，看上去就是闪一下。 */
             let renderedArticleId = null;
             let renderedArticleUnavailable = false;
+            /* 目录：当前这篇里的小标题元素，按文档顺序；以及高亮到第几个。
+               renderArticleToc 每渲染一篇文章重算一次，滚动时只改 class。 */
+            let tocHeadings = [];
+            let tocActiveIndex = -1;
             let embeddedPageObserver = null;
             let embeddedPageResizeHandler = null;
             let embeddedPageFallbackTimer = null;
+            /* 内嵌页的「量内容高度」函数（在 onload 里定义）。
+               字号一变要立刻重量一次，所以得把它存出来 —— 见 applyEmbeddedScale。 */
+            let embeddedMeasure = null;
             // 上一次量出的 iframe 高度：内容没变就不重复写 height，
             // 避免「改高度 → 触发 ResizeObserver → 再改高度」的循环
             let embeddedFrameHeight = 0;
@@ -263,7 +294,7 @@
             // 点击文章跳到独立 HTML 页面后，返回本站时恢复离开时所在的界面：
             // 视图（首页 / 文章列表 / 文章详情 / 电影 / 关于）、当前标签、滚动位置。
             const VIEW_STATE_KEY = 'annie-view-state';
-            const VALID_VIEWS = ['home', 'blog', 'archive', 'tweaks', 'movie', 'about', 'article', 'feedback', 'thanks', 'comments'];
+            const VALID_VIEWS = ['home', 'blog', 'archive', 'tweaks', 'tags', 'movie', 'about', 'article', 'feedback', 'thanks', 'comments'];
 
             function saveViewState() {
                 if (!VALID_VIEWS.includes(currentView)) return;
@@ -459,6 +490,7 @@
                 url.pathname = siteBasePath();
                 url.searchParams.delete(ARTICLE_PARAM);
                 if (currentView === 'about' || currentView === 'archive' || currentView === 'tweaks'
+                    || currentView === 'tags'
                     || currentView === 'feedback' || currentView === 'thanks'
                     || currentView === 'comments') {
                     url.searchParams.set(VIEW_PARAM, currentView);
@@ -1064,9 +1096,13 @@
             });
 
             // ==================== 工具函数 ====================
+            /* 只统计「正文能读」的文章的标签。
+               口径必须和 tools/build-posts.js 生成 /tags/<标签>/ 时一致：
+               那一步用的是 isPublic 过滤后的列表，这里多算一个标签，
+               标签总览里就会多一条点进去 404 的链接。 */
             function getAllTags() {
                 const tagSet = new Set();
-                blogPosts.forEach(p => p.tags.forEach(t => tagSet.add(t)));
+                blogPosts.filter(isArticlePublic).forEach(p => (p.tags || []).forEach(t => tagSet.add(t)));
                 return ['all', ...Array.from(tagSet)];
             }
 
@@ -1076,7 +1112,8 @@
                中文按拼音比较靠 Intl.Collator('zh-Hans-CN')，不用手写映射表。 */
             function getTagStats() {
                 const stats = new Map();
-                blogPosts.forEach(p => {
+                // 同上：隐藏正文的文章不参与统计，否则标签页和站内篇数会对不上
+                blogPosts.filter(isArticlePublic).forEach(p => {
                     const date = postDisplayDate(p);
                     (p.tags || []).forEach(t => {
                         const item = stats.get(t) || { name: t, count: 0, latest: '' };
@@ -1183,7 +1220,8 @@
                     tagLine: (post.tags || []).map(tag => normalizeText(tag)).join(' '),
                     // 正文只在需要时才算：embeddedPage 是 iframe，
                     // 外站内容读不到，只能靠标题/摘要/标签匹配。
-                    content: normalizeText(post.content),
+                    // 搜索匹配的是「读者看到的字」，所以先剥掉 Markdown 记法
+                    content: normalizeText(MARKDOWN.toPlainText(post.content)),
                     date: String(post.date || ''),
                 };
                 searchIndexCache.set(post.id, index);
@@ -2368,6 +2406,61 @@
                 });
             }
 
+            /* 标签总览：每个标签都指向构建出来的 /tags/<标签>/ 独立页。
+               注意这里用的是**真链接**（不是按钮）：点开是一次整页跳转，
+               所以地址栏里那个地址天然可以复制、可以直接发人。
+               链接要按站点根拼，不能写相对路径 —— 站内某个视图的地址不一定是根，
+               相对路径会拼到 /posts/<id>/tags/ 下面去。 */
+            function buildTagUrl(tag) {
+                return siteBasePath() + 'tags/' + encodeURIComponent(tag) + '/';
+            }
+
+            /* 和 tools/build-posts.js 的 TAG_PAGE_MIN_POSTS 保持一致：
+               那边只给 2 篇以上的标签生成页面，这边就只列这些，
+               否则会列出点进去 404 的链接。改数字记得两边一起改。 */
+            const TAG_PAGE_MIN_POSTS = 2;
+
+            function renderTagLanding() {
+                if (!tagLandingList) return;
+                const stats = getTagStats().filter(function (item) {
+                    return item.count >= TAG_PAGE_MIN_POSTS;
+                });
+                if (!stats.length) {
+                    tagLandingList.innerHTML = '<p class="tag-landing-empty">还没有文章数达到 2 篇的标签。</p>';
+                    return;
+                }
+                tagLandingList.innerHTML = stats.map(function (item) {
+                    return '<a class="tag-landing-item" href="' + escapeHtml(buildTagUrl(item.name)) + '">' +
+                        '<span class="tag-landing-name">' + escapeHtml(item.name) + '</span>' +
+                        '<span class="tag-landing-count">' + item.count + ' 篇</span>' +
+                        '<i class="ri-arrow-right-line" aria-hidden="true"></i>' +
+                    '</a>';
+                }).join('');
+            }
+
+            /* 标签总览底部「回到首页」。
+               只调 goHome()，不碰 viewScrollPositions —— switchView('home') 会把
+               离开首页时记下的位置还回去。和文章列表页那个「首页」胶囊按钮不一样，
+               那个的语义是「回首页顶部」。 */
+            (function bindTagsBackHome() {
+                const back = document.getElementById('tagsBackHome');
+                if (!back) return;
+                back.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    goHome();
+                });
+            })();
+
+            // 「全部标签」入口：站内切视图，不整页刷新
+            (function bindTagAll() {
+                const allLink = document.getElementById('tagAll');
+                if (!allLink) return;
+                allLink.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    navigateToView('tags');
+                });
+            })();
+
             function renderTimeline() {
                 const mount = document.getElementById('timelineMount');
                 if (!mount) return;
@@ -3207,6 +3300,442 @@
                 ].join('');
             }
 
+            /* ==================== 阅读辅助：目录 / 进度 / 字号 / 相关文章 ==================== */
+
+            /* 目录锚点：中文标题直接当 id，地址栏会把它转义成 %E4…，但链接本身稳定。
+               题首那截「一、二、」先去掉，否则 id 会变成 "一-当生活变成一潭死水" 这种噪音。
+               同一篇里重名时补 -2、-3，保证全篇唯一。 */
+            function slugifyHeading(text, used) {
+                const base = normalizeText(text)
+                    .replace(/^[一二三四五六七八九十百千]+[、.．,，)）]\s*/, '')
+                    .replace(/[^\p{L}\p{N}]+/gu, '-')
+                    .replace(/^-+|-+$/g, '') || 'section';
+                let slug = base;
+                let n = 2;
+                while (used.has(slug)) {
+                    slug = base + '-' + n;
+                    n += 1;
+                }
+                used.add(slug);
+                return slug;
+            }
+
+            /* 只有一个小标题的目录只是占地方，直接不出。
+               内嵌页和「文章暂不开放」也没有目录可列。 */
+            function renderArticleToc(post, isUnavailableArticle) {
+                if (!articleToc || !articleTocList) return;
+                tocHeadings = [];
+                tocActiveIndex = -1;
+                const hideToc = function () {
+                    articleToc.hidden = true;
+                    articleToc.classList.remove('is-open');
+                    articleTocList.innerHTML = '';
+                    syncTocAria();
+                };
+                if (isUnavailableArticle || !post || post.embeddedPage) {
+                    hideToc();
+                    return;
+                }
+                const headings = Array.prototype.slice.call(articleContent.querySelectorAll('h2'));
+                if (headings.length < 2) {
+                    hideToc();
+                    return;
+                }
+                const used = new Set();
+                const items = headings.map(function (heading) {
+                    /* 正文被复用（renderArticle 里那条 canReuseContent）时 id 已经在了，
+                        这时候收进 used 就行，不要重新生成 —— 重新算会让锚点漂移 */
+                    if (heading.id) used.add(heading.id);
+                    else heading.id = slugifyHeading(heading.textContent, used);
+                    const label = (heading.textContent || '').trim() || heading.id;
+                    /* 标题包一层 span：截断（两行 + 省略号）挂在 span 上，
+                       直接钳 <a> 的话第三行会从它的 padding 里漏出来 */
+                    return '<li><a class="article-toc-link" href="#' + encodeURIComponent(heading.id) +
+                        '" data-toc-target="' + escapeHtml(heading.id) + '">' +
+                        '<span class="article-toc-label">' + escapeHtml(label) + '</span></a></li>';
+                });
+                articleTocList.innerHTML = items.join('');
+                tocHeadings = headings;
+                articleToc.hidden = false;
+                articleToc.classList.remove('is-open');
+                syncTocAria();
+            }
+
+            function toggleArticleToc(open) {
+                if (!articleToc) return;
+                articleToc.classList.toggle('is-open', open);
+                syncTocAria();
+            }
+
+            /* 桌面端目录是常驻展开的（CSS 那边强制显示列表），
+               所以 aria-expanded 也要按断点报 true，否则读屏会被告知「已折叠」。 */
+            const tocWideQuery = window.matchMedia('(min-width: 1180px)');
+            function syncTocAria() {
+                if (!articleTocToggle || !articleToc) return;
+                const expanded = tocWideQuery.matches || articleToc.classList.contains('is-open');
+                articleTocToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            }
+            tocWideQuery.addEventListener('change', function () {
+                if (tocWideQuery.matches && articleToc) articleToc.classList.remove('is-open');
+                syncTocAria();
+                syncReadingUi();
+            });
+
+            /* 高亮「当前读到哪一节」。滚动时只切 class，不重建 DOM。 */
+            function setTocActive(index) {
+                if (index === tocActiveIndex || !articleTocList) return;
+                tocActiveIndex = index;
+                const links = articleTocList.querySelectorAll('.article-toc-link');
+                for (let i = 0; i < links.length; i += 1) {
+                    const on = i === index;
+                    links[i].classList.toggle('is-active', on);
+                    if (on) links[i].setAttribute('aria-current', 'location');
+                    else links[i].removeAttribute('aria-current');
+                }
+            }
+
+            /* ==================== 目录跳转的滚动动画 ==================== */
+            /* 浏览器自带的 scrollIntoView({behavior:'smooth'}) 时长是按距离算的，
+               跨几屏时几乎是「唰」一下冲过去，读起来很僵。这里自己用 rAF 走一条
+               easeOutCubic：起步就有速度、快到位时慢慢收住。
+               中途用户自己滚、翻页、切视图，都要立刻让位，不能跟他抢。 */
+            let tocScrollRaf = null;
+            let tocScrollCleanup = null;
+
+            function cancelTocScroll() {
+                if (tocScrollRaf) {
+                    window.cancelAnimationFrame(tocScrollRaf);
+                    tocScrollRaf = null;
+                }
+                if (tocScrollCleanup) {
+                    const cleanup = tocScrollCleanup;
+                    tocScrollCleanup = null;
+                    cleanup();
+                }
+            }
+
+            function animateTocScroll(destY) {
+                cancelTocScroll();
+                const startY = window.scrollY;
+                const distance = destY - startY;
+                // 差几像素就别演了，直接落位
+                if (Math.abs(distance) < 4) {
+                    window.scrollTo(0, destY);
+                    return;
+                }
+                /* 距离越远走得越久，两头都收个口：
+                   相邻小节别磨叽，跨三四屏也别让人干等。 */
+                const duration = Math.min(720, Math.max(280, Math.abs(distance) * 0.6));
+                const root = document.documentElement;
+                /* html 上写着 scroll-behavior: smooth，逐帧调 scrollTo 会被它
+                   再接管一次，变成「每一帧都重新开一段动画」，结果是抖或者干脆不动。
+                   动画期间临时关掉，收尾（或被打断）再还原。 */
+                const previousBehavior = root.style.scrollBehavior;
+                root.style.scrollBehavior = 'auto';
+
+                const stop = function () {
+                    cancelTocScroll();
+                };
+                /* 键盘整屏翻页也算「用户自己接管了」，同样让位 */
+                const onScrollKey = function (event) {
+                    const key = event.key;
+                    if (key === ' ' || key === 'PageDown' || key === 'PageUp'
+                        || key === 'Home' || key === 'End'
+                        || key === 'ArrowUp' || key === 'ArrowDown') {
+                        cancelTocScroll();
+                    }
+                };
+                window.addEventListener('wheel', stop, { passive: true });
+                window.addEventListener('touchstart', stop, { passive: true });
+                window.addEventListener('keydown', onScrollKey);
+                tocScrollCleanup = function () {
+                    window.removeEventListener('wheel', stop);
+                    window.removeEventListener('touchstart', stop);
+                    window.removeEventListener('keydown', onScrollKey);
+                    root.style.scrollBehavior = previousBehavior;
+                };
+
+                const startedAt = window.performance.now();
+                const easeOutCubic = function (t) {
+                    return 1 - Math.pow(1 - t, 3);
+                };
+                const step = function (now) {
+                    const progress = Math.min(1, (now - startedAt) / duration);
+                    window.scrollTo(0, startY + distance * easeOutCubic(progress));
+                    if (progress < 1) {
+                        tocScrollRaf = window.requestAnimationFrame(step);
+                    } else {
+                        // 收尾时把 scroll-behavior 和监听一起还原
+                        cancelTocScroll();
+                    }
+                };
+                tocScrollRaf = window.requestAnimationFrame(step);
+            }
+
+            /* 目标位置按 h2 自己的 scroll-margin-top 算 —— 跟 CSS 那边共用一份规则，
+               不在这里重复写一遍「导航高度 + 24」，改样式时不会两处对不上。 */
+            function scrollToHeading(target) {
+                const margin = parseFloat(window.getComputedStyle(target).scrollMarginTop) || 0;
+                const destY = target.getBoundingClientRect().top + window.scrollY - margin;
+                if (prefersReducedMotion()) {
+                    /* 系统开了「减少动态效果」就直接落位。
+                       注意不能只写 window.scrollTo(0, destY) —— html 上有
+                       scroll-behavior: smooth，那样还是会滑一段过去，跟这个偏好相反。 */
+                    const root = document.documentElement;
+                    const previousBehavior = root.style.scrollBehavior;
+                    root.style.scrollBehavior = 'auto';
+                    window.scrollTo(0, destY);
+                    root.style.scrollBehavior = previousBehavior;
+                    return;
+                }
+                animateTocScroll(destY);
+            }
+
+            if (articleTocList) {
+                articleTocList.addEventListener('click', function (event) {
+                    const link = event.target.closest('.article-toc-link');
+                    if (!link) return;
+                    // 修饰键 / 中键：交回浏览器，「在新标签打开这一节」照常可用
+                    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+                    const target = document.getElementById(link.getAttribute('data-toc-target'));
+                    if (!target) return;
+                    event.preventDefault();
+                    /* replaceState 而不是 pushState：目录跳转是在同一篇里移动，
+                       压历史记录的话，返回键会一节一节往回退，而不是退出文章。 */
+                    history.replaceState(history.state, '', '#' + encodeURIComponent(target.id));
+                    /* 手机上点完目录会收起折叠卡片，卡片一消失正文整体上移 ——
+                       必须先把这一步做完再量位置，否则按收起前的坐标算，
+                       会正好差出一张卡片的高度。 */
+                    toggleArticleToc(false);
+                    scrollToHeading(target);
+                });
+            }
+
+            if (articleTocToggle) {
+                articleTocToggle.addEventListener('click', function () {
+                    // 桌面端的标题只是个标签，不该有开关行为
+                    if (tocWideQuery.matches || articleToc.hidden) return;
+                    toggleArticleToc(!articleToc.classList.contains('is-open'));
+                });
+            }
+
+            /* ---------------- 正文字号 ---------------- */
+            const ARTICLE_SCALE_KEY = 'annie-article-scale';
+            const ARTICLE_SCALES = { sm: 0.94, md: 1, lg: 1.13 };
+            let articleScale = 'md';
+
+            function applyArticleScale(level, persist) {
+                const key = ARTICLE_SCALES[level] ? level : 'md';
+                articleScale = key;
+                // 倍率挂在文章视图上，正文和 h2 各自的 font-size 都乘它
+                if (viewArticle) {
+                    viewArticle.style.setProperty('--article-scale', String(ARTICLE_SCALES[key]));
+                }
+                if (articleFontSize) {
+                    const buttons = articleFontSize.querySelectorAll('.fontsize-btn');
+                    for (let i = 0; i < buttons.length; i += 1) {
+                        const on = buttons[i].getAttribute('data-fontscale') === key;
+                        buttons[i].classList.toggle('is-active', on);
+                        buttons[i].setAttribute('aria-pressed', on ? 'true' : 'false');
+                    }
+                }
+                if (persist) {
+                    try {
+                        window.localStorage.setItem(ARTICLE_SCALE_KEY, key);
+                    } catch (e) {
+                        /* 隐私模式下 localStorage 会抛异常，字号当次生效就够 */
+                    }
+                }
+                // 内嵌文章的正文在 iframe 里，得单独同步一次
+                applyEmbeddedScale();
+            }
+
+            function readArticleScale() {
+                try {
+                    const saved = window.localStorage.getItem(ARTICLE_SCALE_KEY);
+                    if (saved && ARTICLE_SCALES[saved]) return saved;
+                } catch (e) {
+                    /* 同上，读不到就按标准字号 */
+                }
+                return 'md';
+            }
+
+            /* 内嵌文章（embeddedPage）的正文在 iframe 里，是另一份文档，
+               站点的 --article-scale 传不进去，只能往里塞一条样式。
+               同源才做得到（本站的内嵌页都在自己目录下），跨域时 contentDocument
+               是 null，直接跳过 —— 那就保持原样大小，不会抛错。
+               能生效的前提是内嵌页用 rem 排版（本站那几个页面都是）。
+               改完 html 字号后 body 高度会变，onload 里挂的 ResizeObserver
+               会自己把 iframe 的高度重新量一遍。 */
+            function applyEmbeddedScale() {
+                if (!embeddedPageFrame || !embeddedArticleWrap || embeddedArticleWrap.hidden) return;
+                let doc = null;
+                try {
+                    doc = embeddedPageFrame.contentDocument;
+                } catch (e) {
+                    return;
+                }
+                if (!doc || !doc.documentElement) return;
+                let styleEl = doc.getElementById('annie-embedded-scale');
+                if (!styleEl) {
+                    styleEl = doc.createElement('style');
+                    styleEl.id = 'annie-embedded-scale';
+                    (doc.head || doc.documentElement).appendChild(styleEl);
+                }
+                const percent = (ARTICLE_SCALES[articleScale] * 100).toFixed(2);
+                styleEl.textContent = 'html{font-size:' + percent + '%}';
+                /* 字号变了，内嵌页也变高/变矮了，iframe 得跟着重量。
+                   这里不能只叫 resizeFrame：内嵌页是 `display:flex` + `min-height:100vh`，
+                   正文那一栏被撑成「正好等于 iframe 现高」，所以量出来永远等于当前高度
+                   —— 变大能发现，变小发现不了，文章下面会留一大片空白。
+                   先把 iframe 压到 1px 让 100vh 塌下来，同步量完再一次性写回，
+                   全程在同一个任务里，中间状态不会被画出来。 */
+                if (typeof embeddedMeasure === 'function' && embeddedPageFrame) {
+                    const frame = embeddedPageFrame;
+                    frame.style.height = '1px';
+                    const contentHeight = Math.max(Math.ceil(embeddedMeasure()), 120);
+                    frame.style.height = contentHeight + 'px';
+                    embeddedFrameHeight = contentHeight;
+                    revealEmbeddedPage();
+                }
+            }
+
+            if (articleFontSize) {
+                articleFontSize.addEventListener('click', function (event) {
+                    const btn = event.target.closest('.fontsize-btn');
+                    if (!btn) return;
+                    applyArticleScale(btn.getAttribute('data-fontscale'), true);
+                    // 字号一变，正文总高度就变了，进度条的换算要立刻跟上
+                    syncReadingUi();
+                });
+            }
+
+            /* ---------------- 进度条 + 目录高亮 ---------------- */
+            /* 和 syncHeaderScroll 共用同一个 passive scroll 监听，再经 rAF 合并：
+               另开一个 scroll 监听会让两套回调抢同一帧，滚动反而更抖。 */
+            let readingUiTick = null;
+            function syncReadingUi() {
+                if (readingUiTick) return;
+                readingUiTick = window.requestAnimationFrame(function () {
+                    readingUiTick = null;
+                    applyReadingUi();
+                });
+            }
+
+            function applyReadingUi() {
+                const isArticle = currentView === 'article' && viewArticle.classList.contains('active');
+                /* 进度条：正文比一屏还短的时候不显示 —— 否则它永远是条卡住的线，
+                   看着像加载失败。 */
+                if (readingProgress) {
+                    let ratio = 0;
+                    let scrollable = false;
+                    if (isArticle) {
+                        const total = document.documentElement.scrollHeight - window.innerHeight;
+                        scrollable = total > 80;
+                        if (scrollable) ratio = Math.min(1, Math.max(0, window.scrollY / total));
+                    }
+                    readingProgress.classList.toggle('is-visible', isArticle && scrollable);
+                    if (readingProgressBar) {
+                        // 用 transform 不用 width：不触发重排
+                        readingProgressBar.style.transform = 'scaleX(' + ratio.toFixed(4) + ')';
+                    }
+                }
+                /* 目录高亮：取「最后一个顶端已经越过导航下沿」的标题。
+                   用 getBoundingClientRect 而不是 offsetTop —— 正文里有图片和
+                   内嵌内容，offsetTop 是相对定位祖先算的，换一层就错。 */
+                if (!isArticle || !tocHeadings.length || !articleToc || articleToc.hidden) return;
+                const headerHeight = siteHeader ? siteHeader.getBoundingClientRect().height : 0;
+                const line = headerHeight + 40;
+                let active = -1;
+                for (let i = 0; i < tocHeadings.length; i += 1) {
+                    if (tocHeadings[i].getBoundingClientRect().top <= line) active = i;
+                    else break;
+                }
+                /* 滚到底了就直接锁最后一节：最后一个标题可能永远越不过那条线 */
+                if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2) {
+                    active = tocHeadings.length - 1;
+                }
+                setTocActive(active);
+            }
+
+            /* 别人分享的「第 3 节」：脚本渲染完正文时，浏览器早就错过了原生锚点跳转，
+               这里补一次。地址里没有锚点或找不到目标就什么都不做。 */
+            function scrollToHashTarget() {
+                const raw = window.location.hash.replace(/^#/, '');
+                if (!raw) return false;
+                let target = null;
+                try {
+                    target = document.getElementById(decodeURIComponent(raw));
+                } catch (e) {
+                    target = null;
+                }
+                if (!target) return false;
+                window.requestAnimationFrame(function () {
+                    target.scrollIntoView({ block: 'start' });
+                });
+                return true;
+            }
+
+            /* ---------------- 相关文章 ---------------- */
+            /* 按「共同标签数」打分，主标签相同再加一档，最后才按日期。
+               全程没有随机：刷新十次推荐顺序必须一模一样，否则读者会觉得站点在乱跳。 */
+            function getRelatedPosts(post, limit) {
+                const tags = (post.tags || []).map(String);
+                if (!tags.length) return [];
+                const scored = [];
+                blogPosts.forEach(function (item) {
+                    if (item.id === post.id) return;
+                    if (!isArticlePublic(item)) return;
+                    // 跳到站外的文章在站内没有正文可读，不推荐
+                    if (item.externalPage && !item.embeddedPage) return;
+                    let score = 0;
+                    (item.tags || []).map(String).forEach(function (tag) {
+                        if (tags.indexOf(tag) < 0) return;
+                        score += 10;
+                        if (tag === tags[0]) score += 4;
+                    });
+                    if (score > 0) scored.push({ post: item, score: score });
+                });
+                scored.sort(function (a, b) {
+                    if (b.score !== a.score) return b.score - a.score;
+                    const byDate = postDisplayDate(b.post).localeCompare(postDisplayDate(a.post));
+                    if (byDate !== 0) return byDate;
+                    return (b.post.id || 0) - (a.post.id || 0);
+                });
+                return scored.slice(0, limit || 3).map(item => item.post);
+            }
+
+            function renderRelatedArticles(post, isUnavailableArticle) {
+                if (!articleRelated) return;
+                const list = (isUnavailableArticle || !post) ? [] : getRelatedPosts(post, 3);
+                if (!list.length) {
+                    // 没有共同标签就整块收起，不拿「最新几篇」硬凑
+                    articleRelated.hidden = true;
+                    articleRelated.innerHTML = '';
+                    return;
+                }
+                articleRelated.innerHTML =
+                    '<h2 class="article-related-title" id="articleRelatedTitle">' +
+                        '<i class="ri-bookmark-3-line" aria-hidden="true"></i> 相关文章' +
+                    '</h2>' +
+                    '<ul class="article-related-list">' +
+                        list.map(function (item) {
+                            const tagMarkup = (item.tags || []).slice(0, 2).map(function (tag) {
+                                return '<span class="related-tag">' + escapeHtml(tag) + '</span>';
+                            }).join('');
+                            return '<li>' +
+                                '<a class="article-related-link" href="posts/' + item.id + '/" data-related-article="' + item.id + '">' +
+                                    '<span class="related-title">' + escapeHtml(item.title) + '</span>' +
+                                    '<span class="related-meta">' + tagMarkup +
+                                        '<span>' + postDisplayDate(item) + '</span>' +
+                                    '</span>' +
+                                '</a>' +
+                            '</li>';
+                        }).join('') +
+                    '</ul>';
+                articleRelated.hidden = false;
+            }
+
             function renderArticle(post) {
                 const isUnavailableArticle = !isArticlePublic(post);
                 /* 同一篇文章重新进入时正文可以原样复用：
@@ -3258,7 +3787,11 @@
                     : '文章内嵌页面';
                 if (!canReuseContent) {
                     // 正文里的相对配图要按站点根补全，不能按 /posts/<id>/ 解析
-                    articleContent.innerHTML = isUnavailableArticle ? '' : absolutizeHtml(post.content || '');
+                    articleContent.innerHTML = isUnavailableArticle
+                        ? ''
+                        // 正文是 Markdown：先渲染成 HTML，再补全相对地址
+                        // （顺序不能反，absolutize 作用在 HTML 字符串上）
+                        : absolutizeHtml(MARKDOWN.render(post.content || ''));
                     if (window.AnnieImageLoading) {
                         window.AnnieImageLoading.initialize(articleContent);
                     }
@@ -3266,6 +3799,10 @@
                 renderedArticleId = post.id;
                 renderedArticleUnavailable = isUnavailableArticle;
                 renderAdjacentArticles(post, isUnavailableArticle);
+                // 目录必须放在正文写入之后：它靠 articleContent 里的小标题生成
+                renderArticleToc(post, isUnavailableArticle);
+                renderRelatedArticles(post, isUnavailableArticle);
+                syncReadingUi();
                 renderArticleComments(post, isUnavailableArticle);
                 // 换了文章就重新开始量高度，否则会沿用上一篇记下的旧值
                 embeddedFrameHeight = 0;
@@ -3277,6 +3814,8 @@
                     window.removeEventListener('resize', embeddedPageResizeHandler);
                     embeddedPageResizeHandler = null;
                 }
+                // 上一篇的量高函数跟着它的文档一起作废
+                embeddedMeasure = null;
                 if (isEmbeddedPage) {
                     // 开始加载：先显示加载动画，等页面就绪后再淡入内容
                     embeddedArticleWrap.classList.add('is-loading');
@@ -3308,6 +3847,8 @@
                             embeddedRoot.style.overflow = 'hidden';
                             embeddedBody.style.overflow = 'hidden';
                             embeddedRoot.style.scrollbarWidth = 'none';
+                            // 字号倍率也要带进这份文档，且必须在量高度之前
+                            applyEmbeddedScale();
                         } catch (error) {
                             console.error('无法读取内嵌页面尺寸，将保留可滚动的视口高度。', error);
                             embeddedPageFrame.style.height = `${Math.max(window.innerHeight * 0.8, 600)}px`;
@@ -3366,6 +3907,7 @@
                             embeddedPageObserver.observe(embeddedRoot);
                         }
                         embeddedPageResizeHandler = resizeFrame;
+                        embeddedMeasure = measureContentHeight;
                         window.addEventListener('resize', embeddedPageResizeHandler);
                     };
                     if (!setFrameSource(embeddedPageFrame, embeddedPage) && embeddedPageFrame.contentWindow) {
@@ -4366,6 +4908,8 @@
                 // 上一次切视图排下的滚动恢复任务立刻作废，
                 // 免得它在新视图里把滚动条拽回旧位置
                 cancelScrollRestore();
+                // 目录跳转的滚动动画同理：换了视图还继续滚，就是在跟用户抢
+                cancelTocScroll();
                 /* 间隔太短的连续切换不播入场动画：动画从 opacity:0 起步，
                    350ms 没走完就被切走，页面会一直停在半透明状态——那就是「闪」。
                    注意顺序：必须在所有视图都还没有 active 类的时候设置/移除
@@ -4383,7 +4927,7 @@
                 currentView = viewName;
                 // 离开感谢页就把倒计时停掉，别再偷偷把用户送回首页
                 if (viewName !== 'thanks') stopThanksCountdown();
-                [viewHome, viewBlog, viewArchive, viewTweaks, viewMovie, viewAbout,
+                [viewHome, viewBlog, viewArchive, viewTweaks, viewTags, viewMovie, viewAbout,
                     viewArticle, viewFeedback, viewThanks, viewComments].forEach(v => {
                     v.style.display = 'none';
                     v.classList.remove('active-view');
@@ -4420,6 +4964,10 @@
                     viewTweaks.style.display = 'block';
                     viewTweaks.classList.add('active-view');
                     renderTweaksFeed();
+                } else if (viewName === 'tags') {
+                    viewTags.style.display = 'block';
+                    viewTags.classList.add('active-view');
+                    renderTagLanding();
                 } else if (viewName === 'movie') {
                     viewMovie.style.display = 'block';
                     viewMovie.classList.add('active-view');
@@ -4465,7 +5013,7 @@
                 /* 反馈 / 感谢不属于导航里的任何一栏，映射成 null：
                    否则站在反馈页上会看到「首页」是选中态，比没有高亮更误导。
                    指示块那边找不到 .active 会自己收起，不用额外处理。 */
-                const navMap = { home: 'home', blog: 'blog', archive: 'archive', tweaks: 'home', movie: 'movie', about: 'about', article: 'blog', feedback: null, thanks: null, comments: null };
+                const navMap = { home: 'home', blog: 'blog', archive: 'archive', tweaks: 'home', tags: null, movie: 'movie', about: 'about', article: 'blog', feedback: null, thanks: null, comments: null };
                 const activeNav = (viewName in navMap) ? navMap[viewName] : 'home';
                 const navLink = activeNav
                     ? document.querySelector(`.nav-links a[data-nav="${activeNav}"]`)
@@ -4476,6 +5024,10 @@
                 }
                 // 视图切换后指示块要跟着走；等下一帧元素显示出来再量，尺寸才准
                 window.requestAnimationFrame(updateNavPill);
+
+                /* 进度条只在文章视图出现：切走这一刻它可能还停在 43%，
+                   不主动收一次会一直留到下次滚动。等下一帧再算，此时新视图已经显示出来了。 */
+                syncReadingUi();
 
                 // 地址栏跟着视图走，分享出去的链接才能定位到具体文章
                 syncUrlWithView();
@@ -5101,6 +5653,10 @@
                 navResizeTick = window.requestAnimationFrame(function() {
                     navResizeTick = null;
                     updateNavPill();
+                    // 视口高度变了，正文的「可滚动比例」跟着变
+                    syncReadingUi();
+                    // 版面重排后目录跳转的目标位置也变了，动画别按旧坐标继续跑
+                    cancelTocScroll();
                 });
             });
 
@@ -5111,7 +5667,11 @@
             updateNavPill();
 
             // 滚动状态：进出页面时都同步一次，避免刷新后停在中间位置却没打上标
-            window.addEventListener('scroll', syncHeaderScroll, { passive: true });
+            window.addEventListener('scroll', function () {
+                syncHeaderScroll();
+                // 进度条和目录高亮跟着同一帧走，不另开监听
+                syncReadingUi();
+            }, { passive: true });
             syncHeaderScroll();
 
             backBtn.addEventListener('click', function(e) {
@@ -5334,6 +5894,16 @@
                 });
             });
 
+            /* 文末「相关文章」同理：href 是真地址，有 JS 就站内切换。
+               方向不做左右动画 —— 相关文章不是线性翻页，硬套「下一篇」的动效会误导。 */
+            document.addEventListener('click', function (e) {
+                const link = e.target.closest('[data-related-article]');
+                if (!link) return;
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                e.preventDefault();
+                openArticle(Number(link.getAttribute('data-related-article')));
+            });
+
             document.addEventListener('click', function(e) {
                 if (e.target.matches('[data-nav="blog"]') && e.target.closest('.tag-pill')) {
                     e.preventDefault();
@@ -5367,6 +5937,9 @@
             function init() {
                 // 先把地址栏里的 /index.html 收敛掉，后面的路由和分享链接都基于干净的路径
                 normalizeHomeUrl();
+                /* 字号在读第一篇文章之前就挂上去：等 renderArticle 之后再套，
+                   已经按标准字号画好的正文会跳一下。 */
+                applyArticleScale(readArticleScale(), false);
                 const savedState = readViewState();
                 restoreTagsFromSnapshot(savedState);
                 renderTagPills('tagFilterHome');
@@ -5400,6 +5973,9 @@
                     renderArticle(urlPost);
                     switchView('article');
                     playReturnEnterAnimation();
+                    /* 链接里带了 #小节 的（别人分享的「第 3 节」）：
+                       原生锚点跳转在脚本渲染正文之前就错过了，这里补一次。 */
+                    scrollToHashTarget();
                     return;
                 }
                 // 链接里的 id 不存在（文章被删了、链接被改过）时，
@@ -5417,6 +5993,7 @@
                 // 不受本地界面记忆影响。
                 const urlView = new URL(window.location.href).searchParams.get(VIEW_PARAM);
                 if (urlView === 'about' || urlView === 'archive' || urlView === 'tweaks'
+                    || urlView === 'tags'
                     || urlView === 'feedback' || urlView === 'thanks' || urlView === 'comments') {
                     // 反馈 / 评论的文章信息跟着地址栏走，直接打开也能带上
                     if (urlView === 'feedback') applyFeedbackContext(readFeedbackContextFromUrl());

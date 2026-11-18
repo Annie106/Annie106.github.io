@@ -4,8 +4,9 @@
   "private": true,
   "description": "构建期依赖清单。站点运行时没有任何依赖：这里的包只在 node tools/minify.js 里用来压缩 dist/ 里的 JS 和 CSS，不会被发布出去。",
   "scripts": {
-    "build": "node tools/build-site.js && node tools/build-comment-counts.js && node tools/build-posts.js && node tools/minify.js",
-    "minify": "node tools/minify.js"
+    "build": "node tools/build-posts-data.js && node tools/build-site.js && node tools/build-comment-counts.js && node tools/build-posts.js && node tools/minify.js",
+    "minify": "node tools/minify.js",
+    "build:fast": "node tools/build-posts-data.js && node tools/build-site.js && node tools/build-posts.js && node tools/minify.js"
   },
   "devDependencies": {
     "esbuild": "^0.28.2"

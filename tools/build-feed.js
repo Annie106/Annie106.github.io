@@ -45,6 +45,8 @@ const vm = require('vm');
 const ROOT = path.resolve(__dirname, '..');
 const POSTS_FILE = path.join(ROOT, 'js', 'posts-data.js');
 const OUTPUT_FILE = path.join(ROOT, 'feed.xml');
+// 正文是 Markdown，取「第一张图」要认 ![]() 和 <img> 两种写法
+const markdown = require(path.join(ROOT, 'js', 'markdown.js'));
 
 /* 站点根地址。文章链接是根路径 + 查询串（/?article=N）这种形式，
    feed 里的 guid / link 都要拼成绝对地址，阅读器才能点开。
@@ -101,8 +103,7 @@ function rfc822(ymd) {
    都取不到（或 FALLBACK_COVER 被设成空）就不输出 media:thumbnail。
    阅读器列表页的缩略图就靠这个字段，正文里的图是进文章后才看得见的。 */
 function firstImage(html) {
-    const match = /<img[^>]+src=["']([^"']+)["']/i.exec(String(html || ''));
-    return match ? match[1] : '';
+    return markdown.firstImage(html);
 }
 
 function coverUrl(post) {

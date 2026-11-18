@@ -14,6 +14,13 @@
 
     function applyTheme(theme) {
         root.setAttribute('data-theme', theme);
+        /* 手机浏览器地址栏 / 状态栏的颜色跟着实际主题走。
+           只用 <meta media="(prefers-color-scheme: dark)"> 是不够的：
+           用户手动切过深色之后，系统偏好那套不会跟着变，地址栏会一直是白的。 */
+        const themeColorMeta = document.getElementById('themeColorMeta');
+        if (themeColorMeta) {
+            themeColorMeta.setAttribute('content', theme === 'dark' ? '#0f1115' : '#ffffff');
+        }
         if (icon) {
             // 深色模式显示“太阳”图标（点击切回浅色），浅色模式显示“月亮”图标
             icon.className = theme === 'dark' ? 'ri-sun-line' : 'ri-moon-line';

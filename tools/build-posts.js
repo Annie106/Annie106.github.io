@@ -44,6 +44,9 @@ const vm = require('vm');
 const ROOT = path.resolve(__dirname, '..');
 const OUT_DIR = path.join(ROOT, 'dist');
 const POSTS_FILE = path.join(ROOT, 'js', 'posts-data.js');
+/* 正文已经是 Markdown 了，静态页得在构建时渲染成 HTML。
+   用站点自己那一份渲染器（js/markdown.js），保证爬虫抓到的和浏览器里看到的是同一套规则 */
+const markdown = require(path.join(ROOT, 'js', 'markdown.js'));
 
 /* 站点根地址。文章页的绝对地址、sitemap 里的 loc、JSON-LD 里的 url
    都从这里拼。别写成带 index.html 的形式（地址栏约定见 AGENTS.md）。 */
@@ -202,11 +205,12 @@ function safeJson(value) {
 }
 
 function plainText(html) {
-    return String(html || '')
+    // 正文是 Markdown 了，先按 Markdown 的记法剥一遍，再按 HTML 兜底
+    // （两种写法混在同一份正文里是允许的 —— 原样通过的 HTML 块就是后者）
+    return markdown.toPlainText(String(html || ''))
         .replace(/<script[\s\S]*?<\/script>/gi, ' ')
         .replace(/<style[\s\S]*?<\/style>/gi, ' ')
         .replace(/<[^>]+>/g, ' ')
-        .replace(/&nbsp;/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
 }
@@ -216,9 +220,9 @@ function clamp(text, max) {
     return chars.length > max ? chars.slice(0, max).join('') + '…' : chars.join('');
 }
 
-function firstImage(html) {
-    const match = /<img[^>]+src=["']([^"']+)["']/i.exec(String(html || ''));
-    return match ? match[1] : '';
+/* 正文第一张图：Markdown 的 ![]() 和原样嵌入的 <img> 都要认 */
+function firstImage(source) {
+    return markdown.firstImage(source);
 }
 
 function absoluteUrl(raw) {
@@ -315,13 +319,14 @@ function metaMarkup(post) {
     return parts.join('\n            ');
 }
 
-/* 正文 HTML。有 content 就直接用；没有的（正文是独立页面那几篇）退回摘要，
-   免得留一个空 div —— 只有标题和一句链接的页面在搜索引擎眼里是「薄内容」。
-   这里**不改写相对地址**：文章页 head 里插了 <base href="../../">，
+/* 正文。content 是 Markdown，先交给站点的渲染器转成 HTML；
+   没有 content 的（正文是独立页面那几篇）退回摘要，免得留一个空 div ——
+   只有标题和一句链接的页面在搜索引擎眼里是「薄内容」。
+   这里**不改写相对地址**：文章页 head 里插了 <base href="/">，
    images/a.jpg 会照常解析成 /images/a.jpg，源码里写什么样就是什么样。 */
 function contentMarkup(post) {
     const body = (post.content && String(post.content).trim())
-        ? post.content
+        ? markdown.render(post.content)
         : '<p>' + escapeHtml(post.excerpt || summaryOf(post)) + '</p>';
     if (!post.embeddedPage) return body;
     /* 正文在独立页面里那几篇：给一条明确入口，否则读者和爬虫都只看到一段摘要 */
@@ -460,7 +465,136 @@ function buildPage(post, template, ordered) {
 
 /* ==================== sitemap / robots ==================== */
 
-function buildSitemap(posts) {
+/* ==================== 标签落地页 ==================== */
+
+/* 一个标签至少要有这么多篇文章才值得单独一页。
+   只有一篇的标签，那一篇本来就躺在文章列表里，再给它一个「只有一条」的目录页没有意义，
+   反而会把 sitemap 和标签总览撑得很碎。 */
+const TAG_PAGE_MIN_POSTS = 2;
+
+/* 标签 → 文章。排序跟首页标签云同一套：篇数降序 → 该标签最新文章日期 → 拼音。
+   两边顺序一致，读者从首页点进来不会觉得换了个逻辑。 */
+function groupByTag(posts) {
+    const map = new Map();
+    posts.forEach(function (post) {
+        (post.tags || []).forEach(function (tag) {
+            const key = String(tag);
+            if (!map.has(key)) map.set(key, []);
+            map.get(key).push(post);
+        });
+    });
+    const collator = new Intl.Collator('zh-Hans-CN');
+    return Array.from(map.entries())
+        .filter(function (entry) { return entry[1].length > 0; })
+        .sort(function (a, b) {
+            if (b[1].length !== a[1].length) return b[1].length - a[1].length;
+            const byDate = dateOf(b[1][0]).localeCompare(dateOf(a[1][0]));
+            return byDate !== 0 ? byDate : collator.compare(a[0], b[0]);
+        });
+}
+
+function tagPagePath(tag) {
+    return 'tags/' + tag + '/index.html';
+}
+
+function tagPageUrl(tag) {
+    return SITE + 'tags/' + encodeURIComponent(tag) + '/';
+}
+
+/* 导航在这个独立页上没有 script.js 的拦截，href 必须是真的能跳的地址。
+   从 index.html 里把整个 <header> 原样取过来，省得手抄一份、以后改了忘记同步。 */
+const NAV_TARGETS = {
+    home: '/',
+    blog: '/',
+    archive: '/?view=archive',
+    movie: '/movie.html',
+    about: '/?view=about',
+};
+
+function siteHeaderMarkup() {
+    const page = fs.readFileSync(path.join(OUT_DIR, 'index.html'), 'utf8');
+    const match = /<header class="site-header">[\s\S]*?<\/header>/.exec(page);
+    if (!match) throw new Error('dist/index.html 里找不到 <header class="site-header">');
+    let html = match[0];
+    // 标签页不属于任何一栏，首页那个 active 高亮要摘掉
+    html = html.replace(/\sclass="active"/g, '').replace(/\saria-current="page"/g, '');
+    // 「电影」原本是 role="link" 由脚本接管的，这里改成真链接
+    html = html.replace(/<a data-nav="movie"([^>]*)>/, '<a data-nav="movie" href="/movie.html"$1>');
+    html = html.replace(/id="homeLink" href="#"/, 'id="homeLink" href="/"');
+    html = html.replace(/<a([^>]*?)href="#"([^>]*?)>/g, function (whole, before, after) {
+        const nav = /data-nav="([^"]+)"/.exec(before + after);
+        const target = nav ? (NAV_TARGETS[nav[1]] || '/') : '/';
+        return '<a' + before + 'href="' + target + '"' + after + '>';
+    });
+    return html;
+}
+
+function buildTagPage(tag, tagPosts, header) {
+    const latest = dateOf(tagPosts[0]) || '';
+    const title = '标签：' + tag + ' · ' + SITE_NAME;
+    const description = '「' + tag + '」标签下的 ' + tagPosts.length + ' 篇文章，按时间倒序。';
+
+    const items = tagPosts.map(function (post) {
+        return '            <li><a class="tag-post-item" href="/posts/' + post.id + '/">' +
+            '<span class="tag-post-date">' + escapeHtml(dateOf(post)) + '</span>' +
+            '<span class="tag-post-title">' + escapeHtml(post.title || '') + '</span>' +
+            '</a></li>';
+    }).join('\n');
+
+    return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="robots" content="${ALLOW_SEARCH_INDEXING ? 'index,follow' : 'noindex,follow'}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <base href="/">
+    <title>${escapeHtml(title)}</title>
+    <meta name="description" content="${escapeHtml(description)}">
+    <link rel="canonical" href="${escapeHtml(tagPageUrl(tag))}">
+    <meta name="theme-color" id="themeColorMeta" content="#ffffff">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="apple-touch-icon" sizes="180x180" href="images/apple-touch-icon.png">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <a class="skip-link" href="#app">跳到主要内容</a>
+${header}
+    <div class="main-container" id="app" tabindex="-1">
+        <section class="view active-view tag-hub">
+            <p class="tweaks-eyebrow">// TAG</p>
+            <h1 class="tweaks-title">${escapeHtml(tag)}</h1>
+            <p class="tweaks-lead">共 ${tagPosts.length} 篇文章${latest ? '，最新一篇写于 ' + escapeHtml(latest) : ''}。按时间倒序。</p>
+            <ul class="tag-post-list">
+${items}
+            </ul>
+            <p class="tag-hub-back">
+                <a class="back-link" id="tagBack" href="/"><i class="ri-arrow-left-line" aria-hidden="true"></i> 返回</a>
+            </p>
+        </section>
+    </div>
+    <script>
+        /* 从文章或首页点进这个标签页的，返回就回上一页（还带着那边的滚动位置）；
+           直接打开这个地址（比如从别人发的链接进来）没有上一页，才回首页。
+           JS 没跑起来时 href="/" 兜底。 */
+        (function () {
+            var back = document.getElementById('tagBack');
+            if (!back) return;
+            back.addEventListener('click', function (event) {
+                if (window.history.length > 1) {
+                    event.preventDefault();
+                    window.history.back();
+                }
+            });
+        })();
+    </script>
+    <script src="js/theme.js"></script>
+    <script src="js/touch-hover.js"></script>
+</body>
+</html>
+`;
+}
+
+function buildSitemap(posts, tagGroups) {
     const latest = posts.length ? sortKey(posts[0]).slice(0, 10) : '';
 
     const lines = [
@@ -482,6 +616,19 @@ function buildSitemap(posts) {
         if (lastmod) lines.push('    <lastmod>' + escapeXml(lastmod) + '</lastmod>');
         lines.push('    <changefreq>monthly</changefreq>');
         lines.push('    <priority>0.8</priority>');
+        lines.push('  </url>');
+    });
+
+    /* 标签页：每个标签一个真地址，能单独分享，也进 sitemap。
+       noindex 时进 sitemap 不矛盾 —— sitemap 只是告诉爬虫「这些地址存在」，
+       页面自己的 noindex 才决定收不收录，两者配合反而删得更干净。 */
+    (tagGroups || []).forEach(function (entry) {
+        lines.push('  <url>');
+        lines.push('    <loc>' + escapeXml(tagPageUrl(entry[0])) + '</loc>');
+        const lastmod = dateOf(entry[1][0]);
+        if (lastmod) lines.push('    <lastmod>' + escapeXml(lastmod) + '</lastmod>');
+        lines.push('    <changefreq>weekly</changefreq>');
+        lines.push('    <priority>0.5</priority>');
         lines.push('  </url>');
     });
 
@@ -513,6 +660,18 @@ function writeFile(file, content) {
     fs.writeFileSync(file, content, 'utf8');
 }
 
+/* 手写递归删除。不要用 fs.rmSync：这台机器上它被 shim 成回收站操作、偶发失败
+   （AGENTS.md 里记着这条，build-site.js 也是因此手写了递归复制）。 */
+function removeDir(dir) {
+    if (!fs.existsSync(dir)) return;
+    fs.readdirSync(dir).forEach(function (name) {
+        const target = path.join(dir, name);
+        if (fs.statSync(target).isDirectory()) removeDir(target);
+        else fs.unlinkSync(target);
+    });
+    fs.rmdirSync(dir);
+}
+
 function main() {
     if (!fs.existsSync(OUT_DIR)) {
         throw new Error('dist/ 不存在。先跑 node tools/build-site.js 再跑这个脚本。');
@@ -529,12 +688,26 @@ function main() {
         writeFile(path.join(OUT_DIR, 'posts', String(post.id), 'index.html'), buildPage(post, template, ordered));
     });
 
-    writeFile(path.join(OUT_DIR, 'sitemap.xml'), buildSitemap(posts));
+    /* 标签落地页。先清一遍旧的：标签改名或某篇撤掉之后，
+       不清会留下点进去空荡荡的孤儿页，而且没人会主动发现。 */
+    /* 只收 2 篇以上的标签：单篇标签不单独成页 */
+    const tagGroups = groupByTag(posts).filter(function (entry) {
+        return entry[1].length >= TAG_PAGE_MIN_POSTS;
+    });
+    const tagRoot = path.join(OUT_DIR, 'tags');
+    removeDir(tagRoot);
+    const header = siteHeaderMarkup();
+    tagGroups.forEach(function (entry) {
+        writeFile(path.join(tagRoot, entry[0], 'index.html'), buildTagPage(entry[0], entry[1], header));
+    });
+
+    writeFile(path.join(OUT_DIR, 'sitemap.xml'), buildSitemap(posts, tagGroups));
     writeFile(path.join(OUT_DIR, 'robots.txt'), buildRobots());
 
     console.log('✅ 静态文章页已生成');
     console.log('   文章 ' + posts.length + ' 篇 → dist/posts/<id>/index.html');
-    console.log('   dist/sitemap.xml（' + (posts.length + 1) + ' 个地址）');
+    console.log('   标签 ' + tagGroups.length + ' 个 → dist/tags/<标签>/index.html');
+    console.log('   dist/sitemap.xml（' + (posts.length + 1 + tagGroups.length) + ' 个地址）');
     console.log('   dist/robots.txt');
     posts.forEach(function (post) {
         console.log('   · /posts/' + post.id + '/  ' + (post.title || ''));

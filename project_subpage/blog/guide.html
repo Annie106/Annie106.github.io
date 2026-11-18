@@ -1229,7 +1229,6 @@
     excerpt: '这里写摘要，会显示在文章卡片上',
     tags: ['随笔'],
     pinned: false,
-    featured: true,
     content: `
         &lt;p&gt;正文第一段&lt;/p&gt;
         &lt;h2&gt;一个小标题&lt;/h2&gt;
@@ -1243,7 +1242,6 @@
                     <li><code>title</code> / <code>date</code> / <code>excerpt</code>：标题、发布日期（<code>YYYY-MM-DD</code>）和摘要。首页按日期倒序取最近 6 篇；「文章」视图按数据数组顺序显示（置顶文章排前面），「归档」按日期倒序</li>
                     <li><code>tags</code>：标签，用来看筛选按钮，可以有多个，写成 <code>['随笔', '阅读']</code></li>
                     <li><code>pinned</code>：写 <code>true</code> 就是置顶</li>
-                    <li><code>featured</code>：旧字段，当前页面不读取它。首页会按日期显示最近 6 篇（置顶文章始终靠前），完整文章列表由「文章」视图展示</li>
                     <li><code>updated</code>：可选。填最近一次改这篇的日期（格式同 <code>date</code>）。写了之后，文章卡片和详情页的日期都优先显示它，详情页还会在下面补一行「发布于 原发布日」；不写、或跟 <code>date</code> 一样就只显示 <code>date</code>。首页排序、时间线和归档分组也用这个日期算</li>
                     <li><code>isPublic</code>：可选。设为 <code>false</code> 后，文章详情区域会显示“当前文章不对外开放”，并隐藏文章标题、元信息和正文；改为 <code>true</code> 或删掉此字段即可重新开放。没有设置时默认开放</li>
                     <li><code>content</code>：正文，写在反引号（键盘左上角 <span class="guide-kbd">`</span> 那个键）中间，可以用 <code>&lt;p&gt;</code> 分段、<code>&lt;h2&gt;</code> 加小标题</li>

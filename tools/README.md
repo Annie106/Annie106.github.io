@@ -92,6 +92,7 @@ npm run build
 | `update-icons.bat` | 手动重新裁剪图标（平时钩子会自动跑，一般不用） | `[OK] Icon subset rebuilt and verified.` | `[FAILED] Subset generation failed ...` |
 | `install-hooks.bat` | 重新 clone 仓库后补装钩子（`setup.bat` 已包含） | `[OK] pre-commit hook installed.` | `[X] Not a git repository root` |
 | `check-icons.bat` | 只想检查图标名有没有写错（**不需要 Python**） | 三行 `[OK]` | `[X] 图标名不存在 ...` 并指出文件行号 |
+| `..\新建文章.bat`（仓库根） | 写新文章：问标题 / 标签 → 建 md → 打开编辑器 | `✓ 已创建 posts/xx-标题.md` | `[X] 没生成成功` 或 `Node.js not found` |
 
 > `update-icons.bat` 首次运行如果发现没装 `fonttools`，会自己 `pip install`（十几秒），之后再跑是秒过。
 
@@ -99,10 +100,20 @@ npm run build
 
 ```bat
 node tools\build-site.js            :: 构建
+node tools\build-watch.js build     :: 重新构建一次（= npm run build:fast）
+node tools\build-watch.js watch     :: 监听 posts/*.md，保存即重建
+node tools\build-posts-data.js      :: 由 posts/*.md 生成 js/posts-data.js
+node tools\new-post.js "标题"        :: 新建一篇文章（也可以 --from 草稿.md 导入）
 node tools\build-feed.js            :: 重生成 feed.xml
 node tools\check-icons.js           :: 图标校验（退出码 0 = 通过）
+node tools\make-app-icons.js        :: 从 favicon.svg 生成主屏 PNG 图标
 python tools\subset-icons.py        :: 只重裁图标
 ```
+
+> `make-app-icons.js` 只在**改了 `favicon.svg`** 之后需要跑一次：它把同一个图形栅格化成
+> `images/apple-touch-icon.png`（180）和 `images/icon-192.png` / `icon-512.png`。
+> 它只认直线路径（M/L/H/V/Z），图标要是换成曲线就得先改脚本里的 `extractSubpaths`。
+> 图标本身不带圆角，iOS 和安卓各自会套遮罩。
 
 ---
 

@@ -7021,3 +7021,514 @@
                 font-size: 1.375rem;
             }
         }
+
+        /* ==================== 阅读辅助：进度条 / 目录 / 字号 / 相关文章 ==================== */
+
+        /* 进度条：贴着视口最上沿的一条细线。
+           z-index 比 .site-header（100）高一层，否则会被吸顶栏盖住。
+           pointer-events: none —— 它横跨整幅宽度，绝不能挡住下面的按钮。 */
+        .reading-progress {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            z-index: 101;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        .reading-progress.is-visible {
+            opacity: 1;
+        }
+        .reading-progress-bar {
+            display: block;
+            height: 100%;
+            width: 100%;
+            background: var(--color-accent);
+            transform: scaleX(0);
+            transform-origin: 0 50%;
+            /* 告诉浏览器这一层只改 transform，别为每一帧做重排准备 */
+            will-change: transform;
+        }
+
+        /* 正文与目录的容器。窄屏是普通块级（目录在上、正文在下），
+           宽屏才变成两列，目录靠右，正文的起始位置一点不动。 */
+        .article-reader {
+            display: block;
+        }
+
+        /* ---------- 目录：窄屏是一张可折叠的卡片 ---------- */
+        .article-toc {
+            margin: 0 0 26px;
+            max-width: 860px;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            background: var(--color-surface);
+            padding: 3px 6px;
+        }
+        .article-toc[hidden] {
+            display: none;
+        }
+        .article-toc-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            width: 100%;
+            padding: 9px 8px;
+            border: 0;
+            border-radius: var(--radius-sm);
+            background: transparent;
+            font: inherit;
+            font-size: 0.84rem;
+            font-weight: 600;
+            color: var(--color-text-secondary);
+            cursor: pointer;
+            transition: var(--transition-fast);
+        }
+        .article-toc-title {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .article-toc-title i {
+            font-size: 0.95rem;
+            opacity: 0.8;
+        }
+        .article-toc-chevron {
+            font-size: 1rem;
+            transition: transform var(--transition-fast);
+        }
+        .article-toc.is-open .article-toc-chevron {
+            transform: rotate(180deg);
+        }
+        .article-toc-list {
+            list-style: none;
+            margin: 0;
+            padding: 0 2px 6px;
+        }
+        .article-toc-link {
+            /* 行高用变量，截断那边按同一个值算最大高度，两边不会差半行 */
+            --toc-lh: 1.5;
+            display: block;
+            padding: 7px 9px;
+            border-radius: var(--radius-sm);
+            font-size: 0.84rem;
+            line-height: var(--toc-lh);
+            color: var(--color-text-secondary);
+            text-decoration: none;
+            transition: color var(--transition-fast), background var(--transition-fast);
+        }
+        /* 截断必须放在里层这个 span 上，不能直接钳 .article-toc-link ——
+           overflow: hidden 裁的是 padding 盒，链接自己有上下内边距，
+           第三行会从那几像素的 padding 里漏出半行（截图上就是一道残字）。
+           span 没有内边距，裁在哪儿就是两行的边，干干净净。 */
+        .article-toc-label {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            /* 硬兜底：两行 = 2 × 行高。万一某个浏览器不认 line-clamp，
+               至少还是两行（只是没有省略号）。 */
+            max-height: calc(2 * var(--toc-lh) * 1em);
+        }
+        .article-toc-link.is-active {
+            color: var(--color-text-primary);
+            background: var(--color-tag-bg);
+            font-weight: 600;
+        }
+        html:not(.is-touch-input) .article-toc-link:hover {
+            color: var(--color-text-primary);
+        }
+        /* 手机端默认收起：目录摆在正文前面，展开着会把第一屏挤掉。
+           展开/收起是 JS 加 .is-open，按钮带 aria-expanded。 */
+        @media (max-width: 1179px) {
+            .article-toc-list {
+                display: none;
+            }
+            .article-toc.is-open .article-toc-list {
+                display: block;
+            }
+        }
+
+        /* ---------- 目录：宽屏变成右侧的常驻竖排 ----------
+           1080 容器 − 860 正文 = 220，扣掉 32 间隙正好放 168 宽的目录，
+           所以正文的阅读位置和没有目录时完全一致（它是右列，不是把正文推走）。 */
+        @media (min-width: 1180px) {
+            .article-reader {
+                display: grid;
+                grid-template-columns: minmax(0, 860px) 168px;
+                column-gap: 32px;
+                align-items: start;
+            }
+            .article-toc {
+                grid-column: 2;
+                grid-row: 1;
+                position: sticky;
+                top: calc(var(--header-h) + 24px);
+                max-width: none;
+                max-height: calc(100vh - var(--header-h) - 56px);
+                overflow-y: auto;
+                margin: 0;
+                padding: 0 0 0 0;
+                border: 0;
+                border-left: 1px solid var(--color-border);
+                border-radius: 0;
+                background: transparent;
+            }
+            .article-toc-head {
+                padding: 0 0 10px 13px;
+                font-size: 0.74rem;
+                font-weight: 600;
+                letter-spacing: 0.06em;
+                color: var(--color-text-tertiary);
+                cursor: default;
+            }
+            .article-toc-title i,
+            .article-toc-chevron {
+                display: none;
+            }
+            .article-toc-list {
+                display: block;
+                padding: 0;
+            }
+            /* 每项自带 2px 左边线，盖在容器的 1px 竖线上（margin-left 抵消掉那 1px）。
+               未激活是透明，激活才显形 —— 比另外画一个跟随元素省事，也不会错位。 */
+            .article-toc-link {
+                --toc-lh: 1.55;
+                margin-left: -1px;
+                padding: 5px 0 5px 13px;
+                border-left: 2px solid transparent;
+                border-radius: 0;
+                font-size: 0.78rem;
+            }
+            .article-toc-link.is-active {
+                background: transparent;
+                border-left-color: var(--color-text-primary);
+            }
+        }
+
+        /* ---------- 文章页右上角：字号 + 分享 ---------- */
+        .article-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .article-fontsize {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px;
+            border: 1px solid var(--color-border);
+            border-radius: 999px;
+        }
+        .fontsize-btn {
+            min-width: 30px;
+            padding: 3px 7px;
+            border: 0;
+            border-radius: 999px;
+            background: transparent;
+            font: inherit;
+            line-height: 1.4;
+            color: var(--color-text-tertiary);
+            cursor: pointer;
+            transition: var(--transition-fast);
+        }
+        .fontsize-btn.is-sm {
+            font-size: 0.72rem;
+        }
+        .fontsize-btn.is-md {
+            font-size: 0.83rem;
+        }
+        .fontsize-btn.is-lg {
+            font-size: 0.95rem;
+        }
+        .fontsize-btn.is-active {
+            background: var(--color-tag-bg);
+            color: var(--color-text-primary);
+        }
+        html:not(.is-touch-input) .fontsize-btn:hover {
+            color: var(--color-text-primary);
+        }
+        .fontsize-btn:focus-visible,
+        .article-toc-head:focus-visible,
+        .article-toc-link:focus-visible {
+            outline: 2px solid var(--color-accent);
+            outline-offset: 2px;
+        }
+
+        /* 字号只放大正文，标题和元信息不动：
+           1.05rem 是正文基准，倍率由 #view-article 上的 --article-scale 控制。
+           h2 换算成同一套倍率，否则标题会比正文显得越来越小。 */
+        .article-content {
+            font-size: calc(1.05rem * var(--article-scale, 1));
+        }
+        .article-content h2 {
+            font-size: calc(1.4rem * var(--article-scale, 1));
+            /* 从目录跳过来时，吸顶导航会盖住标题第一行，靠这个把它顶下来 */
+            scroll-margin-top: calc(var(--header-h) + 24px);
+        }
+
+        /* ---------- 相关文章 ---------- */
+        .article-related {
+            max-width: 860px;
+            margin: 30px 0 0;
+        }
+        .article-related[hidden] {
+            display: none;
+        }
+        .article-related-title {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            margin: 0 0 12px;
+            font-family: var(--font-sans);
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            color: var(--color-text-tertiary);
+        }
+        .article-related-title i {
+            font-size: 0.95rem;
+            opacity: 0.85;
+        }
+        .article-related-list {
+            display: grid;
+            gap: 8px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+        .article-related-link {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            padding: 13px 15px;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            color: inherit;
+            text-decoration: none;
+            transition: var(--transition-fast);
+        }
+        html:not(.is-touch-input) .article-related-link:hover {
+            border-color: var(--color-text-tertiary);
+            background: var(--color-surface);
+        }
+        .related-title {
+            font-size: 0.92rem;
+            font-weight: 600;
+            line-height: 1.45;
+        }
+        .related-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            font-size: 0.74rem;
+            color: var(--color-text-tertiary);
+        }
+        .related-meta .related-tag {
+            color: var(--card-accent);
+            font-weight: 500;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .reading-progress,
+            .article-toc-chevron,
+            .article-toc-link,
+            .fontsize-btn,
+            .article-related-link {
+                transition: none;
+            }
+        }
+
+        /* ==================== 标签落地页（/tags/<标签>/） ==================== */
+        /* 这是构建时生成的独立静态页：没有 script.js，导航是真实链接。
+           版式复用「最近折腾」的 eyebrow / title / lead，跟站内其它独立页一个调子。 */
+        .tag-hub {
+            max-width: 860px;
+            padding-bottom: 48px;
+        }
+        .tag-post-list {
+            margin: 28px 0 0;
+            padding: 0;
+            list-style: none;
+        }
+        .tag-post-item {
+            display: flex;
+            align-items: baseline;
+            gap: 16px;
+            padding: 13px 10px;
+            /* 左右各拉出 10px：鼠标悬停时底色铺满一行，文字却保持左对齐 */
+            margin: 0 -10px;
+            border-bottom: 1px solid var(--color-divider);
+            border-radius: var(--radius-sm);
+            color: inherit;
+            text-decoration: none;
+            transition: var(--transition-fast);
+        }
+        .tag-post-list li:last-child .tag-post-item {
+            border-bottom: 0;
+        }
+        .tag-post-date {
+            flex: 0 0 auto;
+            font-size: 0.76rem;
+            color: var(--color-text-tertiary);
+            font-variant-numeric: tabular-nums;
+        }
+        .tag-post-title {
+            font-size: 0.98rem;
+            font-weight: 500;
+            line-height: 1.5;
+        }
+        html:not(.is-touch-input) .tag-post-item:hover {
+            background: var(--color-surface);
+        }
+        html:not(.is-touch-input) .tag-post-item:hover .tag-post-title {
+            color: var(--color-text-secondary);
+        }
+        .tag-hub-back {
+            margin-top: 34px;
+        }
+        @media (max-width: 600px) {
+            .tag-post-item {
+                flex-direction: column;
+                gap: 4px;
+            }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .tag-post-item {
+                transition: none;
+            }
+        }
+
+        /* ==================== 标签总览（?view=tags） ==================== */
+        /* 每条都是指向 /tags/<标签>/ 的真链接。用网格排，
+           12 个标签在两三列里刚好铺满一屏，不用滚。 */
+        .tag-landing {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+            gap: 10px;
+            margin-top: 6px;
+        }
+        .tag-landing-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 16px;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            color: inherit;
+            text-decoration: none;
+            transition: var(--transition-fast);
+        }
+        .tag-landing-name {
+            font-size: 0.95rem;
+            font-weight: 600;
+            /* 标签名过长（比如「第五人格」）别把计数挤出去 */
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .tag-landing-count {
+            margin-left: auto;
+            flex: 0 0 auto;
+            font-size: 0.76rem;
+            color: var(--color-text-tertiary);
+            font-variant-numeric: tabular-nums;
+        }
+        .tag-landing-item i {
+            flex: 0 0 auto;
+            font-size: 0.9rem;
+            color: var(--color-text-tertiary);
+            transition: transform var(--transition-fast);
+        }
+        html:not(.is-touch-input) .tag-landing-item:hover {
+            border-color: var(--color-text-tertiary);
+            background: var(--color-surface);
+        }
+        html:not(.is-touch-input) .tag-landing-item:hover i {
+            transform: translateX(2px);
+        }
+        .tag-landing-empty {
+            color: var(--color-text-tertiary);
+            font-size: 0.9rem;
+        }
+        @media (max-width: 600px) {
+            .tag-landing {
+                grid-template-columns: 1fr;
+            }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .tag-landing-item,
+            .tag-landing-item i {
+                transition: none;
+            }
+        }
+
+        /* ==================== 标签总览（?view=tags） ==================== */
+        /* 每条都是指向 /tags/<标签>/ 的真链接。用网格排，
+           12 个标签在两三列里刚好铺满一屏，不用滚。 */
+        .tag-landing {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+            gap: 10px;
+            margin-top: 6px;
+        }
+        .tag-landing-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 16px;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            color: inherit;
+            text-decoration: none;
+            transition: var(--transition-fast);
+        }
+        .tag-landing-name {
+            font-size: 0.95rem;
+            font-weight: 600;
+            /* 标签名过长（比如「第五人格」）别把计数挤出去 */
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .tag-landing-count {
+            margin-left: auto;
+            flex: 0 0 auto;
+            font-size: 0.76rem;
+            color: var(--color-text-tertiary);
+            font-variant-numeric: tabular-nums;
+        }
+        .tag-landing-item i {
+            flex: 0 0 auto;
+            font-size: 0.9rem;
+            color: var(--color-text-tertiary);
+            transition: transform var(--transition-fast);
+        }
+        html:not(.is-touch-input) .tag-landing-item:hover {
+            border-color: var(--color-text-tertiary);
+            background: var(--color-surface);
+        }
+        html:not(.is-touch-input) .tag-landing-item:hover i {
+            transform: translateX(2px);
+        }
+        .tag-landing-empty {
+            color: var(--color-text-tertiary);
+            font-size: 0.9rem;
+        }
+        @media (max-width: 600px) {
+            .tag-landing {
+                grid-template-columns: 1fr;
+            }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .tag-landing-item,
+            .tag-landing-item i {
+                transition: none;
+            }
+        }
