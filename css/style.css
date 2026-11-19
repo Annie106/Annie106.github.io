@@ -62,6 +62,18 @@
             --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.05);
             --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.08);
 
+            /* 卡片二级菜单这个浮层。浅色下它和卡片同为白色，
+               只能靠投影和一层极淡的描边把「浮在最上层」说清楚 ——
+               所以用了三层阴影：贴着边缘的一点实感、中距离的一层轮廓、
+               远处一层很散的环境光，合起来才是真正的悬浮感，
+               单写一个 0 8px 30px 会像卡片本身的一块阴影。 */
+            --menu-bg: #ffffff;
+            --menu-border: rgba(17, 17, 17, 0.085);
+            --menu-shadow:
+                0 1px 2px rgba(15, 23, 42, 0.05),
+                0 10px 24px -8px rgba(15, 23, 42, 0.16),
+                0 24px 56px -24px rgba(15, 23, 42, 0.22);
+
             --transition-fast: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
             --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
@@ -2930,28 +2942,54 @@
             top: 52px;
             right: 22px;
             z-index: 6;
-            min-width: 184px;
-            padding: 6px;
-            border: 1px solid var(--color-border);
-            border-radius: 12px;
-            background: var(--color-bg);
+            min-width: 190px;
+            padding: 5px;
+            border: 1px solid var(--menu-border);
+            border-radius: 14px;
+            background: var(--menu-bg);
+            box-shadow: var(--menu-shadow);
             /* 展开 / 收起过渡：用透明度和位移，而不是 display，
-               这样打开和关闭都能看到动画 */
+               这样打开和关闭都能看到动画。
+               关闭走得快（0.13s）—— 点完菜单还等它慢慢淡走很拖沓；
+               打开稍慢一点、尾巴收得松，落下来才有「浮层弹出」的手感。 */
             opacity: 0;
             visibility: hidden;
             pointer-events: none;
-            transform: translateY(-6px) scale(0.96);
+            transform: translateY(-6px) scale(0.97);
             transform-origin: top right;
             transition:
-                opacity 0.16s ease,
-                transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
-                visibility 0.18s;
+                opacity 0.13s ease,
+                transform 0.13s ease,
+                visibility 0.13s;
+        }
+        /* 顶端的小三角：菜单看着像是从三点按钮上「长」出来的，
+           而不是凭空贴在卡片上。10px 的方块转 45°，只留上、左两条描边，
+           正好接住菜单自己的边框。
+           right: 8px 是对着按钮中心算的：按钮右缘和菜单右缘只差 1px，
+           按钮半宽 13 → 中心在菜单右缘左侧 12px → 三角盒（宽 10）右移 8。 */
+        .post-menu::before {
+            content: '';
+            position: absolute;
+            top: -5px;
+            right: 8px;
+            width: 10px;
+            height: 10px;
+            background: var(--menu-bg);
+            border-top: 1px solid var(--menu-border);
+            border-left: 1px solid var(--menu-border);
+            border-radius: 2px 0 0 0;
+            transform: rotate(45deg);
+            pointer-events: none;
         }
         .post-card.menu-open .post-menu {
             opacity: 1;
             visibility: visible;
             pointer-events: auto;
             transform: translateY(0) scale(1);
+            transition:
+                opacity 0.16s ease,
+                transform 0.24s cubic-bezier(0.16, 1, 0.3, 1),
+                visibility 0.24s;
         }
         /* 菜单的显示状态由上面的透明度控制，hidden 只用于无障碍语义 */
         .post-menu[hidden] {
@@ -2960,39 +2998,31 @@
         .post-menu-item {
             display: flex;
             align-items: center;
-            gap: 9px;
+            gap: 10px;
             width: 100%;
             padding: 9px 10px;
             border: 0;
-            border-radius: 8px;
+            border-radius: 9px;
             background: transparent;
             color: var(--color-text-primary);
             font: inherit;
-            font-size: 0.88rem;
+            font-size: 0.87rem;
             /* 用整数行高，让每一项的高度都是整数像素。
                否则各项高度会出现 40.39 / 37.7 这类小数，
-               分隔线的落点小数位各不相同，被分摊到相邻像素的比例不一样，
-               看上去就是「有的粗有的细」。 */
+               悬停底色的圆角在相邻项之间就会被分摊到不同的像素比例上，
+               看上去「有的项高一点、有的矮一点」。 */
             line-height: 20px;
             text-align: left;
             text-decoration: none;
             white-space: nowrap;
             cursor: pointer;
+            transition: background-color 0.14s ease, color 0.14s ease;
         }
-        /* 菜单项之间用一条细线分隔 */
+        /* 项与项之间只留 2px：够让人看出这是三条独立的东西，
+           又不至于散成一张表单。分隔线撤掉了 —— 在浮层里它只是多余的线条，
+           悬停时的圆角底色已经足够说清「现在落在哪一项」。 */
         .post-menu-item + .post-menu-item {
-            position: relative;
-            margin-top: 6px;
-        }
-        .post-menu-item + .post-menu-item::before {
-            content: '';
-            position: absolute;
-            top: -3px;
-            left: 8px;
-            right: 8px;
-            height: 1px;
-            background: var(--color-border);
-            pointer-events: none;
+            margin-top: 2px;
         }
         @media (prefers-reduced-motion: reduce) {
             .post-menu {
@@ -3001,12 +3031,28 @@
         }
         html:not(.is-touch-input) .post-menu-item:hover,
         .post-menu-item:focus-visible {
-            background: var(--color-surface);
+            /* 注意用的是按钮圆底那一档（#f1f1f1），不是 surface（#fafafa）：
+               浮层本身就是白底，surface 压上去几乎看不出变化，悬停会像没反应 */
+            background: var(--card-control-bg);
             outline: none;
         }
+        .post-menu-item:active {
+            background: var(--card-control-bg-hover);
+        }
         .post-menu-item i {
-            color: var(--color-text-secondary);
+            color: var(--color-text-tertiary);
             font-size: 1rem;
+            transition: color 0.14s ease;
+        }
+        html:not(.is-touch-input) .post-menu-item:hover i,
+        .post-menu-item:focus-visible i {
+            color: var(--color-text-primary);
+        }
+        /* 手指没有悬停，只能靠行高保证点得准 */
+        @media (hover: none) {
+            .post-menu-item {
+                padding: 11px 12px;
+            }
         }
         .task-title {
             font-size: 1.14rem;
@@ -5221,6 +5267,16 @@
             --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
             --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.45);
             --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.6);
+
+            /* 深色下卡片是 #0f1115，浮层反而要比它亮一档才浮得起来。
+               深底上的投影几乎看不见，层次主要来自底色差 + 一道浅描边，
+               阴影只负责把边缘往外压一压。 */
+            --menu-bg: #1c2029;
+            --menu-border: rgba(255, 255, 255, 0.10);
+            --menu-shadow:
+                0 1px 2px rgba(0, 0, 0, 0.45),
+                0 12px 28px -8px rgba(0, 0, 0, 0.55),
+                0 24px 56px -24px rgba(0, 0, 0, 0.6);
         }
 
         /* 顶部导航：深色下同样是一条通栏底色，只换颜色不加投影 */
@@ -5559,15 +5615,9 @@
         [data-theme="dark"] .options svg {
             fill: #d5d8de;
         }
-        [data-theme="dark"] .post-menu {
-            border-color: rgba(255, 255, 255, 0.14);
-            background: #1e222b;
-            box-shadow: none;
-        }
-        html:not(.is-touch-input)[data-theme="dark"] .post-menu-item:hover,
-        [data-theme="dark"] .post-menu-item:focus-visible {
-            background: rgba(255, 255, 255, 0.08);
-        }
+        /* 二级菜单的深色配色不再单独写死：底色、描边、投影、悬停底
+           全部走 --menu-* / --card-control-* 那组变量（见 :root 与 [data-theme="dark"]），
+           这里再写一份会盖掉变量，深浅两边迟早对不上 */
 
         /* 音乐播放器卡片 */
         [data-theme="dark"] .music-player-card {
@@ -7104,13 +7154,37 @@
             transform: rotate(180deg);
         }
         .article-toc-list {
+            position: relative;
             list-style: none;
             margin: 0;
             padding: 0 2px 6px;
         }
+        /* 跟随高亮项的滑块，做法照搬 guide.html 的侧栏目录：
+           一块绝对定位的底，只改 translateY + height，让「读到哪一节」有方向感，
+           而不是上一项灭、下一项亮地硬切。左右缩进跟着 ol 的 padding 走，
+           宽度就不用 JS 去量了。 */
+        .article-toc-indicator {
+            position: absolute;
+            top: 0;
+            left: 2px;
+            right: 2px;
+            z-index: 0;
+            height: 0;
+            border-radius: var(--radius-sm);
+            background: var(--color-tag-bg);
+            opacity: 0;
+            pointer-events: none;
+        }
+        /* 第一次定位那一下不能演，否则滑块会从列表顶部滑到目标位置 */
+        .article-toc-indicator.is-ready {
+            transition: transform 0.18s ease-out, height 0.18s ease-out,
+                opacity 0.16s ease;
+        }
         .article-toc-link {
             /* 行高用变量，截断那边按同一个值算最大高度，两边不会差半行 */
             --toc-lh: 1.5;
+            position: relative;
+            z-index: 1;
             display: block;
             padding: 7px 9px;
             border-radius: var(--radius-sm);
@@ -7118,7 +7192,7 @@
             line-height: var(--toc-lh);
             color: var(--color-text-secondary);
             text-decoration: none;
-            transition: color var(--transition-fast), background var(--transition-fast);
+            transition: color var(--transition-fast);
         }
         /* 截断必须放在里层这个 span 上，不能直接钳 .article-toc-link ——
            overflow: hidden 裁的是 padding 盒，链接自己有上下内边距，
@@ -7136,20 +7210,60 @@
         }
         .article-toc-link.is-active {
             color: var(--color-text-primary);
-            background: var(--color-tag-bg);
+            /* 底色交给滑块，这里只留字色和字重 */
+            background: transparent;
             font-weight: 600;
         }
         html:not(.is-touch-input) .article-toc-link:hover {
             color: var(--color-text-primary);
         }
         /* 手机端默认收起：目录摆在正文前面，展开着会把第一屏挤掉。
-           展开/收起是 JS 加 .is-open，按钮带 aria-expanded。 */
+           展开/收起是 JS 加 .is-open，按钮带 aria-expanded。
+           高度过渡用 height: 0 ↔ auto，靠 interpolate-size: allow-keywords 让 auto 也能插值。
+           ⚠️ 别改回 grid 的 `auto 0fr ↔ auto 1fr`：容器高度本身是 auto 时，
+           那一行 fr 的目标高度无从算起，浏览器会在过渡中把 `auto` 行的头
+           一起拉伸（实测第一行涨到 92px），head 里的文字跟着上下跳。
+           老浏览器不认 allow-keywords 时退化成瞬间展开，可用但不丝滑。 */
         @media (max-width: 1179px) {
+            .article-toc {
+                interpolate-size: allow-keywords;
+            }
             .article-toc-list {
-                display: none;
+                height: 0;
+                overflow: hidden;
+                padding-bottom: 0;
+                /* 高度收成 0 之后，Tab 仍然能落进那些看不见的链接里，
+                   所以 visibility 也一起收掉 —— 但要等高度过渡走完再收 */
+                visibility: hidden;
+                opacity: 0;
+                transform: translateY(-4px);
+                transition:
+                    height 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+                    opacity 0.16s ease,
+                    transform 0.24s ease,
+                    padding-bottom 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+                    visibility 0s linear 0.28s;
             }
             .article-toc.is-open .article-toc-list {
-                display: block;
+                height: auto;
+                padding-bottom: 6px;
+                visibility: visible;
+                opacity: 1;
+                transform: none;
+                transition:
+                    height 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+                    opacity 0.24s ease 0.04s,
+                    transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+                    padding-bottom 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+                    visibility 0s;
+            }
+            /* 切文章、点目录项这些「布局必须立刻到位」的场合别演过渡，
+               否则量出来的落点还停在收起前的位置。JS 加 .is-instant 用完即删。 */
+            .article-toc.is-instant,
+            .article-toc.is-instant.is-open,
+            .article-toc.is-instant .article-toc-list,
+            .article-toc.is-instant.is-open .article-toc-list {
+                transition: none;
             }
         }
 
@@ -7194,8 +7308,8 @@
                 display: block;
                 padding: 0;
             }
-            /* 每项自带 2px 左边线，盖在容器的 1px 竖线上（margin-left 抵消掉那 1px）。
-               未激活是透明，激活才显形 —— 比另外画一个跟随元素省事，也不会错位。 */
+            /* 每项自带 2px 左边线，只为占位（margin-left 抵消掉容器那 1px）；
+               现在竖条由滑块画，这里保持透明，滑块正好盖在同一位置。 */
             .article-toc-link {
                 --toc-lh: 1.55;
                 margin-left: -1px;
@@ -7203,10 +7317,18 @@
                 border-left: 2px solid transparent;
                 border-radius: 0;
                 font-size: 0.78rem;
+                transition: color var(--transition-fast);
             }
             .article-toc-link.is-active {
                 background: transparent;
-                border-left-color: var(--color-text-primary);
+            }
+            /* 宽屏的滑块是一条 2px 竖线，尺寸和原来那条 border 一致 */
+            .article-toc-indicator {
+                left: -1px;
+                right: auto;
+                width: 2px;
+                border-radius: 1px;
+                background: var(--color-text-primary);
             }
         }
 
@@ -7335,6 +7457,9 @@
 
         @media (prefers-reduced-motion: reduce) {
             .reading-progress,
+            .article-toc,
+            .article-toc-list,
+            .article-toc-indicator.is-ready,
             .article-toc-chevron,
             .article-toc-link,
             .fontsize-btn,
@@ -7400,6 +7525,31 @@
         @media (prefers-reduced-motion: reduce) {
             .tag-post-item {
                 transition: none;
+            }
+        }
+
+        /* ==================== 滚动出现（首页 / 文章列表 / 文章页） ====================
+           元素滚进视口时淡入 + 轻轻上移，由 js/script.js 的 refreshScrollReveal()
+           负责打类、播动画。三条约束，改之前先看：
+           1. 隐藏态 .is-reveal-hidden 只由脚本添加，HTML 和这里都没有预置。
+              脚本没跑到 / 跑挂了 / 访客禁了 JS，页面就是普通的全可见页面，
+              不会出现「内容永远透明」的白屏。
+           2. 只有整个元素都在视口下方时才会被藏起来；首屏里露出一点点的
+              也算已出现，所以首屏永远立刻可读，不等动画。
+           3. 这里故意不写 transition：.task / .tag-pill / .tag-landing-item
+              自己声明了 transition（悬停上浮、底色），在它们身上再写一条
+              会整条覆盖掉，悬停动画直接失效。入场动画走 Web Animations。 */
+        .is-reveal-hidden {
+            opacity: 0;
+            /* 位移只有 18px：再多就成了「从下面顶上来」，读正文会晃眼。
+               和 script.js 里的 REVEAL_DISTANCE 保持一致。 */
+            transform: translate3d(0, 18px, 0);
+        }
+        @media (prefers-reduced-motion: reduce) {
+            /* 兜底：脚本还没来得及接管时也不要有任何隐藏效果 */
+            .is-reveal-hidden {
+                opacity: 1;
+                transform: none;
             }
         }
 

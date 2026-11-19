@@ -174,12 +174,16 @@ python -m http.server 8000
 
 访问 <http://localhost:8000>，或直接打开 `index.html`。背景音乐需用户交互后才能播放。
 
-**② 看线上那一份（含文章专属地址 `/posts/<id>/`）** —— 先构建，再指向 `dist/`：
+> 评论区的黑 / 白聚焦框本地也能看到：主题 CSS 由页面自己读进来、转成 `data:` URL 传给 giscus，不走跨域请求（https 的 giscus.app 取 localhost 的 CSS 会被 Chrome 拦掉）。
+
+**② 看线上那一份（含文章专属地址 `/posts/<id>/`）** —— 先构建，再起本地服务器：
 
 ```bash
 npm run build
-cd dist && python -m http.server 8000
+node tools/serve.js
 ```
+
+访问 <http://localhost:8000>。`tools/serve.js` 指向 `dist/`，并给每个响应加 CORS 头（B 站外链预览、图标等还会用到）。
 
 ⚠️ `/posts/<id>/` 只存在于 `dist/` 里。对着仓库根起服务器，站内点进文章会 404 —— 这不是 bug，是产物没生成或服务器指错了目录。
 

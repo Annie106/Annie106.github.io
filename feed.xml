@@ -7,9 +7,19 @@
     <link>https://annie106.github.io/</link>
     <description>思考 · 记录 · 创造 —— 记录阅读、成长和日常灵感。</description>
     <language>zh-cn</language>
-    <lastBuildDate>Sun, 15 Nov 2026 00:00:00 +0800</lastBuildDate>
+    <lastBuildDate>Thu, 19 Nov 2026 00:00:00 +0800</lastBuildDate>
     <generator>tools/build-feed.js</generator>
     <atom:link href="https://annie106.github.io/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>没进校门，就先迟到了</title>
+      <link>https://annie106.github.io/posts/18/</link>
+      <guid isPermaLink="true">https://annie106.github.io/?article=18</guid>
+      <pubDate>Thu, 19 Nov 2026 00:00:00 +0800</pubDate>
+      <description>饭吃到一半，主任带着政教进来吃饭，看见我：呀！抓到个迟到的。可我在校门外，门都没进。</description>
+      <category>随笔</category>
+      <category>学校</category>
+      <media:thumbnail url="https://annie106.github.io/share_cover.jpg"/>
+    </item>
     <item>
       <title>给这个博客配一个本地服务器</title>
       <link>https://annie106.github.io/posts/17/</link>
@@ -76,6 +86,7 @@
       <pubDate>Fri, 23 Oct 2026 00:00:00 +0800</pubDate>
       <description>一小时的路程，六点五十之前到校。我提的是一道算术题，不是态度问题。</description>
       <category>随笔</category>
+      <category>学校</category>
       <media:thumbnail url="https://annie106.github.io/share_cover.jpg"/>
     </item>
     <item>

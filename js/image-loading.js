@@ -20,7 +20,7 @@
     //   · 头像 .avatar（首页/文章作者头像，走的是媒体 CDN，跟高速直链无关）
     //   · 音乐播放器区域（音频是 <audio>，本来就不会进这里；封面图同样放过）
     //   · 任何显式标了 data-image-loading="off" / data-fast-quota="off" 的区域
-    var EXCLUDED_SELECTOR = '.avatar, .music-player-card, .music-enable-hint, ' +
+    var EXCLUDED_SELECTOR = '.avatar, .music-player-card, ' +
         '[data-image-loading="off"], [data-fast-quota="off"]';
     var FAST_DAILY_KEY = 'annie-image-fast-daily';
 

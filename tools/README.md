@@ -72,7 +72,7 @@ python -c "import fontTools, brotli"    # 没有任何输出 = 装好了
 npm run build
 ```
 
-一条命令跑完四步：`build-site.js`（复制 + 校验图标）→ `build-comment-counts.js`（上网抓真实评论数）→ `build-posts.js`（文章静态页 + sitemap）→ `minify.js`（压缩）。产物在 `dist/`，本地预览指向它即可（`python -m http.server` 或 Live Server）。
+一条命令跑完四步：`build-site.js`（复制 + 校验图标）→ `build-comment-counts.js`（上网抓真实评论数）→ `build-posts.js`（文章静态页 + sitemap）→ `minify.js`（压缩）。产物在 `dist/`，本地预览用 `node tools/serve.js`。
 
 只想看样式改动、不关心评论数时，单独跑 `node tools/build-site.js` 也够。
 
@@ -107,6 +107,7 @@ node tools\new-post.js "标题"        :: 新建一篇文章（也可以 --from 
 node tools\build-feed.js            :: 重生成 feed.xml
 node tools\check-icons.js           :: 图标校验（退出码 0 = 通过）
 node tools\make-app-icons.js        :: 从 favicon.svg 生成主屏 PNG 图标
+node tools\serve.js [端口]          :: 本地预览 dist/（带 CORS + 本地网络访问头）
 python tools\subset-icons.py        :: 只重裁图标
 ```
 

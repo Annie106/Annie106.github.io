@@ -12,7 +12,10 @@
     // 播放状态
     let currentIndex = 0;
     let isPlaying = false;
-    let isEnabled = true; // 用户是否启用音乐
+    /* 只当记账用：记住「上次是播着还是停着的」，不参与要不要起播的判断。
+       起播判断一律看 isPlaying —— 见 toggleMusic。 */
+    let isEnabled = false;
+    /* 用户有没有主动按下过播放。playNext 用它决定切歌后要不要接着播。 */
     let hasUserInteracted = false;
     let retryCount = 0;
     const maxRetries = 3;
@@ -27,7 +30,6 @@
     let musicCurrentTime = null;
     let musicDuration = null;
     let musicPlayerCard = null;
-    let musicEnableHint = null;
     let musicCardTitle = null;
     let musicCardArtist = null;
     let isCollapsed = false;
@@ -40,7 +42,6 @@
        （实测首页两个音频请求），而真正要听的人才会按下播放。
        改成第一次要播时才设 src —— 见 ensureAudioSrc()。 */
     audio.preload = 'none';
-
     /* 第一次播之前必须调一次：没有 src 直接 play() 会抛 NotSupportedError。
        已经有 src 就什么都不做（切歌走 playNext，那里自己会换）。 */
     function ensureAudioSrc() {
@@ -64,7 +65,6 @@
         musicCurrentTime = document.getElementById('musicCurrentTime');
         musicDuration = document.getElementById('musicDuration');
         musicPlayerCard = document.getElementById('musicPlayerCard');
-        musicEnableHint = document.getElementById('musicEnableHint');
         musicCardTitle = document.getElementById('musicCardTitle');
         musicCardArtist = document.getElementById('musicCardArtist');
 
@@ -72,21 +72,17 @@
         syncVolumeUI();
         applyCollapseState();
 
-        // 注意：这里**不**设 audio.src。音频推迟到真要播的时候才加载，
-        // 由 ensureAudioSrc() 负责（tryAutoPlay / 首次交互 / 点播放三处）。
+        // 注意：这里**不**设 audio.src。音频推迟到真要播的时候才加载，见 ensureAudioSrc()。
 
         // 设置事件监听器
         setupEventListeners();
 
-        // 检查用户之前的设置
+        /* 只读回「上次的音量/折叠」这类纯外观偏好（见 loadUserPreference）。
+           进站**不出声**：浏览器对没有用户手势的 play() 本来就会拒绝，
+           更别说访客打开博客就被一段 BGM 糊脸。
+           要听的人自己按播放按钮 —— 见 toggleMusic。 */
         loadUserPreference();
-
-        // 如果启用音乐，尝试自动播放
-        if (isEnabled) {
-            tryAutoPlay();
-        } else {
-            updateToggleButtons();
-        }
+        updateToggleButtons();
     }
 
     // 设置事件监听器
@@ -121,10 +117,9 @@
         audio.addEventListener('durationchange', updatePlaybackProgress);
         audio.addEventListener('error', handleAudioError);
 
-        // 用户交互检测
-        document.addEventListener('click', handleUserInteraction, { once: true });
-        document.addEventListener('keydown', handleUserInteraction, { once: true });
-        document.addEventListener('touchstart', handleUserInteraction, { once: true });
+        /* 这里刻意**不**监听 document 的 click / keydown / touchstart：
+           以前是「首次交互即起播」，结果就是访客随便点一下列表、按一下方向键，
+           BGM 就自己响了。现在只有播放按钮（和 BackgroundMusic.play()）能出声。 */
     }
 
     // 处理音频错误
@@ -190,77 +185,30 @@
         if (message) message.remove();
     }
 
-    /* 页面加载时不再主动起播。
-       原因有两层：① 没有用户手势，play() 一定被浏览器拒绝；
-       ② 只要给 audio 设了 src，浏览器立刻开始下载整首歌 —— 首屏白拉一遍流量。
-       所以这里只亮出「点一下就能听」的提示，真正的加载和起播交给
-       handleUserInteraction（首次点击/按键）和播放按钮。
-       注意不要在这里设 hasUserInteracted，否则首次交互会被那句守卫提前 return 掉。 */
-    function tryAutoPlay() {
-        if (!isEnabled) return;
-        showMusicEnableHint();
-        updateToggleButtons();
-    }
-
-    // 显示音乐启用提示
-    function showMusicEnableHint() {
-        if (musicEnableHint && !hasUserInteracted) {
-            musicEnableHint.style.display = 'block';
-        }
-    }
-
-    // 隐藏音乐启用提示
-    function hideMusicEnableHint() {
-        if (musicEnableHint) {
-            musicEnableHint.style.display = 'none';
-        }
-    }
-
-    // 处理用户交互
-    function handleUserInteraction() {
-        if (hasUserInteracted) return; // 防止重复处理
-
-        hasUserInteracted = true;
-
-        // 隐藏提示
-        hideMusicEnableHint();
-
-        if (isEnabled && !isPlaying) {
-            // 用户首次交互后开始播放
-            audio.muted = false;
-            ensureAudioSrc();
-            audio.play().then(() => {
-                console.log('🎵 用户交互后成功开始播放');
-            }).catch(e => {
-                console.warn('用户交互后播放失败:', e);
-                handleAudioError(e);
-            });
-        }
-    }
-
-    // 切换音乐开关
+    /* 播放按钮只有一个含义：没在播就播，在播就停。
+       别用 isEnabled 反推 —— 它只是「上次停在哪」的记账，
+       拿它当条件的话，刷新后第一次点按钮会变成「关」而不是「播」。 */
     function toggleMusic() {
-        isEnabled = !isEnabled;
-        saveUserPreference();
-
-        if (isEnabled) {
-            // 确保用户已交互
-            hasUserInteracted = true;
-
-            if (!isPlaying) {
-                audio.muted = false;
-                ensureAudioSrc();
-                audio.play().then(() => {
-                    console.log('🎵 音乐开启成功');
-                }).catch(e => {
-                    console.warn('开启音乐失败:', e);
-                    handleAudioError(e);
-                });
-            }
-        } else {
+        if (isPlaying) {
+            isEnabled = false;
+            saveUserPreference();
             audio.pause();
+            updateToggleButtons();
+            return;
         }
 
+        // 点了播放才算「用户交互过」，playNext 靠它决定切歌后要不要接着播
+        hasUserInteracted = true;
+        isEnabled = true;
+        saveUserPreference();
+        audio.muted = false;
+        ensureAudioSrc();
+        audio.play().then(() => {
+            console.log('🎵 音乐开启成功');
+        }).catch(e => {
+            console.warn('开启音乐失败:', e);
+            handleAudioError(e);
+        });
         updateToggleButtons();
     }
 

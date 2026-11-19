@@ -164,6 +164,10 @@
                renderArticleToc 每渲染一篇文章重算一次，滚动时只改 class。 */
             let tocHeadings = [];
             let tocActiveIndex = -1;
+            /* 跟随高亮项的那块滑块（做法照搬 guide.html 的侧栏目录）。
+               renderArticleToc 重写列表时它会被一起清掉，所以要能重建。 */
+            let tocIndicator = null;
+            let tocIndicatorReady = false;
             let embeddedPageObserver = null;
             let embeddedPageResizeHandler = null;
             let embeddedPageFallbackTimer = null;
@@ -406,6 +410,89 @@
             function siteBaseUrl() {
                 return SITE_BASE_URL;
             }
+
+            /* ==================== giscus 主题 ====================
+               评论框是 https://giscus.app 里的跨域 iframe，外面的 style.css
+               进不去，只能通过 data-theme 告诉它用哪份主题。本站要的是自己的
+               两份变体（css/giscus-annie-light.css / -dark.css，giscus 官方主题
+               原样，只把输入区聚焦时那条蓝框换成黑 / 白）。
+
+               ⚠️ 不能把这两个文件的 URL 交给 giscus：那个 iframe 站在公网
+               origin 上，来取 http://localhost 的 CSS 会被 Chrome 的本地网络
+               访问检查拦掉（corsError: LocalNetworkAccessPermissionDenied，
+               加 CORS 头也没用，是浏览器权限层）。主题变量一缺，giscus 里大量
+               var(--color-*) 全部失效 —— 登录之后整个编辑器只剩一行「写评论」
+               和一大片空白，切深浅也切不动。
+
+               做法：父页**同源** fetch 这两个文件，拼成 data:text/css;base64
+               交给 giscus。data: 不产生任何跨网络请求，本地和线上都能用，
+               而且比让它自己再去下载一次 CSS 还快一点。
+
+               首帧不用等：dataset.theme 先给内置的 light / dark，iframe 一出来
+               就有完整样式；data URL 拿到的瞬间再 postMessage 覆盖，两套只差
+               聚焦边框那一根颜色，看不出跳变。 */
+            const giscusThemeDataUrl = Object.create(null);   // 'light'|'dark' -> data: URL
+            const giscusThemeLoading = Object.create(null);   // 同 key -> Promise
+
+            function currentThemeKey() {
+                return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+            }
+
+            /* 读本站主题 CSS 转成 data: URL。失败返回 ''（调用方保持内置主题）。
+               文件里有中文注释，btoa 只吃 latin1，所以先按 UTF-8 取字节。 */
+            function loadGiscusThemeDataUrl(theme) {
+                const key = theme === 'dark' ? 'dark' : 'light';
+                if (giscusThemeDataUrl[key]) return Promise.resolve(giscusThemeDataUrl[key]);
+                if (giscusThemeLoading[key]) return giscusThemeLoading[key];
+
+                const request = fetch(siteBaseUrl() + 'css/giscus-annie-' + key + '.css')
+                    .then(function (res) { return res.ok ? res.text() : ''; })
+                    .then(function (text) {
+                        if (!text) return '';
+                        const bytes = new TextEncoder().encode(text);
+                        let binary = '';
+                        for (let i = 0; i < bytes.length; i += 0x8000) {
+                            binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+                        }
+                        const url = 'data:text/css;base64,' + btoa(binary);
+                        giscusThemeDataUrl[key] = url;
+                        return url;
+                    })
+                    .catch(function () { return ''; })
+                    .then(function (url) {
+                        delete giscusThemeLoading[key];
+                        return url;
+                    });
+
+                giscusThemeLoading[key] = request;
+                return request;
+            }
+
+            /* 把当前主题推给页面上所有 giscus iframe（文章正文下那块 + 评论视图那块）。
+               先用内置主题名立刻切一次（一定成功，保证「切深浅会跟着变」这个基本
+               预期），data URL 到手后再覆盖成站点的黑 / 白聚焦框。 */
+            function syncGiscusTheme() {
+                const theme = currentThemeKey();
+
+                function apply(value) {
+                    /* 每次重新查：异步期间 iframe 可能被换掉 */
+                    document.querySelectorAll('iframe.giscus-frame').forEach(function (frame) {
+                        if (!frame.contentWindow) return;
+                        frame.contentWindow.postMessage({
+                            giscus: { setConfig: { theme: value } }
+                        }, 'https://giscus.app');
+                    });
+                }
+
+                apply(theme);
+                loadGiscusThemeDataUrl(theme).then(function (url) {
+                    if (url) apply(url);
+                });
+            }
+
+            /* 站点切主题时由 theme.js 发这个事件（它不自己算 giscus 地址，
+               否则两处各算一遍，改一处漏一处） */
+            document.addEventListener('annie:themechange', syncGiscusTheme);
 
             // 当前地址是不是文章页（/posts/<id>/），是就返回 id，否则 null
             function readArticleIdFromPath() {
@@ -2083,7 +2170,12 @@
                     renderHomePager();
                 }
                 // 换筛选 / 翻页、或明确要求播入场动画（animate）时才真的重画
-                if (!animate && postsRenderKeys.get(containerId) === listKey && container.firstChild) return;
+                if (!animate && postsRenderKeys.get(containerId) === listKey && container.firstChild) {
+                    /* 列表没重画，但它可能刚从 display:none 显示出来
+                       （之前量不到尺寸、没能登记），这里补一次 */
+                    refreshScrollReveal(container);
+                    return;
+                }
                 postsRenderKeys.set(containerId, listKey);
                 /* 这一帧是即时局部重画：把可能在跑的淡出/高度过渡中止掉，
                    否则 120ms 后那次定时回调会用旧数据把列表盖回去。 */
@@ -2277,6 +2369,9 @@
                         if (this.target !== '_blank') saveViewState();
                     });
                 });
+                /* 新卡片登记「滚动出现」：只有还在视口下方的才会被藏起来，
+                   已经在屏幕里的是直接可见的（首屏 / 翻页后落在顶部都一样）。 */
+                refreshScrollReveal(container);
             }
 
             // ==================== 本周折腾 ====================
@@ -3098,6 +3193,10 @@
                 if (!articleComments) return;
                 const term = commentsTerm(post);
 
+                /* 顺手把主题 CSS 读成 data: URL 缓存起来：giscus 整条链要 2-3 秒，
+                   这点请求早就跑完了，iframe 就绪时能立刻换成站点配色 */
+                loadGiscusThemeDataUrl(currentThemeKey());
+
                 /* 已经挂着同一篇文章的 iframe：直接复用，不再走一遍完整请求链 */
                 if (!force && commentsMountedTerm === term
                     && articleComments.querySelector('iframe.giscus-frame')) {
@@ -3123,9 +3222,9 @@
                 script.dataset.reactionsEnabled = '0';
                 script.dataset.emitMetadata = '0';
                 script.dataset.inputPosition = 'bottom';
-                script.dataset.theme = document.documentElement.getAttribute('data-theme') === 'dark'
-                    ? 'dark'
-                    : 'light';
+                /* 先挂内置主题（不用等任何请求，iframe 一出来就是完整样式）；
+                   就绪后再由 syncGiscusTheme() 换成站点的黑 / 白变体 */
+                script.dataset.theme = currentThemeKey();
                 script.dataset.lang = 'zh-CN';
                 articleComments.appendChild(script);
                 commentsMountedTerm = term;
@@ -3156,22 +3255,13 @@
                             stableTicks = 0;
                         }
                         lastHeight = height;
-                        if (stableTicks >= 3 || ticks > 70) {
+                        if (stableTicks >= 2 || ticks > 70) {
                             clearInterval(commentsReadyTimer);
                             commentsReadyTimer = null;
-                            /* 预热挂载比读者先到，这期间切主题的消息 iframe 还收不到，
-                               就绪后按当前主题补一次 */
-                            if (frame.contentWindow) {
-                                frame.contentWindow.postMessage({
-                                    giscus: {
-                                        setConfig: {
-                                            theme: document.documentElement.getAttribute('data-theme') === 'dark'
-                                                ? 'dark'
-                                                : 'light'
-                                        }
-                                    }
-                                }, 'https://giscus.app');
-                            }
+                            /* 预热挂载比读者先到，这期间 iframe 里的 giscus 还没装好
+                               消息监听、收不到主题，就绪后再补一次（内部会先发内置
+                               主题名，再换成站点的 data: 变体） */
+                            syncGiscusTheme();
                             frame.classList.add('is-ready');
                             const skeleton = articleCommentsStage ? articleCommentsStage.querySelector('.comments-skeleton') : null;
                             if (skeleton) {
@@ -3330,6 +3420,8 @@
                     articleToc.hidden = true;
                     articleToc.classList.remove('is-open');
                     articleTocList.innerHTML = '';
+                    tocIndicator = null;
+                    tocIndicatorReady = false;
                     syncTocAria();
                 };
                 if (isUnavailableArticle || !post || post.embeddedPage) {
@@ -3355,15 +3447,49 @@
                         '<span class="article-toc-label">' + escapeHtml(label) + '</span></a></li>';
                 });
                 articleTocList.innerHTML = items.join('');
+                /* 列表整段被换掉，滑块也跟着没了：清引用，等下次定位时重建，
+                   并且重新走一遍「首帧不加过渡」的流程，别从上一项的旧位置滑过来 */
+                tocIndicator = null;
+                tocIndicatorReady = false;
                 tocHeadings = headings;
                 articleToc.hidden = false;
-                articleToc.classList.remove('is-open');
-                syncTocAria();
+                /* 换文章 = 整块列表换内容，展开状态一并归零。
+                   这里必须 instant：下面紧接着就要量正文坐标，
+                   如果目录还在演 0.28s 的收起，高度是变化的，落点会算偏。 */
+                toggleArticleToc(false, true);
+                animateTocListIn();
             }
 
-            function toggleArticleToc(open) {
+            /* 目录整块换内容（换文章）时，别让文字「啪」一下变成另一篇的标题：
+               新内容先落位，再用一段极短的淡入 + 上移把它托进来。
+               收起状态下看不见，就不必演了。 */
+            function animateTocListIn() {
+                if (!articleToc || !articleTocList || !articleTocList.children.length) return;
+                if (!tocWideQuery.matches && !articleToc.classList.contains('is-open')) return;
+                if (prefersReducedMotion() || typeof articleTocList.animate !== 'function') return;
+                articleTocList.animate(
+                    [
+                        { opacity: 0, transform: 'translateY(6px)' },
+                        { opacity: 1, transform: 'translateY(0)' }
+                    ],
+                    { duration: 240, easing: 'cubic-bezier(0.22, 0.61, 0.36, 1)' }
+                );
+            }
+
+            /* instant = 这一刻布局必须马上到位：切文章要量正文坐标、点目录项要量落点，
+               都不能被 0.28s 的高度过渡拖住。做法是临时关掉过渡、改完读一次布局、
+               再把过渡交还给 CSS —— 同一帧里改 class 又删 class 会被合批，所以中间那次
+               offsetHeight 不能省。 */
+            function toggleArticleToc(open, instant) {
                 if (!articleToc) return;
-                articleToc.classList.toggle('is-open', open);
+                if (instant && !tocWideQuery.matches) {
+                    articleToc.classList.add('is-instant');
+                    articleToc.classList.toggle('is-open', open);
+                    void articleToc.offsetHeight;
+                    articleToc.classList.remove('is-instant');
+                } else {
+                    articleToc.classList.toggle('is-open', open);
+                }
                 syncTocAria();
             }
 
@@ -3376,7 +3502,8 @@
                 articleTocToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
             }
             tocWideQuery.addEventListener('change', function () {
-                if (tocWideQuery.matches && articleToc) articleToc.classList.remove('is-open');
+                // 跨断点等于整个形态换掉，别演动画，直接落到目标状态
+                if (tocWideQuery.matches && articleToc) toggleArticleToc(false, true);
                 syncTocAria();
                 syncReadingUi();
             });
@@ -3386,13 +3513,72 @@
                 if (index === tocActiveIndex || !articleTocList) return;
                 tocActiveIndex = index;
                 const links = articleTocList.querySelectorAll('.article-toc-link');
+                let activeLink = null;
                 for (let i = 0; i < links.length; i += 1) {
                     const on = i === index;
                     links[i].classList.toggle('is-active', on);
-                    if (on) links[i].setAttribute('aria-current', 'location');
-                    else links[i].removeAttribute('aria-current');
+                    if (on) {
+                        links[i].setAttribute('aria-current', 'location');
+                        activeLink = links[i];
+                    } else {
+                        links[i].removeAttribute('aria-current');
+                    }
                 }
+                moveTocIndicator(activeLink);
             }
+
+            /* 滑块只认两个数：相对列表的 y 和自身高度。都用 rect 相减算，
+               不用 offsetTop —— 链接外面还包着一层 <li>，offsetParent 链靠不住。 */
+            function moveTocIndicator(link) {
+                const indicator = ensureTocIndicator();
+                if (!indicator) return;
+                if (!link) {
+                    indicator.style.opacity = '0';
+                    return;
+                }
+                const listRect = articleTocList.getBoundingClientRect();
+                const linkRect = link.getBoundingClientRect();
+                indicator.style.transform = 'translate3d(0, ' + (linkRect.top - listRect.top) + 'px, 0)';
+                indicator.style.height = linkRect.height + 'px';
+                if (!tocIndicatorReady) {
+                    /* 第一下必须直接落位：这时候要是带着过渡，它会从列表顶端滑过来。
+                       所以先写好位置（还没上过渡），下一帧再打开过渡并淡入。 */
+                    tocIndicatorReady = true;
+                    window.requestAnimationFrame(function () {
+                        if (!tocIndicator || !tocIndicator.parentNode) return;
+                        tocIndicator.classList.add('is-ready');
+                        window.requestAnimationFrame(function () {
+                            if (tocIndicator) tocIndicator.style.opacity = '1';
+                        });
+                    });
+                    return;
+                }
+                indicator.style.opacity = '1';
+            }
+
+            function ensureTocIndicator() {
+                if (!articleTocList) return null;
+                if (tocIndicator && tocIndicator.parentNode === articleTocList) return tocIndicator;
+                tocIndicator = document.createElement('span');
+                tocIndicator.className = 'article-toc-indicator';
+                tocIndicator.setAttribute('aria-hidden', 'true');
+                articleTocList.appendChild(tocIndicator);
+                tocIndicatorReady = false;
+                return tocIndicator;
+            }
+
+            /* 窗口宽度变了，某一项可能从一行折成两行，滑块高度得跟着改。
+               滚动不走这里 —— 那种情况高亮项本身就会换，setTocActive 会重定位。 */
+            let tocResizeRaf = null;
+            window.addEventListener('resize', function () {
+                if (tocResizeRaf) return;
+                tocResizeRaf = window.requestAnimationFrame(function () {
+                    tocResizeRaf = null;
+                    if (tocActiveIndex < 0 || !tocIndicator || !articleTocList) return;
+                    const link = articleTocList.querySelectorAll('.article-toc-link')[tocActiveIndex];
+                    if (link) moveTocIndicator(link);
+                });
+            });
 
             /* ==================== 目录跳转的滚动动画 ==================== */
             /* 浏览器自带的 scrollIntoView({behavior:'smooth'}) 时长是按距离算的，
@@ -3475,6 +3661,10 @@
             /* 目标位置按 h2 自己的 scroll-margin-top 算 —— 跟 CSS 那边共用一份规则，
                不在这里重复写一遍「导航高度 + 24」，改样式时不会两处对不上。 */
             function scrollToHeading(target) {
+                /* 目标还没「出现过」时它正带着 18px 的下移（见「滚动出现」那节），
+                   直接量会把这段位移算进落点，滚到位之后元素再上移就成了差一截。
+                   先让它原地显形（instant：不播动画、不动位置）再量。 */
+                if (target.classList.contains('is-reveal-hidden')) playReveal(target, 0, true);
                 const margin = parseFloat(window.getComputedStyle(target).scrollMarginTop) || 0;
                 const destY = target.getBoundingClientRect().top + window.scrollY - margin;
                 if (prefersReducedMotion()) {
@@ -3505,8 +3695,10 @@
                     history.replaceState(history.state, '', '#' + encodeURIComponent(target.id));
                     /* 手机上点完目录会收起折叠卡片，卡片一消失正文整体上移 ——
                        必须先把这一步做完再量位置，否则按收起前的坐标算，
-                       会正好差出一张卡片的高度。 */
-                    toggleArticleToc(false);
+                       会正好差出一张卡片的高度。
+                       instant 是因为收起现在带 0.28s 高度过渡：等它演完再滚，
+                       点击到滚动之间会空一拍；不等它，量到的又是过渡中间的高度。 */
+                    toggleArticleToc(false, true);
                     scrollToHeading(target);
                 });
             }
@@ -4852,6 +5044,216 @@
                 window.scrollTo({ top: 0, behavior: 'instant' });
             }
 
+            // ==================== 滚动出现（首页 / 文章列表 / 文章页） ====================
+            /* 元素滚进视口时淡入 + 轻轻上移。改之前先读这五条：
+               1. 隐藏态 .is-reveal-hidden 只在脚本里加，HTML / CSS 里没有预置。
+                  脚本没跑到、跑挂了，页面就是普通的全可见页面，不会白屏。
+               2. 只有「整个元素都在视口下方」时才藏。首屏里哪怕露出一像素
+                  也直接算已出现 —— 首屏永远立刻可读，不参与动画。
+               3. 出现过就打 data-reveal="in" 并 unobserve，来回滚动不重播。
+                  列表 / 正文重画出来的是全新节点，会重新登记。
+               4. 入场用 Web Animations 而不是 transition：.task / .tag-pill 这些
+                  元素自己带了 transition（悬停上浮、底色），在它们身上再声明一条
+                  transition 会整条覆盖掉，悬停动画直接失效。播完 cancel()，
+                  transform 不再被动画钉住，悬停照常。
+               5. 系统开了「减少动态效果」→ 一律直接可见；核数 / 内存很小的设备
+                  收一档（10px / 320ms / 不错开）—— 淡入本身合成层就能做。 */
+            const REVEAL_TARGETS = [
+                // —— 首页 ——
+                '#view-home .section-header',
+                '#view-home .post-card',
+                '#view-home .home-more',
+                '#view-home .tweak-head',
+                '#view-home .tweak-card',
+                '#view-home .tl-year',
+                '#view-home .tag-cloud .tag-pill',
+                // —— 文章列表（导航「文章」） ——
+                '#view-blog .section-header',
+                '#view-blog .post-card',
+                // —— 文章页：正文逐块出现（标题、小标题、段落、列表、代码块…） ——
+                '#view-article .article-full-title',
+                '#view-article .article-full-meta',
+                '#articleContent > *',
+                '#articleAdjacent > *',
+                '#articleRelated > *',
+                '#view-article .article-comments'
+            ].join(',');
+
+            /* 同一批进视口的元素按屏幕位置从上到下依次错开。上限 3 档（180ms）：
+               再多就变成「等动画」而不是内容在出现 —— 尤其跳转 / 快速滚动时
+               一整屏元素同时进场，末尾那几个的延迟必须压得住。 */
+            const REVEAL_STAGGER = 60;
+            const REVEAL_STAGGER_MAX = 3;
+            /* 低性能设备只看两个信号：逻辑核数、设备内存（Safari / Firefox
+               不报 deviceMemory，取 0 就跳过这条判断，不会误伤）。 */
+            const REVEAL_LITE = (function () {
+                const cores = navigator.hardwareConcurrency || 0;
+                const memory = navigator.deviceMemory || 0;
+                return (cores > 0 && cores <= 2) || (memory > 0 && memory <= 2);
+            })();
+            const REVEAL_DURATION = REVEAL_LITE ? 320 : 520;
+            const REVEAL_DISTANCE = REVEAL_LITE ? 10 : 18;
+
+            let revealObserver = null;
+            /* 还没显形的元素。IO 负责「正常的滚入」，这份名单负责「直接被跳过」
+               的那一屏（见 sweepPendingReveal），也是松开引用用的。 */
+            const revealPending = new Set();
+
+            function revealDisabled() {
+                return prefersReducedMotion() || typeof window.IntersectionObserver !== 'function';
+            }
+
+            function getRevealObserver() {
+                if (revealObserver) return revealObserver;
+                revealObserver = new IntersectionObserver(function (entries) {
+                    const batch = [];
+                    entries.forEach(function (entry) {
+                        if (!entry.isIntersecting) return;
+                        // 出现过就不再观察。这是「不重播」的唯一保证，别去掉
+                        revealObserver.unobserve(entry.target);
+                        batch.push(entry.target);
+                    });
+                    if (!batch.length) return;
+                    batch.sort(function (a, b) {
+                        return a.getBoundingClientRect().top - b.getBoundingClientRect().top;
+                    });
+                    batch.forEach(function (el, index) {
+                        const delay = REVEAL_LITE
+                            ? 0
+                            : Math.min(index, REVEAL_STAGGER_MAX) * REVEAL_STAGGER;
+                        playReveal(el, delay);
+                    });
+                }, { rootMargin: '0px 0px -6% 0px', threshold: 0 });
+                return revealObserver;
+            }
+
+            function playReveal(el, delay, instant) {
+                const wasHidden = el.classList.contains('is-reveal-hidden');
+                revealPending.delete(el);
+                if (revealObserver) revealObserver.unobserve(el);
+                el.classList.remove('is-reveal-hidden');
+                el.setAttribute('data-reveal', 'in');
+                if (instant || !wasHidden || typeof el.animate !== 'function') return;
+                const animation = el.animate([
+                    { opacity: 0, transform: 'translate3d(0, ' + REVEAL_DISTANCE + 'px, 0)' },
+                    { opacity: 1, transform: 'none' }
+                ], {
+                    duration: REVEAL_DURATION,
+                    delay: delay,
+                    easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+                    fill: 'both'
+                });
+                /* 播完把动画撤掉。留着 fill:both 会把 transform 钉成 none，
+                   卡片悬停上浮（.task:hover 的 translateY(-2px)）就压不过它。 */
+                animation.onfinish = function () { animation.cancel(); };
+            }
+
+            /* 把 root 里还没登记过的目标登记一遍。
+               调用时机只有两个：视图刚显示出来（switchView 末尾）、列表重画之后。
+               之所以要等视图显示：display:none 的元素量不到尺寸，分不清
+               「在视口下方」和「压根没显示」。 */
+            function refreshScrollReveal(root) {
+                const scope = root || document;
+                if (!scope.querySelectorAll) return;
+                const nodes = scope.querySelectorAll(REVEAL_TARGETS);
+                if (!nodes.length) return;
+                const off = revealDisabled();
+                const observer = off ? null : getRevealObserver();
+                const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+                for (let i = 0; i < nodes.length; i += 1) {
+                    const el = nodes[i];
+                    if (el.hasAttribute('data-reveal')) continue;
+                    /* 所在视图还是 display:none（尺寸为 0）：这次先跳过，
+                       等它被 switchView 显示出来时会再走一遍这里。 */
+                    if (!off && !el.getClientRects().length) continue;
+                    /* 顶部已经进视口的（包括只露出一角的）直接算已出现。
+                       首屏不能有任何元素先透明一下再浮现。 */
+                    if (off || el.getBoundingClientRect().top < viewportHeight) {
+                        el.setAttribute('data-reveal', 'in');
+                        continue;
+                    }
+                    /* 筛选 / 翻页时新卡片自带 .post-card-enter 入场动画：
+                       再叠一层隐藏态会和它打架（动画的 fill 会盖过 opacity:0，
+                       滚到时反而一点变化都没有），直接放过。 */
+                    if (el.classList.contains('post-card-enter')) {
+                        el.setAttribute('data-reveal', 'in');
+                        continue;
+                    }
+                    el.classList.add('is-reveal-hidden');
+                    el.setAttribute('data-reveal', 'pending');
+                    revealPending.add(el);
+                    observer.observe(el);
+                }
+            }
+
+            /* IntersectionObserver 只在「相交状态变化」时回调。直接跳到页底
+               （End / 拖一下滚动条 / 恢复上次位置）时，中间那一整屏元素
+               上一帧还在视口下方、这一帧已经在视口上方，一次都没「相交」过，
+               回调永远不会来 —— 它们就那么透明着，直到用户滚回来。
+               这里跟着已有的 scroll 监听补扫一遍。
+               两档刹车，保证它几乎不花钱：
+               ① 名单空了直接返回，只剩一次 size 判断；
+               ② 位移不到 0.6 屏就不扫 —— 慢慢滚的那些 IO 会按时回调，
+                  只有「一跳就过一屏」才可能整屏跨过去。 */
+            let lastRevealSweepY = 0;
+            function sweepPendingReveal() {
+                if (!revealPending.size) return;
+                const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+                if (Math.abs(window.scrollY - lastRevealSweepY) < viewportHeight * 0.6) return;
+                lastRevealSweepY = window.scrollY;
+                const cutoff = viewportHeight * 0.94;
+                // 先读完再动：中间夹着样式写入会让每个元素都强制一次重排
+                const hits = [];
+                revealPending.forEach(function (el) {
+                    if (!el.isConnected) {
+                        revealPending.delete(el);
+                        return;
+                    }
+                    const rect = el.getBoundingClientRect();
+                    /* 尺寸为 0 = 它所在的视图现在还是 display:none。
+                       这种元素的 rect.top 也是 0，直接当成「已经在视口上方」
+                       就会把别的视图里排队的元素全放掉 —— 等那个视图显示出来
+                       再按真实位置算。 */
+                    if (!rect.width && !rect.height) return;
+                    if (rect.top < cutoff) hits.push(el);
+                });
+                hits.forEach(function (el) { playReveal(el, 0); });
+            }
+
+            /* Tab 键可能把焦点送进还没显形的内容里（opacity:0 拦不住焦点）。
+               挨到就立刻显形，别让人对着空气按键盘。 */
+            document.addEventListener('focusin', function (event) {
+                const target = event.target;
+                if (!target || !target.closest) return;
+                const hidden = target.closest('.is-reveal-hidden');
+                if (hidden) playReveal(hidden, 0);
+            }, true);
+
+            /* 系统「减少动态效果」中途被打开 / 关掉：立刻收干净或重新登记。
+               （style.css 里还有一条同名的兜底，改的是同一个类） */
+            function revealAllPending() {
+                revealPending.forEach(function (el) {
+                    if (revealObserver) revealObserver.unobserve(el);
+                    el.classList.remove('is-reveal-hidden');
+                    el.setAttribute('data-reveal', 'in');
+                });
+                revealPending.clear();
+            }
+
+            (function watchRevealMotion() {
+                if (!window.matchMedia) return;
+                const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+                const onChange = function () {
+                    if (query.matches) revealAllPending();
+                    else refreshScrollReveal(document);
+                };
+                if (typeof query.addEventListener === 'function') {
+                    query.addEventListener('change', onChange);
+                } else if (typeof query.addListener === 'function') {
+                    query.addListener(onChange);
+                }
+            })();
+
             // ==================== 导航栏：滚动状态 ====================
             /* 半透明的顶栏在页面静止时背后是空白，透出的几乎是纯底色；
                一旦开始滚动，才真的有内容从下面经过。这时候给条带加一个
@@ -5031,6 +5433,12 @@
 
                 // 地址栏跟着视图走，分享出去的链接才能定位到具体文章
                 syncUrlWithView();
+
+                /* 视图显示出来了，元素这时才有真实尺寸：把还没露过面的区块
+                   登记进「滚动出现」。放到下一帧，等 display 变更的布局算完。 */
+                window.requestAnimationFrame(function () {
+                    refreshScrollReveal(document);
+                });
             }
 
             // 回到首页（用户主动点「首页」入口时走这里，而不是直接 switchView）。
@@ -5491,6 +5899,9 @@
                 if (!commentsViewWidget || !commentsContext.id || !commentsContext.title) return;
                 const term = commentsViewTermOf();
 
+                /* 同 mountArticleComments：提前把主题 CSS 读成 data: URL */
+                loadGiscusThemeDataUrl(currentThemeKey());
+
                 // 同一篇文章的 iframe 还挂着：直接复用
                 if (!force && commentsViewTerm === term
                     && commentsViewWidget.querySelector('iframe.giscus-frame')) {
@@ -5520,10 +5931,9 @@
                 // 独立入口保留表情回应；文章页那块是 0
                 script.dataset.reactionsEnabled = '1';
                 script.dataset.emitMetadata = '0';
+                /* 独立入口先挂内置主题，和文章页那块同一套逻辑（见 syncGiscusTheme） */
                 script.dataset.inputPosition = 'bottom';
-                script.dataset.theme = document.documentElement.getAttribute('data-theme') === 'dark'
-                    ? 'dark'
-                    : 'light';
+                script.dataset.theme = currentThemeKey();
                 script.dataset.lang = 'zh-CN';
                 // 先让 .giscus 只命中评论视图这一个，再插脚本（见 parkArticleGiscus 的注释）
                 parkArticleGiscus(true);
@@ -5560,9 +5970,11 @@
                             stableTicks = 0;
                         }
                         lastHeight = height;
-                        if (stableTicks >= 3 || ticks > 70) {
+                        if (stableTicks >= 2 || ticks > 70) {
                             clearInterval(commentsViewReadyTimer);
                             commentsViewReadyTimer = null;
+                            /* 和文章页一样：就绪后补一次主题（换成站点自己的变体） */
+                            syncGiscusTheme();
                             fadeCommentsViewSkeleton();
                         }
                     }, 150);
@@ -5671,6 +6083,8 @@
                 syncHeaderScroll();
                 // 进度条和目录高亮跟着同一帧走，不另开监听
                 syncReadingUi();
+                // 被一次跳转「跨过」的那一屏元素在这里补显形，见 sweepPendingReveal
+                sweepPendingReveal();
             }, { passive: true });
             syncHeaderScroll();
 

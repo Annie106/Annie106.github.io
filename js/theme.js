@@ -32,21 +32,12 @@
         if (embeddedPageFrame && embeddedPageFrame.contentWindow) {
             embeddedPageFrame.contentWindow.postMessage({ type: 'annie-theme', theme: theme }, '*');
         }
-        /* 页面上可能同时挂着两个 giscus iframe（文章正文下那块 + 评论视图那块），
-           要全部同步，只取第一个的话另一个会停在旧主题上 */
-        document.querySelectorAll('.giscus-frame').forEach(function (giscusFrame) {
-            if (!giscusFrame.contentWindow) return;
-            giscusFrame.contentWindow.postMessage(
-                {
-                    giscus: {
-                        setConfig: {
-                            theme: theme,
-                        },
-                    },
-                },
-                'https://giscus.app'
-            );
-        });
+        /* 评论区的 giscus 主题不在这里算：主题 CSS 必须先转成 data: URL 才能进
+           那个跨域 iframe（算法在 js/script.js 的 syncGiscusTheme 里），这边只
+           通知一声 —— 两处各算一遍的话，改一处就漏一处。 */
+        document.dispatchEvent(new CustomEvent('annie:themechange', {
+            detail: { theme: theme },
+        }));
     }
 
     function init() {
