@@ -5079,10 +5079,11 @@
                 '#view-article .article-comments'
             ].join(',');
 
-            /* 同一批进视口的元素按屏幕位置从上到下依次错开。上限 3 档（180ms）：
+            /* 同一批进视口的元素按屏幕位置从上到下依次错开。上限 3 档（270ms）：
                再多就变成「等动画」而不是内容在出现 —— 尤其跳转 / 快速滚动时
-               一整屏元素同时进场，末尾那几个的延迟必须压得住。 */
-            const REVEAL_STAGGER = 60;
+               一整屏元素同时进场，末尾那几个的延迟必须压得住。
+               90ms 是参考站（ulyssesyang.top）的节奏。 */
+            const REVEAL_STAGGER = 90;
             const REVEAL_STAGGER_MAX = 3;
             /* 低性能设备只看两个信号：逻辑核数、设备内存（Safari / Firefox
                不报 deviceMemory，取 0 就跳过这条判断，不会误伤）。 */
@@ -5091,8 +5092,18 @@
                 const memory = navigator.deviceMemory || 0;
                 return (cores > 0 && cores <= 2) || (memory > 0 && memory <= 2);
             })();
-            const REVEAL_DURATION = REVEAL_LITE ? 320 : 520;
+            /* 1000ms：0.8s 是参考站的节奏，用户又要求再长一点。
+               低性能机 320ms —— 那边主要靠合成层，拖长了更像卡顿。 */
+            const REVEAL_DURATION = REVEAL_LITE ? 320 : 1000;
             const REVEAL_DISTANCE = REVEAL_LITE ? 10 : 18;
+            /* 起始不透明度：元素一碰到视口下沿就以「半显示」的状态立在那儿。
+               不能从 0 起：视口最下面那一条会是一整片纯白，读者以为已经到底了
+               （2026-11-20 用户截图里那块空白就是这么来的）。 */
+            const REVEAL_BASE_OPACITY = 0.4;
+            /* 参考 ulyssesyang.top 的收尾：先是一团毛玻璃，再走到清晰。
+               只有透明度的话「出现」是个弱信号，加一点 blur 才有对焦感。
+               低性能机（REVEAL_LITE）不加 —— filter 动画最费的是合成，不是位移。 */
+            const REVEAL_BLUR = 6;
 
             let revealObserver = null;
             /* 还没显形的元素。IO 负责「正常的滚入」，这份名单负责「直接被跳过」
@@ -5123,7 +5134,15 @@
                             : Math.min(index, REVEAL_STAGGER_MAX) * REVEAL_STAGGER;
                         playReveal(el, delay);
                     });
-                }, { rootMargin: '0px 0px -6% 0px', threshold: 0 });
+                }, {
+                    /* 底边不内缩也不外扩：
+                       `-6%` 会让视口最下面约 50px 变成永远不触发的空带（元素在里面
+                       一直 opacity:0，看起来就是「到底了」）；
+                       `+8%` 又会在元素进视口之前把动画演完，渐显等于没有。
+                       只有 0 两头都成立：一露头就开始，静止后视口内不再有隐藏元素。 */
+                    rootMargin: '0px',
+                    threshold: 0
+                });
                 return revealObserver;
             }
 
@@ -5134,17 +5153,27 @@
                 el.classList.remove('is-reveal-hidden');
                 el.setAttribute('data-reveal', 'in');
                 if (instant || !wasHidden || typeof el.animate !== 'function') return;
-                const animation = el.animate([
-                    { opacity: 0, transform: 'translate3d(0, ' + REVEAL_DISTANCE + 'px, 0)' },
-                    { opacity: 1, transform: 'none' }
-                ], {
+                /* 收尾对齐 ulyssesyang.top：power3.out、每项错开 0.09s，
+                   前半程是「毛玻璃 + 略低」——读者一眼看出还有内容没读。
+                   filter 只加在非低性能机上，关键帧里给两端，中间由浏览器插值。 */
+                const start = {
+                    opacity: REVEAL_BASE_OPACITY,
+                    transform: 'translate3d(0, ' + REVEAL_DISTANCE + 'px, 0)'
+                };
+                const end = { opacity: 1, transform: 'none' };
+                if (!REVEAL_LITE) {
+                    start.filter = 'blur(' + REVEAL_BLUR + 'px)';
+                    end.filter = 'blur(0px)';
+                }
+                const animation = el.animate([start, end], {
                     duration: REVEAL_DURATION,
                     delay: delay,
-                    easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+                    easing: 'cubic-bezier(0.165, 0.84, 0.44, 1)',
                     fill: 'both'
                 });
-                /* 播完把动画撤掉。留着 fill:both 会把 transform 钉成 none，
-                   卡片悬停上浮（.task:hover 的 translateY(-2px)）就压不过它。 */
+                /* 播完把动画撤掉。留着 fill:both 会把 transform 钉成 none、
+                   把 filter 钉成 blur(0)（一样要建合成层），
+                   卡片悬停上浮（.task:hover 的 translateY(-2px)）也压不过它。 */
                 animation.onfinish = function () { animation.cancel(); };
             }
 
@@ -5191,17 +5220,22 @@
                上一帧还在视口下方、这一帧已经在视口上方，一次都没「相交」过，
                回调永远不会来 —— 它们就那么透明着，直到用户滚回来。
                这里跟着已有的 scroll 监听补扫一遍。
-               两档刹车，保证它几乎不花钱：
+               三档刹车，保证它几乎不花钱：
                ① 名单空了直接返回，只剩一次 size 判断；
                ② 位移不到 0.6 屏就不扫 —— 慢慢滚的那些 IO 会按时回调，
-                  只有「一跳就过一屏」才可能整屏跨过去。 */
+                  只有「一跳就过一屏」才可能整屏跨过去；
+               ③ 松手 220ms 后再扫一次（force，不看滚了多远），
+                  兜住 IO 时序上的漏网：静止时视口里不许留隐藏元素。 */
             let lastRevealSweepY = 0;
-            function sweepPendingReveal() {
+            let revealSweepTimer = null;
+            function sweepPendingReveal(force) {
                 if (!revealPending.size) return;
                 const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-                if (Math.abs(window.scrollY - lastRevealSweepY) < viewportHeight * 0.6) return;
+                if (!force && Math.abs(window.scrollY - lastRevealSweepY) < viewportHeight * 0.6) return;
                 lastRevealSweepY = window.scrollY;
-                const cutoff = viewportHeight * 0.94;
+                /* rootMargin 是 0，所以「顶边已经进视口」就等于「它该出现了」。
+                   留一点余量会重新造出一条半透明空带 —— 那正是要修的东西。 */
+                const cutoff = viewportHeight;
                 // 先读完再动：中间夹着样式写入会让每个元素都强制一次重排
                 const hits = [];
                 revealPending.forEach(function (el) {
@@ -5220,8 +5254,21 @@
                 hits.forEach(function (el) { playReveal(el, 0); });
             }
 
+            /* 滚动停了再补扫一次。IO 的交回调是异步的，慢速拖拽 / 惯性滚动
+               收尾时偶尔会差一帧，那一帧里视口最下面就是一条空白。
+               名单空了就不排定时器，正常页面几乎不进这里。 */
+            function scheduleRevealSweep() {
+                if (!revealPending.size) return;
+                if (revealSweepTimer) window.clearTimeout(revealSweepTimer);
+                revealSweepTimer = window.setTimeout(function () {
+                    revealSweepTimer = null;
+                    sweepPendingReveal(true);
+                }, 220);
+            }
+
             /* Tab 键可能把焦点送进还没显形的内容里（opacity:0 拦不住焦点）。
-               挨到就立刻显形，别让人对着空气按键盘。 */
+               挨到就立刻显形，别让人对着空气按键盘。
+               这里是「直接给结果」，不走滚动进度 —— 键盘用户不该等滚动。 */
             document.addEventListener('focusin', function (event) {
                 const target = event.target;
                 if (!target || !target.closest) return;
@@ -6085,6 +6132,8 @@
                 syncReadingUi();
                 // 被一次跳转「跨过」的那一屏元素在这里补显形，见 sweepPendingReveal
                 sweepPendingReveal();
+                // 松手后再补一次，保证静止时视口内没有还藏在半透明的元素
+                scheduleRevealSweep();
             }, { passive: true });
             syncHeaderScroll();
 

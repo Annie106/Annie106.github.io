@@ -119,26 +119,43 @@
   (function () {
     const countdown = document.getElementById('redirectCountdown');
     const page = document.querySelector('.thanks-page');
-    const embedded = new URLSearchParams(window.location.search).get('embedded') === '1'
-      && window.parent !== window;
+    const heading = document.querySelector('.thanks-page h1');
+    const message = document.getElementById('thanksMessage');
+    const closeBtn = document.getElementById('thanksClose');
+    const params = new URLSearchParams(window.location.search);
+    /* ?embedded=1 现在有两个来源：
+       ① 电影投稿面板里的 iframe；
+       ② 投稿页提交成功后整页带过来的（submission.html 里由脚本拼好）。
+       两种都要「不自动跳走」，区别只在按钮：有父窗口就关面板，
+       没有父窗口就回首页。 */
+    const embedded = params.get('embedded') === '1';
+    const inFrame = window.parent !== window;
+
     if (embedded) {
       page.classList.add('is-embedded');
-      document.querySelector('.thanks-page h1').textContent = '已提交';
-      document.getElementById('thanksMessage').textContent = '你的投稿已成功提交，正在等待处理。';
-      document.getElementById('thanksClose').addEventListener('click', function () {
-        window.parent.postMessage(
-          { type: 'annie-movie-submission', action: 'close' },
-          '*'
-        );
-      });
-      document.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape') {
+      heading.textContent = '已提交';
+      message.textContent = '你的投稿已成功提交，正在等待处理。';
+
+      if (inFrame) {
+        closeBtn.textContent = '关闭并继续观看';
+        const requestClose = function (event) {
+          if (event) event.preventDefault();
           window.parent.postMessage(
             { type: 'annie-movie-submission', action: 'close' },
             '*'
           );
-        }
-      });
+        };
+        closeBtn.addEventListener('click', requestClose);
+        document.addEventListener('keydown', function (event) {
+          if (event.key === 'Escape') requestClose(event);
+        });
+      } else {
+        /* 整页打开：没有面板可关，按钮改成回首页 */
+        closeBtn.textContent = '返回首页';
+        closeBtn.addEventListener('click', function () {
+          window.location.href = '../../index.html';
+        });
+      }
       return;
     }
 

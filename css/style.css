@@ -76,6 +76,11 @@
 
             --transition-fast: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
             --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            /* 卡片悬停专用的时长。比 --transition-smooth 长一截、曲线起手快、
+               收尾长：抬起和阴影要「看得见地飘上去」，0.2s + ease 太干脆，
+               鼠标划过只像闪了一下。底下那条横线是同族曲线（0.42s），
+               两者对得上才不会一个先到、一个后到。 */
+            --transition-card: 0.42s cubic-bezier(0.22, 0.61, 0.36, 1);
 
             /* 顶部导航的尺寸令牌。放在 :root 而不是 .site-header 里，
                是因为吸顶后「顶部被占掉多少高度」是全站共享的信息——
@@ -2759,7 +2764,9 @@
             border-radius: 14px;
             padding: 20px 22px 18px;
             box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03), 0 10px 24px -16px rgba(15, 23, 42, 0.10);
-            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+            /* 抬起 / 阴影 / 描边共用一条 --transition-card（0.42s），
+               和底边那条 0.42s 的横线同时起步、同时收尾。 */
+            transition: transform var(--transition-card), box-shadow var(--transition-card), border-color var(--transition-card);
         }
         @media (hover: hover) and (pointer: fine) {
             .task:hover {
@@ -7540,10 +7547,11 @@
               自己声明了 transition（悬停上浮、底色），在它们身上再写一条
               会整条覆盖掉，悬停动画直接失效。入场动画走 Web Animations。 */
         .is-reveal-hidden {
+            /* 只写 opacity，绝对不要在这里写 transform：
+               transform 会把 IntersectionObserver 的包围盒一起往下推，
+               触发点跟着偏 —— 视口最下面又会多出一条「露头了也不显示」的带。
+               那 18px 的位移由 script.js 里 playReveal 的关键帧负责。 */
             opacity: 0;
-            /* 位移只有 18px：再多就成了「从下面顶上来」，读正文会晃眼。
-               和 script.js 里的 REVEAL_DISTANCE 保持一致。 */
-            transform: translate3d(0, 18px, 0);
         }
         @media (prefers-reduced-motion: reduce) {
             /* 兜底：脚本还没来得及接管时也不要有任何隐藏效果 */

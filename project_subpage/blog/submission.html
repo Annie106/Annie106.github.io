@@ -565,7 +565,9 @@
 
       <form class="feedback-form" id="movieForm" action="https://api.web3forms.com/submit" method="POST">
         <input type="hidden" name="access_key" value="14cc0dde-c616-4604-a802-84686ae0c843">
-        <input type="hidden" name="redirect" value="thanks.html">
+        <!-- 提交成功后的跳转由页内脚本自己做（见底部 THANKS_HREF）。
+             web3forms 的 redirect 免费版还要求「绝对 https + 同域」，
+             线上也出现过静默失效，所以不再放 redirect 隐藏字段。 -->
         <input type="hidden" name="subject" value="博客电影投稿">
         <input type="hidden" name="from_name" value="Annie 的博客">
 
@@ -692,7 +694,6 @@
   const typeOtherText     = document.getElementById('typeOtherText');
   const submitBtn         = document.getElementById('submitBtn');
   const submitHint        = document.getElementById('submitHint');
-  const redirectField     = form.querySelector('input[name="redirect"]');
   const movieIdInput      = document.getElementById('movie_id');
   const movieTitleInput   = document.getElementById('movieTitle');
   const movieContextCard  = document.getElementById('movieContextCard');
@@ -860,21 +861,21 @@
   updateSubmitState();
 
   /* ============================================================
-     提交后的跳转
-     web3forms 的 redirect 只在「原生表单提交」时生效，而且必须是绝对的
-     https 地址。所以这里在页面打开时按当前环境准备好这个字段。
+     提交后的跳转：自己接管，不再依赖 web3forms 的 redirect
+     web3forms 的 redirect 要同时满足「原生表单 POST + 绝对 https +
+     同域」三条，缺一条就静默失效——页面上没有任何提示，只是停在它的
+     成功页或者干脆回到表单，看着就跟「没写」一样。
+     所以这里改用 AJAX 提交（带 Accept: application/json 拿 JSON），
+     成功后由脚本自己把页面带到 thanks.html?embedded=1。
+     thanks.html 看到 embedded=1 就显示「已提交 + 按钮」，不再走 3 秒
+     倒计时：嵌在电影投稿面板的 iframe 里时按钮是「关闭并继续观看」，
+     整页打开时是「返回首页」。
      ============================================================ */
-  const THANKS_URL = 'thanks.html';
-
-  if (/^https?:$/.test(window.location.protocol)) {
-    const thanksUrl = new URL(THANKS_URL, window.location.href);
-    if (isEmbeddedMovieSubmission) {
-      thanksUrl.searchParams.set('embedded', '1');
-    }
-    redirectField.value = thanksUrl.href;
-  } else {
-    redirectField.remove();
-  }
+  const thanksUrl = new URL('thanks.html', window.location.href);
+  thanksUrl.searchParams.set('embedded', '1');
+  const THANKS_HREF = thanksUrl.href;
+  /* file:// 直接双击打开时 fetch 会被 CORS 拦掉，那种情况退回浏览器原生提交 */
+  const CAN_USE_FETCH = /^https?:$/.test(window.location.protocol);
 
   form.addEventListener('submit', function (e) {
     if (submittedToday) {
@@ -888,13 +889,44 @@
       return;
     }
 
-    /* ★ 记录今天已提交，防止刷新页面后重复投稿 */
-    submittedToday = true;
-    writeSubmitDate(todayKey());
+    if (!CAN_USE_FETCH) {
+      /* file:// 预览：没法 fetch，交回浏览器原生提交 */
+      submittedToday = true;
+      writeSubmitDate(todayKey());
+      submitBtn.classList.add('loading');
+      submitBtn.disabled = true;
+      submitHint.textContent = '正在提交……';
+      return;
+    }
 
+    /* 成功与否要等响应回来才知道，所以一律拦掉原生提交 */
+    e.preventDefault();
     submitBtn.classList.add('loading');
     submitBtn.disabled = true;
     submitHint.textContent = '正在提交……';
+
+    fetch(form.action, {
+      method: 'POST',
+      headers: { 'Accept': 'application/json' },
+      body: new FormData(form)
+    })
+      .then(function (res) { return res.json().catch(function () { return null; }); })
+      .then(function (data) {
+        if (data && data.success) {
+          /* ★ 只有真提交成功才记「今天已投稿」，失败还能立刻重试 */
+          submittedToday = true;
+          writeSubmitDate(todayKey());
+          window.location.href = THANKS_HREF;
+          return;
+        }
+        throw new Error('submit failed');
+      })
+      .catch(function () {
+        /* 失败时不要把按钮永久锁死：恢复可点，并说明失败原因在页面上 */
+        submitBtn.classList.remove('loading');
+        updateSubmitState();
+        submitHint.textContent = '提交没有成功，请检查网络后重试';
+      });
   });
 
 })();
