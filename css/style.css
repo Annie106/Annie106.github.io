@@ -2735,7 +2735,11 @@
            延迟期间卡片还是透明的，滚动稍快就会看到「一块空白」。
            现在所有卡片同时淡入，节奏更干脆。 */
         .post-card-enter {
-            animation: postCardEnter 0.28s ease both;
+            /* 填充模式必须是 backwards，不能用 both：动画播完后 both 会把
+               transform 继续钉在 translateY(0) 上，而动画声明优先级高于普通
+               规则，.task:hover 的 translateY(-2px) 就永远被压住——翻页后的
+               卡片只剩下底边横线，整卡上浮和阴影全没了。 */
+            animation: postCardEnter 0.28s ease backwards;
         }
         @keyframes postCardEnter {
             from {
