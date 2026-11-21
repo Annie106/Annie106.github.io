@@ -6464,6 +6464,15 @@
                     setTimeout(function () {
                         el.classList.remove('is-visible');
                         el.classList.remove('is-leaving');
+                        /* 15 秒后可能已经切到「可重载」态：迟到的完成要把它还原，
+                           否则隐藏的提示里会残留一个仍然可聚焦的按钮 */
+                        el.classList.remove('is-slow');
+                        const reloadBtn = el.querySelector('.boot-loading-reload');
+                        if (reloadBtn) {
+                            reloadBtn.hidden = true;
+                            reloadBtn.disabled = false;
+                            reloadBtn.textContent = '重新加载';
+                        }
                         // 等动画走完再从无障碍树里摘掉，免得读屏软件还念着「正在加载」
                         el.setAttribute('aria-hidden', 'true');
                     }, 380);

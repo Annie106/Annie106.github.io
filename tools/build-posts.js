@@ -320,18 +320,15 @@ function metaMarkup(post) {
 }
 
 /* 正文。content 是 Markdown，先交给站点的渲染器转成 HTML；
-   没有 content 的（正文是独立页面那几篇）退回摘要，免得留一个空 div ——
-   只有标题和一句链接的页面在搜索引擎眼里是「薄内容」。
+   没有 content 的（正文是独立页面那几篇）退回摘要，免得留一个空 div。
+   这里**不拼「打开正文页面」之类的入口**：那几篇的正文只该嵌在文章页里，
+   静态页在脚本接管前露出一个跳转链接，反而会被当成独立页面打开。
    这里**不改写相对地址**：文章页 head 里插了 <base href="/">，
    images/a.jpg 会照常解析成 /images/a.jpg，源码里写什么样就是什么样。 */
 function contentMarkup(post) {
-    const body = (post.content && String(post.content).trim())
+    return (post.content && String(post.content).trim())
         ? markdown.render(post.content)
         : '<p>' + escapeHtml(post.excerpt || summaryOf(post)) + '</p>';
-    if (!post.embeddedPage) return body;
-    /* 正文在独立页面里那几篇：给一条明确入口，否则读者和爬虫都只看到一段摘要 */
-    return body + '\n<p><a href="' + escapeHtml(post.embeddedPage) + '">打开正文页面' +
-        ' <i class="ri-external-link-line"></i></a></p>';
 }
 
 /* 文章专属的 head 片段。插在 <meta charset> 后面，

@@ -108,6 +108,7 @@
             display: flex;
             align-items: center;
             gap: 11px;
+            box-sizing: border-box;
             max-width: calc(100% - 32px);
             padding: 11px 18px 11px 14px;
             border: 1px solid rgba(17, 17, 17, 0.08);
@@ -217,6 +218,129 @@
             color: #9aa1ad;
         }
 
+        /* ---- 15 秒仍未加载完：同一条提示切换成「可重载」态 ----
+           不新增第二个浮层；只在原提示里换图标、换文案、露出按钮。 */
+        .boot-loading.is-slow {
+            flex-wrap: wrap;
+            row-gap: 8px;
+        }
+
+        .boot-loading.is-slow .boot-loading-text {
+            flex: 1 1 160px;
+        }
+
+        /* 转圈停掉：继续转会让人以为还在正常加载。
+           换成内联 SVG 警示图标 —— 图标字体此刻不一定到，SVG 不依赖外部资源 */
+        .boot-loading.is-slow .boot-loading-spin {
+            animation: none;
+        }
+
+        /* 15 秒切换的那一下：整条提示轻微上浮，文案、警示图标、按钮依次淡入。
+           用 keyframes 而不是 transition —— 同帧的两次样式变更会被合并跳过。
+           :not(.is-leaving) 保证加载完成后仍然走 bootOut 淡出，不被这里的动画盖掉。 */
+        .boot-loading.is-visible.is-slow:not(.is-leaving) {
+            animation: bootSlowIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+        }
+
+        .boot-loading.is-slow .boot-loading-text {
+            animation: bootTextIn 0.36s 0.04s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+        }
+
+        @keyframes bootSlowIn {
+            from { transform: translate(-50%, 8px) scale(0.97); }
+            to { transform: translate(-50%, 0) scale(1); }
+        }
+
+        @keyframes bootTextIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .boot-loading-warn {
+            flex: 0 0 18px;
+            width: 18px;
+            height: 18px;
+            color: #b7791f;
+            animation: bootWarnIn 0.38s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+        }
+
+        @keyframes bootWarnIn {
+            from { opacity: 0; transform: scale(0.6) rotate(-12deg); }
+            to { opacity: 1; transform: scale(1) rotate(0); }
+        }
+
+        [data-theme="dark"] .boot-loading-warn {
+            color: #ecc94b;
+        }
+
+        .boot-loading-reload {
+            flex: 0 0 auto;
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
+            padding: 0 16px;
+            /* 跟随全站主按钮：浅色近黑底白字，深色反过来 */
+            border: 1px solid #0d0d0d;
+            border-radius: 999px;
+            background: #0d0d0d;
+            color: #ffffff;
+            font: inherit;
+            font-size: 0.82rem;
+            font-weight: 600;
+            line-height: 1.2;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            animation: bootBtnIn 0.38s 0.08s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+        }
+
+        @keyframes bootBtnIn {
+            from { opacity: 0; transform: translateY(4px) scale(0.96); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .boot-loading-reload:hover {
+            background: #333333;
+            border-color: #333333;
+        }
+
+        .boot-loading-reload:active {
+            transform: scale(0.97);
+        }
+
+        .boot-loading-reload:focus-visible {
+            outline: 2px solid #0d0d0d;
+            outline-offset: 2px;
+        }
+
+        .boot-loading-reload:disabled {
+            opacity: 0.72;
+            cursor: default;
+        }
+
+        [data-theme="dark"] .boot-loading-reload {
+            background: #ffffff;
+            border-color: #ffffff;
+            color: #0f1115;
+        }
+
+        [data-theme="dark"] .boot-loading-reload:hover {
+            background: #d6d9e0;
+            border-color: #d6d9e0;
+        }
+
+        [data-theme="dark"] .boot-loading-reload:focus-visible {
+            outline-color: #ffffff;
+        }
+
+        /* hidden 要压过上面的 display，否则按钮藏不住 */
+        .boot-loading-spin[hidden],
+        .boot-loading-warn[hidden],
+        .boot-loading-reload[hidden] {
+            display: none;
+        }
+
         @media (max-width: 600px) {
             .boot-loading {
                 top: 82px;
@@ -230,7 +354,11 @@
                所以是「直接出现、直接消失」，不会变成永远看不见 */
             .boot-loading,
             .boot-loading.is-visible,
-            .boot-loading.is-leaving {
+            .boot-loading.is-visible.is-slow,
+            .boot-loading.is-leaving,
+            .boot-loading.is-slow .boot-loading-text,
+            .boot-loading-warn,
+            .boot-loading-reload {
                 animation: none;
             }
 
@@ -254,11 +382,19 @@
          加载快的时候用户全程看不到这条提示。
          收起由 script.js 的 hideBootLoading() 负责（去掉 .is-visible 触发淡出）。 -->
     <div class="boot-loading" id="bootLoading" role="status" aria-live="polite">
-        <span class="boot-loading-spin" aria-hidden="true"></span>
+        <span class="boot-loading-spin" id="bootLoadingSpin" aria-hidden="true"></span>
+        <svg class="boot-loading-warn" id="bootLoadingWarn" viewBox="0 0 24 24"
+             aria-hidden="true" focusable="false" hidden>
+            <path d="M12 3.6 2.6 19.4A1.4 1.4 0 0 0 3.8 21.6h16.4a1.4 1.4 0 0 0 1.2-2.2L12 3.6Z"
+                  fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M12 9v4.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <circle cx="12" cy="17.4" r="1" fill="currentColor"/>
+        </svg>
         <span class="boot-loading-text">
-            正在加载博客数据…
-            <small>首次加载速度较慢，请稍候</small>
+            <span id="bootLoadingTitle">正在加载博客数据…</span>
+            <small id="bootLoadingNote">首次加载速度较慢，请稍候</small>
         </span>
+        <button type="button" class="boot-loading-reload" id="bootReloadBtn" hidden>重新加载</button>
     </div>
 
     <script>
@@ -266,27 +402,68 @@
             var el = document.getElementById('bootLoading');
             if (!el) return;
 
+            var titleEl = document.getElementById('bootLoadingTitle');
+            var noteEl = document.getElementById('bootLoadingNote');
+            var spinEl = document.getElementById('bootLoadingSpin');
+            var warnEl = document.getElementById('bootLoadingWarn');
+            var reloadBtn = document.getElementById('bootReloadBtn');
+            var startedAt = Date.now();
+            var slowShown = false;
+
             /* 3 秒后才露脸：这是「慢」而不是「卡」，用户不需要在正常速度下被打扰。
                注意这个计时器必须写在页面里、不能放进 script.js ——
                真慢的时候，script.js 正是那个还没下载完的东西。 */
             setTimeout(function () {
                 // 已经加载完了就别再弹出来（script.js 会打这个标记）
                 if (el.getAttribute('data-done')) return;
+                // 已经被 15 秒判定（后台节流时两者顺序可能颠倒）放出来过，别再盖时间
+                if (el.getAttribute('data-shown-at')) return;
                 el.setAttribute('data-shown-at', String(Date.now()));
                 el.classList.add('is-visible');
             }, 3000);
 
-            /* 兜底：script.js 万一没跑到头（断网、语法错），
-               别让提示条赖在屏幕上不走。15 秒自己淡出。 */
-            setTimeout(function () {
-                if (el.getAttribute('data-done')) return;
-                el.classList.add('is-leaving');
-                setTimeout(function () {
-                    el.classList.remove('is-visible');
-                    el.classList.remove('is-leaving');
-                    el.setAttribute('aria-hidden', 'true');
-                }, 380);
-            }, 15000);
+            /* 15 秒还没初始化完：把同一条提示切换成「加载时间过长 + 重新加载」。
+               这里不自动刷新 —— 弱网下自动刷新会反复打断阅读、掐掉背景音乐。
+               也不再用原来的「15 秒自己淡出」：真卡住时用户需要的是一个入口，
+               而不是一条自己消失、什么也没留下的提示。 */
+            function showSlow() {
+                if (slowShown || el.getAttribute('data-done')) return;
+                slowShown = true;
+                if (!el.getAttribute('data-shown-at')) {
+                    el.setAttribute('data-shown-at', String(Date.now()));
+                }
+                el.classList.add('is-visible', 'is-slow');
+                if (titleEl) titleEl.textContent = '加载时间过长';
+                if (noteEl) noteEl.textContent = '网络可能不稳定，可以重新加载';
+                if (spinEl) spinEl.hidden = true;
+                if (warnEl) warnEl.hidden = false;
+                if (reloadBtn) reloadBtn.hidden = false;
+            }
+
+            setTimeout(showSlow, 15000);
+
+            /* 后台标签页的计时器会被浏览器降频，15 秒可能被拖到很晚。
+               切回前台时补一次判定，保证看到页面的第一时间就有入口。 */
+            document.addEventListener('visibilitychange', function () {
+                if (document.visibilityState !== 'visible') return;
+                if (slowShown || el.getAttribute('data-done')) return;
+                if (Date.now() - startedAt < 15000) return;
+                showSlow();
+            });
+
+            if (reloadBtn) {
+                reloadBtn.addEventListener('click', function () {
+                    if (reloadBtn.disabled) return;
+                    reloadBtn.disabled = true;
+                    reloadBtn.textContent = '正在重新加载…';
+                    if (noteEl) noteEl.textContent = '请稍候，正在重新打开当前页面';
+                    /* 留一帧把「正在重新加载」画出来，再交给浏览器重载。
+                       reload() 原样保留当前地址的路径、查询串和哈希。 */
+                    window.setTimeout(function () {
+                        window.location.reload();
+                    }, 80);
+                });
+            }
         })();
     </script>
 
@@ -847,7 +1024,7 @@
             </section>
 
             <!-- 版本号：从页脚挪到这里，收在关于页右下角 -->
-            <p class="about-version">版本 0.4.26.064</p>
+            <p class="about-version">版本 0.4.26.067</p>
         </div>
 
         <!-- ==================== 文章详情视图 ==================== -->
