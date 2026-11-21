@@ -825,7 +825,7 @@
         <div class="guide-intro">
             <p>这是一个部署、修改和使用此博客的操作指南。</p>
             <p>本指南将带你从零开始，了解如何修改、使用并部署这个博客。</p>
-            <p>GitHub 项目地址：<a href="https://github.com/Annie106/Annie106.github.io" target="_blank" rel="noopener noreferrer">github.com/Annie106/Annie106.github.io</a></p>
+            <p>GitHub 项目地址：<a href="https://github.com/Annie106/Annie106.github.io" target="_blank" rel="noopener noreferrer" data-confirm-leave="Annie106 的 GitHub 项目仓库">github.com/Annie106/Annie106.github.io</a></p>
         </div>
 
         <!-- ==================== 名词 ==================== -->
@@ -1010,6 +1010,7 @@
 │   ├── touch-hover.js       ← 修手机点击后按钮常亮的问题
 │   ├── background-music.js  ← 背景音乐
 │   ├── image-loading.js     ← 图片加载策略
+│   ├── leave-confirm.js     ← 外链「即将离开」确认弹窗（见 6.21）
 │   └── copyToClipboard.js   ← 点图标复制联系方式
 │
 ├── project_subpage/         ← 子页面都放这里
@@ -1059,7 +1060,7 @@
                     js 文件夹
                 </h3>
                 <p><code>posts-data.js</code> 里的 <code>window.BLOG_POSTS</code> 才是文章数据；首页、文章列表和归档共用它。<code>tweaks-data.js</code> 保存博客更新记录，首页卡片和「本周折腾」视图共用它。<code>script.js</code> 负责筛选、搜索、页面切换和文章渲染，不存文章正文。</p>
-                <p><code>theme.js</code> 管深浅色切换，还会记住访客的选择。<code>touch-hover.js</code> 修的是「手机上点一下按钮，按钮就一直亮着不恢复」的问题，它给页面加一个标记，样式表据此决定要不要显示鼠标悬停效果。<code>image-loading.js</code> 管图片加载：先用模糊占位顶上，图加载完再淡入变清晰，也负责 <code>data-fast-src</code> / <code>data-slow-src</code> 那套高速/慢速链接的切换。<code>background-music.js</code> 管背景音乐，歌单在文件最开头。电影板块的停服公告写在 <code>movie.html</code> 自己里面。<code>copyToClipboard.js</code> 就是「点一下微信图标自动复制」那个功能。</p>
+                <p><code>theme.js</code> 管深浅色切换，还会记住访客的选择。<code>touch-hover.js</code> 修的是「手机上点一下按钮，按钮就一直亮着不恢复」的问题，它给页面加一个标记，样式表据此决定要不要显示鼠标悬停效果。<code>image-loading.js</code> 管图片加载：先用模糊占位顶上，图加载完再淡入变清晰，也负责 <code>data-fast-src</code> / <code>data-slow-src</code> 那套高速/慢速链接的切换。<code>background-music.js</code> 管背景音乐，歌单在文件最开头。电影板块的停服公告写在 <code>movie.html</code> 自己里面。<code>copyToClipboard.js</code> 就是「点一下微信图标自动复制」那个功能。<code>leave-confirm.js</code> 管外链的「即将离开」确认弹窗（怎么用见 6.21）。</p>
                 <p><code>archive/</code> 文件夹里是留档的旧文件，<strong>整个目录不进产物</strong>（<code>tools/build-site.js</code> 的发布白名单里没有它），线上访问不到，页面也不会加载它们。<code>music-player.js</code> 是旧版播放器（现在用 <code>background-music.js</code>），<code>feedback-tx.html</code> 是旧版腾讯问卷反馈页。<code>feedback.html</code> 和 <code>comments.html</code> 是从 <code>project_subpage/blog/</code> 挪过来的跳转桩——反馈页和评论区早就并进主页面了（<code>?view=feedback</code> / <code>?view=comments</code>），旧链接由根目录的 <code>404.html</code> 接住再送过去。不用管它们，删了也不影响网页；往这个目录里加页面时，记得把文件名同步进 <code>build-site.js</code> 的 <code>IGNORE_HTML</code>，否则构建会因为「有源码、没产物」报错。</p>
 
                 <div class="guide-tip">
@@ -1677,6 +1678,38 @@ html:not(.is-touch-input) .options:hover {
                     <p>这些规则都包在 <code>max-width: 600px</code> 里，电脑上还是原来的透明样式 + 悬停变灰，Ctrl K 键帽也照常显示。</p>
                     <p>屏幕特别窄（≤330px）或标签太多时，按钮会自动缩成一个只有放大镜的圆形，灰底会跟着变成圆形，不会破版。</p>
                 </div>
+
+                <!-- 6.21 外链确认弹窗 -->
+                <h3 class="guide-subtitle">
+                    <i class="ri-external-link-line"></i>
+                    6.21 给外链加「即将离开」确认弹窗
+                </h3>
+                <p>指向站外的链接可以先问一句「即将前往 GitHub，是否继续？」，避免访客误点跳走。<strong>任何页面都能用，两步：</strong></p>
+                <p>第一步，确认这个页面引了 <code>js/leave-confirm.js</code>（<code>index.html</code> 和本页已经引了，新页面照抄一行，路径按自己的层级写）：</p>
+                <pre><code>&lt;script src="../../js/leave-confirm.js"&gt;&lt;/script&gt;</code></pre>
+                <p>第二步，给链接加属性。<code>data-confirm-leave</code> 的值就是弹窗里出现的站点名，省略就当「外部网站」：</p>
+                <pre><code>&lt;a href="https://github.com/Annie106" target="_blank" rel="noopener noreferrer"
+   data-confirm-leave="GitHub"&gt;GitHub&lt;/a&gt;</code></pre>
+                <p>想换整句文案，再加 <code>data-confirm-title</code>（标题）和 <code>data-confirm-desc</code>（正文）：</p>
+                <pre><code>&lt;a href="feed.xml" target="_blank" rel="noopener"
+   data-confirm-leave="RSS 订阅源"
+   data-confirm-title="打开 RSS 订阅源"
+   data-confirm-desc="地址可以直接粘进阅读器订阅；继续会打开原始 XML。"&gt;RSS&lt;/a&gt;</code></pre>
+                <p>文章正文（<code>posts/*.md</code>）里也能用，<strong>不用另外引脚本</strong> —— 文章页由 <code>index.html</code> 生成，那页已经引了。只是 Markdown 的 <code>[文字](链接)</code> 语法加不了自定义属性，得直接写 HTML：</p>
+                <pre><code>详情见 &lt;a href="https://github.com/Annie106" target="_blank" rel="noopener noreferrer" data-confirm-leave="GitHub"&gt;GitHub&lt;/a&gt; 页面。</code></pre>
+                <p>列表里同样可以（<code>- 下载：&lt;a … data-confirm-leave="百度网盘"&gt;百度网盘&lt;/a&gt;</code>）。</p>
+                <p>别让这一行以 <code>&lt;</code> 开头：渲染器把「以 <code>&lt;</code> 开头的一行」原样输出、不包 <code>&lt;p&gt;</code>，和上下文的间距会跟别的段落不一样。属性最好也一行写完。</p>
+                <div class="guide-tip">
+                    <div class="guide-tip-title">
+                        <i class="ri-information-line"></i>
+                        几个替你处理好的细节
+                    </div>
+                    <p>忘了引那行脚本不会报错，只是属性静默失效、点了直接跳走 —— 加完记得点一下试试。</p>
+                    <p>按住 <span class="guide-kbd">Ctrl</span> / <span class="guide-kbd">⌘</span> / <span class="guide-kbd">Shift</span> 点，或者用鼠标中键，是「我就是要新窗口」，不拦。</p>
+                    <p>选「继续」走的是原来那个链接的地址和 <code>target</code>，所以还是新标签页打开，不会变成当前页跳转。</p>
+                    <p>本页会被嵌在文章里显示，弹窗会自动挂到外层页面上，不会跑到半篇文章以外。</p>
+                    <p>样式在 <code>css/style.css</code> 的「离开本站前的确认弹窗」一节，页面正常引了 <code>style.css</code> 就有，不用另加。</p>
+                </div>
             </div>
         </section>
 
@@ -2123,6 +2156,16 @@ rm -rf "$TMP"</code></pre>
             </div>
         </div>
     </div>
+
+    <!-- 外链确认弹窗：<a data-confirm-leave="GitHub"> 点下去先问一句。
+         不引这一行，data-confirm-* 属性会静默失效（点了直接跳走）。
+         被 iframe 内嵌时它会自动把弹窗挂到父文档，不受 iframe 高度影响。 -->
+    <script src="../../js/leave-confirm.js"></script>
+
+    <!-- 滚动出现：版本行、开头说明、每一节（本页不引 script.js，用独立版）。
+         这一页是整篇 3 万多像素的长文，按「节」淡入，不要按段。 -->
+    <script src="../../js/scroll-reveal.js"
+            data-reveal-targets=".guide-version-row, .guide-intro, .guide-section"></script>
 
     <script>
         // 接收主页面传来的主题信息

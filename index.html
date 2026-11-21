@@ -847,7 +847,7 @@
             </section>
 
             <!-- 版本号：从页脚挪到这里，收在关于页右下角 -->
-            <p class="about-version">版本 0.4.26.054</p>
+            <p class="about-version">版本 0.4.26.062</p>
         </div>
 
         <!-- ==================== 文章详情视图 ==================== -->
@@ -1305,6 +1305,9 @@
          它们都不依赖 script.js（各自只往 window 上挂一个对象）。 -->
     <script src="js/copyToClipboard.js"></script>
     <script src="js/background-music.js"></script>
+    <!-- 外链确认弹窗（<a data-confirm-leave="GitHub">）。和 guide.html 这类
+         独立页共用同一份，逻辑不在 script.js 里。独立页要自己引这一行。 -->
+    <script src="js/leave-confirm.js"></script>
     <script src="js/script.js"></script>
     <script>
         (function () {

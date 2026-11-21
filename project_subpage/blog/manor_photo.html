@@ -870,6 +870,10 @@
          它会扫一遍文档里的 <img>，也会盯着之后插入的图片，
          所以在博客里被 js/script.js 再 initialize 一次也不会重复处理。 -->
     <script src="../../js/image-loading.js"></script>
+    <!-- 滚动出现：抬头 + 每张照片一块（本页不引 script.js，用独立版）。
+         照片是懒加载的，高度会变，脚本在 load 之后会重量一次。 -->
+    <script src="../../js/scroll-reveal.js"
+            data-reveal-targets=".manor-hero, .manor-body > *"></script>
     <script>
         (function () {
             'use strict';

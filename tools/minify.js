@@ -56,6 +56,7 @@ const ASSERTIONS = {
     'js/posts-data.js': ['window.BLOG_POSTS'],
     'js/tweaks-data.js': ['window.BLOG_TWEAKS'],
     'js/image-loading.js': ['window.AnnieImageLoading'],
+    'js/leave-confirm.js': ['window.LeaveConfirm'],
     'js/background-music.js': ['window.BackgroundMusic'],
     'js/script.js': ['function openArticle', 'function switchView'],
     'css/style.css': ['.article-content', '@import'],

@@ -3809,6 +3809,20 @@
             outline-offset: 3px;
         }
 
+        /* 「继续」是深色实心按钮，外面再套一圈同色描边 = 黑块外面粘一圈黑边，
+           看着像按钮没对齐。这里把环收进按钮里、用按钮的文字色画：
+           浅色内环不往外扩，深色模式下（按钮变浅）同样成立。 */
+        .leave-confirm-btn.is-primary:focus-visible {
+            outline: 2px solid var(--color-bg);
+            outline-offset: -4px;
+        }
+
+        /* 鼠标打开时焦点落在卡片上，只是为了兜住 Tab（别让它跑到背后页面），
+           卡片本身不可操作，不画聚焦环 */
+        .leave-confirm-card:focus {
+            outline: none;
+        }
+
         @keyframes leaveConfirmFade {
             from { opacity: 0; }
             to { opacity: 1; }

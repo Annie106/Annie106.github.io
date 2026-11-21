@@ -82,7 +82,9 @@
 - **图片**：`data-fast-src` / `data-slow-src` 双直链，每张图每天 1 次高速额度。头像走内联 `onerror`，**别接进** `image-loading.js`。
 - **背景音乐**：进站绝不出声，只有播放按钮（和 `BackgroundMusic.play()`）能起播。**别再挂「首次交互即播放」的 document 监听**——访客随便点一下列表、按个方向键就响起来，用户明确否掉过一次。`preload = 'none'`，第一次真要播才设 `src`（`ensureAudioSrc()`），别在 init 里赋 src。
 - **评论**：giscus，term 是「文章 N：标题」。文章页和 `?view=comments` 两处配置要一起改。配色用 `css/giscus-annie-light.css` / `-dark.css`（官方原样，只换输入框聚焦框 —— 新版那条框是 `box-shadow: 0 0 0 2px` 画的，**border-color 和 box-shadow 都要写**）。⚠️ **绝不能把 CSS 的 URL 交给 giscus**：它站在公网 origin，取 localhost 的 CSS 会被 Chrome 的本地网络访问检查拒掉，主题变量一缺编辑器就塌成一片空白。`syncGiscusTheme()` 是同源 fetch 后转 `data:text/css;base64` 塞进去；切主题由 `theme.js` 发 `annie:themechange` 事件，别在 theme.js 里自己算地址。
-- **滚动出现**：首页 / 文章列表 / 文章页的元素滚进视口才淡入上移。隐藏态 `.is-reveal-hidden` **只能由 `script.js` 的 `refreshScrollReveal()` 挂**，CSS / HTML 里预置就是「脚本一挂全站白屏」；新加的视图要写进 `REVEAL_TARGETS`。
+- **外链确认**：`<a data-confirm-leave="GitHub">` 的弹窗在 `js/leave-confirm.js`，全站一份（`index.html` + 各独立页各自引一行）。**别搬回 `script.js`**：不引 script.js 的页面（guide.html 等）拿不到它，属性静默失效。弹窗建在最顶层同源文档里，内嵌页面（guide.html）也不会跑位。
+- **滚动出现**：首页 / 文章列表 / 文章页 / 关于 / 归档的元素滚进视口才淡入上移。隐藏态 `.is-reveal-hidden` **只能由 `script.js` 的 `refreshScrollReveal()` 挂**，CSS / HTML 里预置就是「脚本一挂全站白屏」；新加的站内视图要写进 `REVEAL_TARGETS`。
+- **独立页（不引 script.js）**：`article_14_baidu` / `manor_photo` / `guide` 各自引一行 `<script src="../../js/scroll-reveal.js" data-reveal-targets="选择器">`。它被文章页 iframe 内嵌时按**父窗口的滚动**换算（iframe 高度=全文，自己的 viewport 等于全文高度，IO 会判「全部已出现」）；跨域拿不到 `frameElement` 就退回独立页逻辑，全部直接可见，不会坏。
 - **`contact.html` / 404 浮窗**：改动前先读这两个文件里的注释——行高、`min-width`、iframe、内联 SVG、高度上报这些坑都记在那儿了。
 
 ## 提交前

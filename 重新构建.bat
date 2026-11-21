@@ -7,16 +7,20 @@ cd /d "%~dp0"
 where node >nul 2>nul
 if errorlevel 1 goto :no_node
 
-rem Arguments skip the menu:
-rem     rebuild.bat build    one build
-rem     rebuild.bat watch    rebuild on every save
-node tools\build-watch.js %~1
+:build
+node tools\build-watch.js build
 set "RESULT=%ERRORLEVEL%"
 
 echo.
-if not "%RESULT%"=="0" echo   [X] Build failed - see the messages above.
+if not "%RESULT%"=="0" (
+    echo   [X] Build failed - see the messages above.
+    pause >nul
+    exit /b %RESULT%
+)
+
+echo   Press Enter to build again, or close this window to quit.
 pause >nul
-exit /b %RESULT%
+goto :build
 
 :no_node
 echo.
