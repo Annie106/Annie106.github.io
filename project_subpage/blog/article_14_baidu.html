@@ -396,10 +396,12 @@
 </article>
 
 <script src="../../js/image-loading.js"></script>
-<!-- 滚动出现：标题块 + 正文逐块淡入（本页不引 script.js，用这份独立版）。
+<!-- 滚动出现：标题逐行 + 正文逐块淡入（本页不引 script.js，用这份独立版）。
+     一次滚进来好几块时错开 60ms，不然段落和截图会一起「啪」地出现。
      选择器写在 data-reveal-targets 里，改区块结构时同步这里。 -->
 <script src="../../js/scroll-reveal.js"
-        data-reveal-targets=".post-head, .post-body > *"></script>
+        data-reveal-targets=".post-head > *, .post-body > *"
+        data-reveal-stagger="60"></script>
 <script>
     (function () {
         'use strict';

@@ -2610,10 +2610,14 @@
                 ? window.matchMedia('(prefers-reduced-motion: reduce)')
                 : null;
 
-            function animateCollapse(list, start, end) {
+            function animateCollapse(list, start, end, onSettled) {
+                const settle = typeof onSettled === 'function' ? onSettled : null;
                 if (start === end
                     || typeof list.animate !== 'function'
                     || (timelineReduceMotion && timelineReduceMotion.matches)) {
+                    /* 没有动画也要结算一次，否则这种路径下展开后
+                       新露出的行永远不会被重新登记。 */
+                    if (settle) window.requestAnimationFrame(settle);
                     return;
                 }
                 // 动画期间才裁切（见 .tl-months.is-animating 的注释）
@@ -2623,7 +2627,12 @@
                     [{ height: `${start}px` }, { height: `${end}px` }],
                     { duration: 280, easing: 'cubic-bezier(0.22, 0.61, 0.36, 1)' }
                 );
-                anim.onfinish = cleanup;
+                anim.onfinish = function () {
+                    cleanup();
+                    if (settle) settle();
+                };
+                /* 取消不结算：280ms 内连点时，后一段动画会自己收尾，
+                   用中间高度去登记会判错位置。 */
                 anim.oncancel = cleanup;
                 collapseAnimations.set(list, anim);
             }
@@ -2636,12 +2645,25 @@
                 const previous = collapseAnimations.get(list);
                 if (previous) previous.cancel();
 
+                /* 展开前把待出现的行退回未登记（动画期间内容必须可见），
+                   收起前先停掉在播的行级动画，再退回未登记。 */
+                if (open) {
+                    resetRevealWithin(host);
+                } else {
+                    cancelRevealWithin(host);
+                    resetRevealWithin(host);
+                }
+
                 applyClass(host, open);
                 // 量一次目标状态的自然高度：展开是内容高度，收起是 0
                 list.style.height = 'auto';
                 const natural = list.getBoundingClientRect().height;
                 list.style.height = '';
-                animateCollapse(list, start, open ? natural : 0);
+                /* 展开要等高度动画结束再登记：用最终几何判断首屏，
+                   视口内的直接显示，视口下方的等滚动再逐项出现。 */
+                animateCollapse(list, start, open ? natural : 0, open
+                    ? function () { refreshScrollReveal(host); }
+                    : undefined);
             }
 
             function setMonthOpen(monthEl, open) {
@@ -4912,7 +4934,15 @@
                 '#view-home .home-more',
                 '#view-home .tweak-head',
                 '#view-home .tweak-card',
-                '#view-home .tl-year',
+                /* —— 时间线：年标题 / 月标题 / 每条文章，三个粒度各算各的 ——
+                   不挂 .tl-year / .tl-month 整块：块级目标上的 opacity:0
+                   会乘到所有子元素，行级动画永远突破不了那层透明。
+                   一屏约 21 个目标（17 行 + 4 个头）不人为分批：分批会让
+                   滚入过程变成「一批出现、停一下、再一批」的断档，
+                   最多 3 档（270ms）的错开已经压得住末项延迟。 */
+                '#view-home .tl-year-head',
+                '#view-home .tl-month-head',
+                '#view-home .tl-post',
                 '#view-home .tag-cloud .tag-pill',
                 // —— 文章列表（导航「文章」） ——
                 '#view-blog .section-header',
@@ -4973,6 +5003,9 @@
             /* 还没显形的元素。IO 负责「正常的滚入」，这份名单负责「直接被跳过」
                的那一屏（见 sweepPendingReveal），也是松开引用用的。 */
             const revealPending = new Set();
+            /* 在播的入场动画。只给「收起折叠块」时按 host 批量 cancel 用，
+               播完即删，不参与任何状态判定。WeakMap 才能随节点回收。 */
+            const revealAnimations = new WeakMap();
 
             function revealDisabled() {
                 return prefersReducedMotion() || typeof window.IntersectionObserver !== 'function';
@@ -5038,7 +5071,35 @@
                 /* 播完把动画撤掉。留着 fill:both 会把 transform 钉成 none、
                    把 filter 钉成 blur(0)（一样要建合成层），
                    卡片悬停上浮（.task:hover 的 translateY(-2px)）也压不过它。 */
-                animation.onfinish = function () { animation.cancel(); };
+                revealAnimations.set(el, animation);
+                /* 先删引用再 cancel：cancel 会走 oncancel，别让那条路径
+                   看到残留的引用。oncancel 只负责删引用，不改任何状态。 */
+                animation.onfinish = function () {
+                    revealAnimations.delete(el);
+                    animation.cancel();
+                };
+                animation.oncancel = function () { revealAnimations.delete(el); };
+            }
+
+            /* 目标是不是正被折叠藏起来。判定与 CSS 的 .tl-month.is-open /
+               .tl-year.is-collapsed 同源，纯读类名，不量布局：
+               折叠中的元素仍有布局盒、rect.top 贴在被折叠的位置，
+               直接按几何判断会被当成「已经在首屏」，行级效果就没了。 */
+            function revealFoldHidden(el) {
+                if (!el || typeof el.closest !== 'function') return false;
+                const posts = el.closest('.tl-posts');
+                if (posts) {
+                    const month = posts.closest('.tl-month');
+                    if (!month || !month.classList.contains('is-open')) return true;
+                }
+                const months = el.closest('.tl-months');
+                if (months) {
+                    const year = months.closest('.tl-year');
+                    if (year && year.classList.contains('is-collapsed')) return true;
+                }
+                /* 年头不在这两个容器里：收起整年时它自己仍然可见，
+                   不能被误伤。 */
+                return false;
             }
 
             /* 把 root 里还没登记过的目标登记一遍。
@@ -5056,6 +5117,9 @@
                 for (let i = 0; i < nodes.length; i += 1) {
                     const el = nodes[i];
                     if (el.hasAttribute('data-reveal')) continue;
+                    /* 折叠里的行这次不登记：既不进 pending 也不标 in，
+                       留给展开动画结束后按最终几何重新判定。 */
+                    if (revealFoldHidden(el)) continue;
                     /* 所在视图还是 display:none（尺寸为 0）：这次先跳过，
                        等它被 switchView 显示出来时会再走一遍这里。 */
                     if (!off && !el.getClientRects().length) continue;
@@ -5076,6 +5140,38 @@
                     el.setAttribute('data-reveal', 'pending');
                     revealPending.add(el);
                     observer.observe(el);
+                }
+            }
+
+            /* 展开折叠块之前，把里面「待出现」的行退回未登记态：
+               展开动画期间内容必须是完全可见的，不能滑出一片透明行。
+               只动 pending，data-reveal="in" 永不回退（出现过就出现过）。
+               幂等：第二次调用查不到 pending，什么也不做。 */
+            function resetRevealWithin(root) {
+                if (!root || !root.querySelectorAll) return;
+                const nodes = root.querySelectorAll('[data-reveal="pending"]');
+                for (let i = 0; i < nodes.length; i += 1) {
+                    const el = nodes[i];
+                    if (revealObserver) revealObserver.unobserve(el);
+                    revealPending.delete(el);
+                    el.removeAttribute('data-reveal');
+                    el.classList.remove('is-reveal-hidden');
+                }
+            }
+
+            /* 收起折叠块时立刻停掉里面没播完的入场动画，
+               否则行会悬在半透明 / 半位移的位置被裁掉。
+               用同一份 REVEAL_TARGETS 找目标，避免漏项；cancel 后
+               元素保持 data-reveal="in" 且无隐藏类，回到自然位置。 */
+            function cancelRevealWithin(root) {
+                if (!root || !root.querySelectorAll) return;
+                const nodes = root.querySelectorAll(REVEAL_TARGETS);
+                for (let i = 0; i < nodes.length; i += 1) {
+                    const el = nodes[i];
+                    const animation = revealAnimations.get(el);
+                    if (!animation) continue;
+                    revealAnimations.delete(el);
+                    animation.cancel();
                 }
             }
 

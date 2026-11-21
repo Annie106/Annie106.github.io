@@ -2162,10 +2162,13 @@ rm -rf "$TMP"</code></pre>
          被 iframe 内嵌时它会自动把弹窗挂到父文档，不受 iframe 高度影响。 -->
     <script src="../../js/leave-confirm.js"></script>
 
-    <!-- 滚动出现：版本行、开头说明、每一节（本页不引 script.js，用独立版）。
-         这一页是整篇 3 万多像素的长文，按「节」淡入，不要按段。 -->
+    <!-- 滚动出现：版本行、开头说明、每节标题 + 节内逐段（本页不引 script.js，用独立版）。
+         这一页是整篇 3 万多像素的长文：按「节」整块淡入的话，一屏就只有一两个块，
+         等于看不出效果，所以拆到 .guide-content 的直接子元素（p / h3 / pre / 提示框），
+         同一批滚进视口的再错开 60ms。改节内结构时留意这里的选择器。 -->
     <script src="../../js/scroll-reveal.js"
-            data-reveal-targets=".guide-version-row, .guide-intro, .guide-section"></script>
+            data-reveal-targets=".guide-version-row, .guide-intro > *, .guide-section-title, .guide-content > *"
+            data-reveal-stagger="60"></script>
 
     <script>
         // 接收主页面传来的主题信息

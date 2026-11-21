@@ -870,10 +870,13 @@
          它会扫一遍文档里的 <img>，也会盯着之后插入的图片，
          所以在博客里被 js/script.js 再 initialize 一次也不会重复处理。 -->
     <script src="../../js/image-loading.js"></script>
-    <!-- 滚动出现：抬头 + 每张照片一块（本页不引 script.js，用独立版）。
+    <!-- 滚动出现：抬头逐行、段落、每张照片、手记、说明条目（本页不引 script.js，用独立版）。
+         拆到「直接子元素」而不是整块，一屏滚进来的几项再错开 70ms，
+         否则一次冒出半屏，看着和没加动画差不多。
          照片是懒加载的，高度会变，脚本在 load 之后会重量一次。 -->
     <script src="../../js/scroll-reveal.js"
-            data-reveal-targets=".manor-hero, .manor-body > *"></script>
+            data-reveal-targets=".manor-hero > *, .manor-body > *, .manor-figure, .manor-quote, .manor-notes-title, .manor-notes .note, .manor-outro > *"
+            data-reveal-stagger="70"></script>
     <script>
         (function () {
             'use strict';
