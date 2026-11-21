@@ -2273,6 +2273,12 @@
                     `;
                 }).join('');
                 container.querySelectorAll('.post-card').forEach(card => {
+                    /* 入场动画播完就摘掉类。动画已经改用独立 translate 属性，
+                       不会压住悬停的 transform；但类留着会让卡片一直处于
+                       「带动画」的状态，悬停重绘时多一层合成开销。 */
+                    card.addEventListener('animationend', function(e) {
+                        if (e.animationName === 'postCardEnter') card.classList.remove('post-card-enter');
+                    });
                     card.addEventListener('click', function(e) {
                         if (e.target.closest('.options, .post-menu')) return;
                         /* 标题现在是真链接（href 指向 /posts/<id>/，给爬虫和

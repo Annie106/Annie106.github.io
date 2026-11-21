@@ -2737,18 +2737,20 @@
         .post-card-enter {
             /* 填充模式必须是 backwards，不能用 both：动画播完后 both 会把
                transform 继续钉在 translateY(0) 上，而动画声明优先级高于普通
-               规则，.task:hover 的 translateY(-2px) 就永远被压住——翻页后的
-               卡片只剩下底边横线，整卡上浮和阴影全没了。 */
+               规则，.task:hover 的 translateY(-2px) 就永远被压住。
+               位移必须用独立 translate 属性而不是 transform：transform 在
+               动画播放期间同样会压住 :hover，翻页后立刻把鼠标移到卡片上会
+               先没反应、动画结束才突然开始上浮，看起来就是「卡一下」。 */
             animation: postCardEnter 0.28s ease backwards;
         }
         @keyframes postCardEnter {
             from {
                 opacity: 0;
-                transform: translateY(10px);
+                translate: 0 10px;
             }
             to {
                 opacity: 1;
-                transform: translateY(0);
+                translate: 0 0;
             }
         }
         .post-card {
