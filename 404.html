@@ -192,7 +192,8 @@
             border-radius: 18px;
             box-shadow: 0 32px 80px rgba(0, 0, 0, .26);
             outline: none;
-            animation: contactRise .28s cubic-bezier(.32, .72, 0, 1) both;
+            /* 和文章页「获取联系」同一套节奏：0.34s、强 ease-out、16px 上浮 + 轻微放大收尾 */
+            animation: contactRise .34s cubic-bezier(.16, 1, .3, 1) both;
         }
 
         .contact-panel-head {
@@ -388,23 +389,58 @@
         @keyframes contactFade { from { opacity: 0; } to { opacity: 1; } }
         @keyframes contactFadeOut { from { opacity: 1; } to { opacity: 0; } }
         @keyframes contactRise {
-            from { opacity: 0; transform: translateY(14px) scale(.985); }
+            from { opacity: 0; transform: translateY(16px) scale(.982); }
             to { opacity: 1; transform: none; }
         }
         @keyframes contactFall {
             from { opacity: 1; transform: none; }
             to { opacity: 0; transform: translateY(10px) scale(.99); }
         }
+        /* 窄屏专用：从下沿浮起来。0.44s 比桌面版长一点，
+           28px 的位移太短，太快就看不见那段「上升」 */
+        @keyframes contactSheetIn {
+            /* from 必须是整块都在视口下沿之外（百分比跟着面板高度走），
+               只给十几二十像素的话看不出「从下面上来」 */
+            from { transform: translateY(100%); }
+            to { transform: none; }
+        }
+        @keyframes contactSheetOut {
+            from { transform: none; }
+            to { transform: translateY(100%); }
+        }
 
         /* 浮窗打开时背后不许滚 */
         body.is-contact-open { overflow: hidden; }
 
         @media (max-width: 640px) {
-            /* 窄屏不再铺满屏幕：内容只有两张卡片，铺满会剩一大片空白。
-               留一圈边距做成一浮起的卡片，高过视口时 max-height 会兜住。 */
-            .contact-modal { padding: 12px; }
-            .contact-panel { width: 100%; }
-            .contact-panel-head { padding: 11px 11px 11px 18px; }
+            /* 窄屏做成从底部浮起的浮层：贴着下沿、上圆角，
+               动作和文章页里的「获取联系」完全一致（0.44s 上滑） */
+            .contact-modal {
+                padding: 0;
+                align-items: flex-end;
+                justify-content: flex-start;
+            }
+            .contact-panel {
+                flex: none;
+                width: 100%;
+                max-height: 88vh;
+                max-height: 88dvh;
+                border-radius: 20px 20px 0 0;
+                border-bottom: 0;
+                box-shadow: 0 -12px 44px rgba(0, 0, 0, .22);
+                animation-name: contactSheetIn;
+                animation-duration: .46s;
+                /* 曲线和文章页浮层一致：整屏高的位移要「前段稍缓、后段收稳」 */
+                animation-timing-function: cubic-bezier(.32, .72, 0, 1);
+            }
+            /* 收起给 0.22s：closeModal 里 220ms 后就 hidden 了 */
+            .contact-modal.is-closing .contact-panel {
+                animation-name: contactSheetOut;
+                animation-duration: .22s;
+                animation-timing-function: cubic-bezier(.4, 0, 1, 1);
+            }
+            .contact-panel-head { padding: 13px 12px 13px 16px; }
+            .contact-panel-body { padding-bottom: env(safe-area-inset-bottom); }
             /* 单列时四张卡竖着排，骨架和占位都要高得多 */
             .contact-frame { height: 450px; }
         }

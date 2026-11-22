@@ -34,8 +34,20 @@
             if (data && data.type === 'annie-theme') apply(data.theme);
         });
 
-        if (/[?&]embedded=1(?:&|$)/.test(window.location.search)) {
+        var compact = /[?&]embedded=1(?:&|$)/.test(window.location.search);
+        var inFrame = window.parent !== window;
+        /* 浮窗（?embedded=1）要收起页头大标题，由 is-compact 控制；
+           is-embedded 只负责「在框子里」的高度和滚动处理 */
+        if (compact) {
+            document.documentElement.classList.add('is-compact');
+        }
+        if (compact || inFrame) {
             document.documentElement.classList.add('is-embedded');
+        }
+        /* 文章正文里的 iframe 不带 ?embedded=1：保留页头标题，
+           只清掉站点外壳（见下面 is-inline-embed 那段样式） */
+        if (inFrame && !compact) {
+            document.documentElement.classList.add('is-inline-embed');
         }
     })();
 </script>
@@ -248,15 +260,51 @@
     html.is-embedded .contact-page {
         padding: 24px 0 30px;
     }
-    html.is-embedded .contact-hero {
+    html.is-compact .contact-hero {
         /* 浮窗自己的标题栏已经写了「获取联系」 */
         display: none;
+    }
+
+    /* ---------- 文章正文里的 iframe（不带 ?embedded=1） ----------
+       父页面按内容高度撑开 iframe，这里必须清掉站点样式表里的
+       body { min-height: 100vh; display: flex; padding: 0 24px }，
+       否则 iframe 会先被 100vh 顶住、高度越量越大。404 浮窗走
+       ?embedded=1，不经过这套规则，原来的紧凑样式不变。 */
+    html.is-inline-embed,
+    html.is-inline-embed body {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        min-height: 0;
+        height: auto;
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+    html.is-inline-embed {
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+    }
+    /* 站点样式表里的 body::before 是给外层页面用的顶部虚化层：
+       position: fixed + backdrop-filter，会盖住内嵌内容最上面 150px */
+    html.is-inline-embed body::before,
+    html.is-inline-embed body::after {
+        content: none;
+        display: none;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+    html.is-inline-embed .contact-page {
+        max-width: 660px;
+        padding: 32px 16px 16px;
     }
 
     @media (max-width: 560px) {
         .contact-page { padding: 40px 0 64px; }
         .contact-title { font-size: 1.5rem; }
         html.is-embedded .contact-page { padding: 18px 0 26px; }
+        html.is-inline-embed .contact-page { padding: 24px 16px 12px; }
     }
 
     @media (prefers-reduced-motion: reduce) {

@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="robots" content="noindex,follow">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <title>Annie · 文章无法查看的原因</title>
+  <link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+  <script>
+    (function () {
+      const systemPrefersDark = window.matchMedia
+        && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      let savedTheme = null;
+      try { savedTheme = localStorage.getItem('annie-theme'); } catch (e) {}
+      document.documentElement.setAttribute(
+        'data-theme',
+        savedTheme === 'light' || savedTheme === 'dark'
+          ? savedTheme
+          : (systemPrefersDark ? 'dark' : 'light')
+      );
+
+      // 只有「单独打开这个页面」时才打上 is-standalone：
+      // 被嵌进文章（iframe）时保持纯内容高度，绝不能用 100vh 去撑，
+      // 否则外层量到的高度会包含 iframe 自身高度，越撑越高。
+      try {
+        const inFrame = window.parent !== window || window.frameElement;
+        if (!inFrame) {
+          document.documentElement.classList.add('is-standalone');
+        }
+      } catch (e) {
+        // 跨域读取 frameElement 会抛错，说明确实在 iframe 里，不做处理
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="../../css/style.css">
+  <style>
+    /* ==================== 内嵌页面基础 ==================== */
+    /* 作为 iframe 嵌入文章时，这里必须清掉站点样式表里的
+       body { min-height: 100vh; display: flex; padding: 0 24px }，
+       否则内嵌页面会被撑到 iframe 自身的高度：外层量到的高度里包含了
+       那个 100vh，iframe 一变高、100vh 又跟着变大，于是越撑越高、
+       内容一直在往上跑，卡片上下也会空出一整屏。 */
+    html,
+    body {
+      box-sizing: border-box;
+      margin: 0 !important;
+      padding: 0 !important;
+      min-height: 0 !important;
+      height: auto !important;
+      display: block !important;
+      overflow-x: hidden;
+      width: 100%;
+      max-width: 100%;
+    }
+
+    /* iOS 在 iframe / 横屏下会自动放大文字，导致内嵌页面字号突然变大、
+       排版被撑破，这里强制按 CSS 尺寸显示 */
+    html {
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+      /* UA 层（画布底色、滚动条）只认 data-theme，不跟系统偏好走；
+         深色仍由 style.css 的 [data-theme="dark"] 接管 */
+      color-scheme: light;
+    }
+    html[data-theme="dark"] { color-scheme: dark; }
+
+    /* 站点样式表里的 body::before 是给外层页面用的「顶部渐变虚化」层：
+       position: fixed + backdrop-filter，会盖在内嵌内容最上面 150px，
+       把卡片顶部糊成一片灰白，这里必须关掉 */
+    body::before,
+    body::after {
+      content: none !important;
+      display: none !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+
+    /* ==================== 页面容器 ==================== */
+    .reasons-page {
+      box-sizing: border-box;
+      display: grid;
+      /* 只做「垂直居中 + 水平居中元素」，不要用 place-content: center：
+         那会把列轨道缩成 max-content，卡片宽度就跟着文案长短跳
+         （同一块卡片在 760px 窗口里只有 550px，再宽一点又突然撑满） */
+      align-content: center;
+      justify-items: center;
+      width: 100%;
+      /* 内嵌时上下留白保持对称，卡片在文章里不会显得「上紧下松」 */
+      padding: 32px 24px;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* body 的左右 padding 被清掉了，这里把主容器重新居中，
+       保证单独打开页面时版心不会贴到左边 */
+    .main-container {
+      margin: 0 auto;
+    }
+
+    /* 单独打开这个页面（不是被嵌入）时，卡片垂直居中。
+       默认不撑满视口：嵌入文章时必须严格按内容高度，不能被 100vh 顶住。 */
+    html.is-standalone .reasons-page {
+      min-height: 100vh;
+      padding: 56px 24px;
+    }
+
+    /* ==================== 卡片 ==================== */
+    /* 字体跟博客正文一致：样式表没加载时也不会掉成衬线 */
+    .reasons-card {
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 760px;
+      padding: 40px 40px 34px;
+      font-family: var(--font-sans, 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif);
+      color: var(--color-text-primary);
+      text-align: left;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-md);
+      /* 内嵌进文章时卡片只淡入、不做位移：外层会遍历节点取最大 rect.bottom
+         当 iframe 高度，卡片要是带着 translateY 往下站，量到的高度就会多出
+         那几像素，卡片下面挂一条再也收不回去的空白。单独打开本页没有这个
+         约束，才让它整个浮起来。 */
+      animation: reasonsFade 0.4s ease backwards;
+    }
+
+    html.is-standalone .reasons-card {
+      animation: reasonsCardIn 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+    }
+
+    /* ==================== 头部 ==================== */
+    .reasons-head {
+      text-align: center;
+    }
+
+    .reasons-icon {
+      display: grid;
+      place-items: center;
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 22px;
+      border: 1px solid var(--color-border);
+      border-radius: 16px;
+      background: var(--color-bg);
+      color: var(--color-text-primary);
+      font-size: 1.375rem;
+      box-shadow: var(--shadow-xs);
+    }
+
+    .reasons-label {
+      margin: 0 0 9px;
+      color: var(--color-text-tertiary);
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+    }
+
+    .reasons-title {
+      margin: 0 0 10px;
+      font-size: clamp(1.375rem, 1.15rem + 0.8vw, 1.5625rem);
+      font-weight: 600;
+      line-height: 1.35;
+      letter-spacing: -0.01em;
+      color: var(--color-text-primary);
+    }
+
+    .reasons-lead {
+      max-width: 44ch;
+      margin: 0 auto;
+      color: var(--color-text-secondary);
+      font-size: 0.9375rem;
+      line-height: 1.85;
+    }
+
+    /* ==================== 原因列表 ====================
+       一行一条：编号 + 标题 + 说明同一行排开，说明自动占满剩余宽度。
+       够宽（≥780px）才这么排；窄屏下标题和说明上下两行，见文末媒体查询。
+       序号由 CSS 计数器生成，增删条目不用手动重编数字；
+       list-style 去掉只是因为视觉上换成了左侧的方块编号，
+       语义仍是 ol / li，读屏会按有序列表朗读。 */
+    .reasons-list {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 2px;
+      /* 负边距让悬停底色比文字区宽出 10px，和卡片内边距对齐，
+         鼠标扫过时不会觉得色块紧贴着字 */
+      margin: 24px -10px 0;
+      padding: 0;
+      list-style: none;
+      counter-reset: reason;
+    }
+
+    .reasons-item {
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr);
+      align-items: start;
+      column-gap: 12px;
+      padding: 10px;
+      border-radius: 10px;
+      counter-increment: reason;
+      transition: background var(--transition-fast);
+    }
+
+    .reasons-item::before {
+      content: counter(reason, decimal-leading-zero);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--color-text-tertiary);
+      font-size: 0.6875rem;
+      font-weight: 500;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      transition: color var(--transition-fast), border-color var(--transition-fast);
+    }
+
+    /* 默认（窄屏）上下两行：标题一行、说明一行铺满整宽。
+       一行排开的版本见下方 min-width: 780px 的媒体查询。 */
+    .reasons-item > div {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .reasons-item-title {
+      flex: none;
+      margin: 0;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      line-height: 1.5;
+      color: var(--color-text-primary);
+    }
+
+    .reasons-item-text {
+      min-width: 0;
+      margin: 0;
+      color: var(--color-text-secondary);
+      font-size: 0.875rem;
+      line-height: 1.7;
+    }
+
+    /* 只有真能悬停的设备才给反馈；触屏上点一下不该留下「选中」的底色 */
+    @media (hover: hover) and (pointer: fine) {
+      .reasons-item:hover {
+        background: var(--color-tag-bg);
+      }
+      .reasons-item:hover::before {
+        border-color: var(--color-text-tertiary);
+        color: var(--color-text-secondary);
+      }
+    }
+
+    /* ==================== 操作区 ==================== */
+    .reasons-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 28px;
+    }
+
+    /* 浮窗打开时，卡片底部这两个按钮会透过遮罩显出来，像浮窗下面又贴了
+       一个黑按钮。模态状态下它们本来也点不到，直接收起来 */
+    html.acd-behind .reasons-actions {
+      visibility: hidden;
+    }
+
+    .reasons-action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 44px;
+      padding: 0 22px;
+      border: 1px solid var(--color-accent);
+      border-radius: var(--radius-md);
+      background: var(--color-accent);
+      color: var(--color-bg);
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      line-height: 1;
+      text-decoration: none;
+      white-space: nowrap;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+      -webkit-tap-highlight-color: transparent;
+      transition: background var(--transition-fast), border-color var(--transition-fast),
+        color var(--transition-fast), box-shadow var(--transition-fast),
+        transform var(--transition-fast);
+    }
+
+    .reasons-action i {
+      font-size: 1.0625rem;
+      line-height: 1;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .reasons-action:hover {
+        border-color: var(--color-accent-hover);
+        background: var(--color-accent-hover);
+        color: var(--color-bg);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.16);
+      }
+    }
+
+    .reasons-action:active {
+      transform: translateY(0) scale(0.99);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    }
+
+    .reasons-action:focus-visible {
+      outline: 2px solid var(--color-accent);
+      outline-offset: 3px;
+    }
+
+    /* 次级按钮（描边款） */
+    .reasons-action.is-secondary {
+      border-color: var(--color-border);
+      background: var(--color-bg);
+      color: var(--color-text-secondary);
+      box-shadow: none;
+    }
+
+    .reasons-action.is-secondary i {
+      transition: transform var(--transition-fast);
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .reasons-action.is-secondary:hover {
+        border-color: var(--color-text-tertiary);
+        background: var(--color-bg);
+        color: var(--color-text-primary);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+      }
+      /* 深色下不要「反色」，亮一档平涂 + 极淡白描边，和全站一致 */
+      html[data-theme="dark"] .reasons-action.is-secondary:hover {
+        background: var(--card-control-bg-hover);
+        border-color: rgba(255, 255, 255, 0.18);
+        color: var(--color-text-primary);
+        box-shadow: none;
+      }
+      .reasons-action.is-secondary:hover i {
+        transform: translateX(-2px);
+      }
+    }
+
+    /* ==================== 入场动画 ====================
+       整体只走 transform + opacity，不动布局；元素各自带 backwards，
+       延迟期间停在起始态，播完立刻归还自然样式（不留合成的痕迹）。
+       节奏：卡片 → 头部四段 → 六条原因 → 操作区，总计约 0.9s。 */
+    @keyframes reasonsCardIn {
+      from { opacity: 0; transform: translateY(12px) scale(0.994); }
+      to { opacity: 1; transform: none; }
+    }
+
+    /* 内嵌模式专用：只改透明度，绝不动几何 */
+    @keyframes reasonsFade {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes reasonsRise {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: none; }
+    }
+
+    @keyframes reasonsPop {
+      from { opacity: 0; transform: translateY(6px) scale(0.92); }
+      to { opacity: 1; transform: none; }
+    }
+
+    .reasons-head > * {
+      animation: reasonsRise 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+    }
+    .reasons-head > .reasons-icon {
+      animation-name: reasonsPop;
+    }
+    .reasons-head > *:nth-child(1) { animation-delay: 0.05s; }
+    .reasons-head > *:nth-child(2) { animation-delay: 0.1s; }
+    .reasons-head > *:nth-child(3) { animation-delay: 0.14s; }
+    .reasons-head > *:nth-child(4) { animation-delay: 0.18s; }
+
+    .reasons-item {
+      animation: reasonsRise 0.42s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+    }
+    .reasons-item:nth-child(1) { animation-delay: 0.2s; }
+    .reasons-item:nth-child(2) { animation-delay: 0.238s; }
+    .reasons-item:nth-child(3) { animation-delay: 0.276s; }
+    .reasons-item:nth-child(4) { animation-delay: 0.314s; }
+    .reasons-item:nth-child(5) { animation-delay: 0.352s; }
+    .reasons-item:nth-child(6) { animation-delay: 0.39s; }
+
+    .reasons-actions {
+      animation: reasonsRise 0.45s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+      animation-delay: 0.42s;
+    }
+
+    /* ==================== 响应式 ====================
+       一行一条只在真的排得下时才用：卡内可用宽度低于约 700px 时，
+       说明那一列只剩两三百像素，一句话会被拆成两截、反而更难扫读。
+       这个阈值是按最长的第 5 条实测算出来的（卡宽 698px 时刚好一整行）。 */
+    @media (min-width: 780px) {
+      .reasons-item > div {
+        flex-direction: row;
+        flex-wrap: nowrap;
+        align-items: baseline;
+        column-gap: 10px;
+      }
+      .reasons-item-text {
+        flex: 1 1 auto;
+      }
+    }
+
+    @media (max-width: 560px) {
+      /* 水平内边距不能去掉：body 的 24px padding 已经被清掉了，
+         这里再归零卡片就会贴到屏幕边缘 */
+      .reasons-page { padding: 24px 16px 28px; }
+      html.is-standalone .reasons-page { padding: 40px 16px; }
+      .reasons-card { padding: 30px 20px 26px; border-radius: 14px; }
+      .reasons-icon {
+        width: 50px;
+        height: 50px;
+        margin-bottom: 18px;
+        border-radius: 15px;
+        font-size: 1.25rem;
+      }
+      .reasons-title { font-size: 1.3125rem; }
+      /* 条目内边距和列表负边距要成对改：文字必须和上面的标题对齐 */
+      .reasons-list { margin: 20px -8px 0; }
+      .reasons-item { padding: 9px 8px; column-gap: 10px; }
+      .reasons-actions { margin-top: 22px; gap: 8px; }
+      .reasons-action { padding: 0 18px; }
+    }
+
+    /* 很窄的机器上两个按钮等分整行，指头比「内容宽度」好按 */
+    @media (max-width: 400px) {
+      .reasons-action { flex: 1 1 0; padding: 0 12px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      /* 单独打开那条动画的选择器权重更高，这里必须一起写，否则「减少动态」
+         只关掉了内嵌模式的那一份 */
+      .reasons-card,
+      html.is-standalone .reasons-card,
+      .reasons-head > *,
+      .reasons-item,
+      .reasons-actions { animation: none; }
+      .reasons-item,
+      .reasons-item::before,
+      .reasons-action,
+      .reasons-action i,
+      .reasons-action.is-secondary i { transition: none; }
+      .reasons-action:hover,
+      .reasons-action:active { transform: none; }
+      .reasons-action.is-secondary:hover i { transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="main-container">
+    <main class="reasons-page">
+      <section class="reasons-card" aria-labelledby="reasonsTitle">
+        <header class="reasons-head">
+          <div class="reasons-icon" aria-hidden="true">
+            <i class="ri-question-line"></i>
+          </div>
+          <p class="reasons-label">可能原因</p>
+          <h1 class="reasons-title" id="reasonsTitle">为什么看不到这篇文章</h1>
+          <p class="reasons-lead">这篇文章没有正常打开，通常和下面几种情况有关。</p>
+        </header>
+
+        <!-- 原因清单：改文案直接改下面的 li，序号会自动排。 -->
+        <ol class="reasons-list">
+          <li class="reasons-item">
+            <div>
+              <h2 class="reasons-item-title">文章还在撰写中</h2>
+              <p class="reasons-item-text">作者可能还没写完，或者正在补图、校对，所以暂时没有放出来。</p>
+            </div>
+          </li>
+          <li class="reasons-item">
+            <div>
+              <h2 class="reasons-item-title">文章还没有公开</h2>
+              <p class="reasons-item-text">作者可能把阅读范围收紧了，打算等合适的时机再开放。</p>
+            </div>
+          </li>
+          <li class="reasons-item">
+            <div>
+              <h2 class="reasons-item-title">内容已过期</h2>
+              <p class="reasons-item-text">此文章内容不再适合阅读，已下架。</p>
+            </div>
+          </li>
+          <li class="reasons-item">
+            <div>
+              <h2 class="reasons-item-title">文章已被撤回或归档</h2>
+              <p class="reasons-item-text">内容可能被作者临时下线、删除，或者移到了不公开的位置。</p>
+            </div>
+          </li>
+          <li class="reasons-item">
+            <div>
+              <h2 class="reasons-item-title">内容仅对特定读者开放</h2>
+              <p class="reasons-item-text">有些文章会限制访问范围，用普通链接直接打开就会看到这个提示。</p>
+            </div>
+          </li>
+          <li class="reasons-item">
+            <div>
+              <h2 class="reasons-item-title">页面没有完整加载</h2>
+              <p class="reasons-item-text">网络不稳定、浏览器缓存过期或扩展拦截，都可能让文章短暂打不开。</p>
+            </div>
+          </li>
+        </ol>
+
+        <div class="reasons-actions">
+          <a href="contact.html" class="reasons-action" id="reasonsContactLink" aria-haspopup="dialog">
+            <i class="ri-mail-line" aria-hidden="true"></i>
+            <span>获取联系</span>
+          </a>
+          <a href="article_unavailable.html" class="reasons-action is-secondary" id="reasonsBackLink">
+            <i class="ri-arrow-left-line" aria-hidden="true"></i>
+            <span>返回</span>
+          </a>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="../../js/theme.js"></script>
+  <script>
+    (function () {
+      const backLink = document.getElementById('reasonsBackLink');
+
+      // 在 iframe 里直接点链接会往浏览器历史里多塞一条记录，占掉一次「返回」，
+      // 所以「返回」用 location.replace()：只替换当前记录，不新增记录。
+      function replaceWith(follow) {
+        return function (event) {
+          if (event.defaultPrevented || event.button !== 0
+            || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+            return;
+          }
+          event.preventDefault();
+          window.location.replace(follow.href);
+        };
+      }
+
+      if (backLink) backLink.addEventListener('click', replaceWith(backLink));
+
+      // 父页面切换深浅色时会把主题 postMessage 进来，跟着换，避免正文和卡片两种配色
+      window.addEventListener('message', function (event) {
+        const data = event.data;
+        if (!data || data.type !== 'annie-theme') return;
+        if (data.theme === 'dark' || data.theme === 'light') {
+          document.documentElement.setAttribute('data-theme', data.theme);
+        }
+      });
+    })();
+  </script>
+  <script>
+    /* ==================== 「获取联系」浮窗 ====================
+       参考 404.html 的联系浮窗：遮罩 + 居中面板 + 标题栏 + 关闭按钮，
+       内容是 contact.html?embedded=1（去掉页头大标题的紧凑版）。
+
+       这个页面经常被文章页的 iframe 装起来，只在当前文档里 position: fixed
+       只能盖住 iframe 那一块，盖不住文章页的导航和底栏，所以浮窗优先挂到
+       最顶层同源文档；单独打开本页、或跨域拿不到顶层时，退回当前文档。 */
+    (function () {
+      const trigger = document.getElementById('reasonsContactLink');
+      if (!trigger) return;
+
+      let hostWin = window;
+      let hostDoc = document;
+      try {
+        if (window.top && window.top !== window && window.top.document) {
+          hostWin = window.top;
+          hostDoc = window.top.document;
+        }
+      } catch (e) { /* 跨域内嵌：只能在当前文档里弹 */ }
+
+      const CONTACT_URL = new URL('contact.html?embedded=1', window.location.href).href;
+      const STYLE_ID = 'articleContactDialogStyle';
+      const MODAL_ID = 'articleContactDialog';
+
+      const CSS = `
+        .acd-modal {
+          position: fixed;
+          inset: 0;
+          z-index: 2000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 24px;
+        }
+        /* 遮罩全屏，导航栏也一起压暗虚化。
+           ⚠️ 锁定滚动只动 html，绝不要碰 body：body 一旦 overflow: hidden 就
+           变成滚动容器，sticky 导航会跟着文档一起滚走（实测 hdTop 直接等于
+           -scrollY）；而把导航改成 position: fixed 又会把它抽出文档流，下面
+           的内容整体上移一大截 —— 用户看到的就是「点开后界面位置变了」。
+           只锁 html 时 scrollY 保持不变、sticky 照常生效，页面一格都不动。 */
+        .acd-modal[hidden] { display: none; }
+
+        .acd-backdrop {
+          /* 用 100vw 而不是 inset: 0：锁滚动时滚动条被拿掉，视口右侧会留下
+             一条十几像素的空白（position: fixed 只到布局视口，盖不到那里），
+             100vw 含滚动条宽度，正好把那条缝也压暗 */
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100vw;
+          height: 100%;
+          /* 背景里还有文章页的大块文字和黑色按钮，08 以下太透会透出来、看着像没盖住 */
+          background: rgba(20, 20, 18, .58);
+          -webkit-backdrop-filter: blur(5px) saturate(115%);
+          backdrop-filter: blur(5px) saturate(115%);
+          animation: acdFade .22s ease both;
+        }
+        html[data-theme="dark"] .acd-backdrop {
+          background: rgba(0, 0, 0, .66);
+        }
+
+        .acd-panel {
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          width: min(860px, 100%);
+          max-height: min(760px, 100%);
+          overflow: hidden;
+          background: var(--color-bg, #fff);
+          border: 1px solid var(--color-border, #e3e3e3);
+          border-radius: 20px;
+          box-shadow: 0 24px 64px rgba(0, 0, 0, .24), 0 2px 10px rgba(0, 0, 0, .06);
+          outline: none;
+          /* 面板默认不可见，等 iframe 把真实高度报上来（加 is-ready）才入场：
+             占位高度是 272 / 450，真实高度一定不一样，面板又是垂直居中的，
+             高度一变就会整体上下挪 half(差值) —— 打开时那一下「轻微位移」。
+             先量后显，入场动画开始时尺寸已经是最终值，全程不动。
+             不可见的那几十毫秒里也别接点击（否则点在「面板」上不会穿透到
+             遮罩，用户会觉得关不掉）。 */
+          opacity: 0;
+          pointer-events: none;
+        }
+
+        .acd-modal.is-ready .acd-panel {
+          opacity: 1;
+          pointer-events: auto;
+          animation: acdRise .34s cubic-bezier(.16, 1, .3, 1) both;
+        }
+
+        /* 标题栏铺一层浅底，和 iframe 里的白色内容分出层级；
+           浮窗自己的标题就是这一层的锚，手机上没有多余的留白可浪费 */
+        .acd-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          flex: none;
+          padding: 13px 14px 13px 18px;
+          border-bottom: 1px solid var(--color-border, #e3e3e3);
+          background: var(--color-surface, #fafafa);
+        }
+
+        .acd-head-main {
+          display: flex;
+          align-items: center;
+          gap: 11px;
+          min-width: 0;
+        }
+
+        .acd-badge {
+          display: grid;
+          place-items: center;
+          flex: none;
+          width: 32px;
+          height: 32px;
+          border: 1px solid var(--color-border, #e3e3e3);
+          border-radius: 10px;
+          background: var(--color-bg, #fff);
+          color: var(--color-text-primary, #1a1a1a);
+        }
+        .acd-badge svg {
+          width: 15px;
+          height: 15px;
+          fill: currentColor;
+        }
+
+        .acd-head-text {
+          min-width: 0;
+        }
+        .acd-head h2 {
+          margin: 0;
+          font-family: var(--font-sans, inherit);
+          font-size: 14px;
+          font-weight: 600;
+          line-height: 1.4;
+          letter-spacing: .01em;
+          color: var(--color-text-primary, #1a1a1a);
+        }
+        .acd-sub {
+          margin: 2px 0 0;
+          font-family: var(--font-sans, inherit);
+          font-size: 12px;
+          line-height: 1.4;
+          letter-spacing: .02em;
+          color: var(--color-text-tertiary, #999);
+        }
+
+        /* 关闭按钮用内联 SVG 画叉，不依赖图标字体（顶层文档不一定有） */
+        .acd-close {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex: none;
+          width: 34px;
+          height: 34px;
+          border: 1px solid transparent;
+          border-radius: 50%;
+          background: transparent;
+          color: var(--color-text-tertiary, #888);
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+          transition: background .2s ease, color .2s ease, transform .2s ease;
+        }
+        .acd-close svg {
+          width: 15px;
+          height: 15px;
+          fill: none;
+          stroke: currentColor;
+          stroke-width: 1.8;
+          stroke-linecap: round;
+        }
+        @media (hover: hover) and (pointer: fine) {
+          .acd-close:hover {
+            background: var(--card-control-bg, rgba(0, 0, 0, .06));
+            color: var(--color-text-primary, #1a1a1a);
+          }
+          /* 深色下不能「反色」：亮一档平涂就好，否则鼠标一过就是个发光白点 */
+          html[data-theme="dark"] .acd-close:hover {
+            background: var(--card-control-bg-hover, rgba(255, 255, 255, .1));
+          }
+        }
+        .acd-close:active {
+          transform: scale(.94);
+        }
+        .acd-close:focus-visible {
+          /* 不要描边圈：初始焦点落在关闭按钮上时会画出一个黑环，
+             只把颜色压深足够表明焦点 */
+          outline: none;
+          color: var(--color-text-primary, #1a1a1a);
+        }
+
+        .acd-body {
+          position: relative;
+          flex: 1;
+          min-height: 0;
+          overflow-x: hidden;
+          overflow-y: auto;
+          overscroll-behavior: contain;
+          background: var(--color-bg, #fff);
+        }
+
+        /* 初始高度只是「还没量到真实高度」时的占位，面板此时不可见，
+           所以这里绝不要挂 transition：首帧定高要是动画过渡，面板又在
+           入场动画中途继续长高，看起来就是「一边淡入一边上下挪」。
+           之后的尺寸变化（窗口缩放、字号倍率）才平滑过渡。 */
+        .acd-frame {
+          display: block;
+          width: 100%;
+          height: 272px;
+          border: 0;
+          background: transparent;
+        }
+        .acd-modal.is-ready .acd-frame {
+          transition: height .24s cubic-bezier(.4, 0, .2, 1);
+        }
+
+        /* iframe 首帧要等它自己的样式表，等待期给一个安静的转圈，
+           比直接露一块空白更像「正在打开」 */
+        .acd-loading {
+          position: absolute;
+          inset: 0;
+          z-index: 1;
+          display: grid;
+          place-items: center;
+          background: var(--color-bg, #fff);
+          pointer-events: none;
+          transition: opacity .24s ease;
+        }
+        .acd-modal.is-ready .acd-loading { opacity: 0; }
+        .acd-spinner {
+          width: 18px;
+          height: 18px;
+          border: 2px solid var(--color-border, #e3e3e3);
+          border-top-color: var(--color-text-tertiary, #999);
+          border-radius: 50%;
+          animation: acdSpin .7s linear infinite;
+        }
+
+        /* 关闭是「加一个类」，用 @keyframes 而不是 transition：
+           同一帧里两次样式变更会被合并，transition 会被整条跳过 */
+        .acd-modal.is-closing .acd-backdrop { animation: acdFadeOut .2s ease both; }
+        .acd-modal.is-closing .acd-panel { animation: acdFall .2s ease both; }
+
+        @keyframes acdFade { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes acdFadeOut { from { opacity: 1; } to { opacity: 0; } }
+        @keyframes acdRise {
+          from { opacity: 0; transform: translateY(16px) scale(.982); }
+          to { opacity: 1; transform: none; }
+        }
+        @keyframes acdFall {
+          from { opacity: 1; transform: none; }
+          to { opacity: 0; transform: translateY(10px) scale(.99); }
+        }
+        @keyframes acdSpin {
+          to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 640px) {
+          /* 窄屏做成从底部浮起的表单：拇指够得到关闭键，
+             高度交给 max-height 兜住，内容超出时框内滚动 */
+          .acd-modal {
+            padding: 0;
+            align-items: flex-end;
+            /* 左对齐 + 多出的那条 gutter 宽度，正好把右侧滚动条留下的缝盖住 */
+            justify-content: flex-start;
+          }
+          .acd-panel {
+            /* flex 项默认 flex-shrink: 1，会把多出来的这条 gutter 又缩回去，
+               必须 flex: none 才真的能盖住右侧那条缝 */
+            flex: none;
+            width: calc(100% + var(--acd-gutter, 0px));
+            max-height: 88vh;
+            max-height: 88dvh;
+            border-radius: 20px 20px 0 0;
+            border-bottom: 0;
+            box-shadow: 0 -12px 44px rgba(0, 0, 0, .22);
+          }
+          /* 入场 keyframes 挂在 is-ready 上，这里的选择器要跟着升一级，
+             否则会被 .acd-modal.is-ready .acd-panel 的 acdRise 压回去。
+             时长比桌面版（.34s）长一点：从底下浮上来这段位移只有 28px，
+             太快的话那一趟「上升」几乎看不见，0.44s 能看清又不拖 */
+          .acd-modal.is-ready .acd-panel {
+            animation-name: acdSheetIn;
+            animation-duration: 0.46s;
+            /* 减速曲线用 .32/.72 而不是桌面版的 .16/1：位移从 28px 变成整屏高，
+               (.16,1,.3,1) 会在头 100ms 冲完 80%，后半程几乎不动（还是不像「逐渐」）；
+               这条曲线前段慢一点、后段收得稳，整段上升看得完整 */
+            animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+          }
+          /* 收起只给 0.22s：close() 里的收尾定时器就是 220ms，
+             再长就会被提前 hidden 掉 */
+          .acd-modal.is-closing .acd-panel {
+            animation-name: acdSheetOut;
+            animation-duration: 0.22s;
+            animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
+          }
+          .acd-head { padding: 13px 12px 13px 16px; }
+          .acd-body { padding-bottom: env(safe-area-inset-bottom); }
+          .acd-frame { height: 450px; }
+          .acd-loading { padding-bottom: env(safe-area-inset-bottom); }
+        }
+
+        /* 窄屏浮层：从屏幕下沿整块推上来。
+           起点必须是 translateY(100%)（整块都在视口下沿之外），不能只给 28px ——
+           28px 只占面板高度的 5%，配上 0→1 的淡入，眼睛读到的是「淡进来」而不是
+           「从下面上来」；百分比位移跟面板自身高度挂钩，换机型/换内容都不会失真。
+           这里也不再写 opacity：有了真实位移就不需要靠淡入假装出现，
+           半透明的浮层反而会削弱「一整块推上来」的实体感。 */
+        @keyframes acdSheetIn {
+          from { transform: translateY(100%); }
+          to { transform: none; }
+        }
+        @keyframes acdSheetOut {
+          from { transform: none; }
+          to { transform: translateY(100%); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .acd-backdrop,
+          .acd-panel,
+          .acd-modal.is-ready .acd-panel,
+          .acd-modal.is-closing .acd-backdrop,
+          .acd-modal.is-closing .acd-panel { animation: none; }
+          .acd-frame { transition: none; }
+          .acd-loading { transition: none; }
+          .acd-spinner { animation-duration: 1.6s; }
+          .acd-close { transition: none; }
+          .acd-close:active { transform: none; }
+        }
+      `;
+
+      if (!hostDoc.getElementById(STYLE_ID)) {
+        const style = hostDoc.createElement('style');
+        style.id = STYLE_ID;
+        style.textContent = CSS;
+        hostDoc.head.appendChild(style);
+      }
+
+      /* 原因页可能被反复打开，顶层文档不会跟着重建：
+         清掉上一次留下的浮窗，避免叠出好几层隐藏的 iframe */
+      const oldModal = hostDoc.getElementById(MODAL_ID);
+      if (oldModal) oldModal.remove();
+
+      const modal = hostDoc.createElement('div');
+      modal.className = 'acd-modal';
+      modal.id = MODAL_ID;
+      modal.hidden = true;
+      modal.innerHTML = '<div class="acd-backdrop" data-acd-close></div>'
+        + '<div class="acd-panel" role="dialog" aria-modal="true" aria-labelledby="acdTitle" tabindex="-1">'
+        + '<div class="acd-head">'
+        + '<div class="acd-head-main">'
+        + '<span class="acd-badge" aria-hidden="true">'
+        + '<svg viewBox="0 0 24 24"><path d="M3 3h18a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm1 3.2V19h16V6.2l-8 6.1-8-6.1ZM4.6 5l7.4 5.6L19.4 5H4.6Z"></path></svg>'
+        + '</span>'
+        + '<div class="acd-head-text">'
+        + '<h2 id="acdTitle">获取联系</h2>'
+        + '<p class="acd-sub">微信 · QQ · 邮箱</p>'
+        + '</div>'
+        + '</div>'
+        + '<button class="acd-close" type="button" aria-label="关闭">'
+        + '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6 L18 18 M18 6 L6 18"></path></svg>'
+        + '</button></div>'
+        + '<div class="acd-body"></div>'
+        + '</div>';
+      hostDoc.body.appendChild(modal);
+
+      const panel = modal.querySelector('.acd-panel');
+      const closeBtn = modal.querySelector('.acd-close');
+      const bodyBox = modal.querySelector('.acd-body');
+
+      let frame = null;
+      let loader = null;
+      let isOpen = false;
+      let lastFocus = null;
+      let prevHtmlOverflow = '';
+      let prevHtmlPaddingRight = '';
+      let prevScrollY = 0;
+      /* 面板是否已经能显示（真实高度已定稿） */
+      let frameReady = false;
+      /* 已量到的 iframe 高度，第二次打开直接用它，不用再等 */
+      let frameHeight = 0;
+      /* 滚动锁状态：关闭动画播完才解锁，见 close() */
+      let scrollLocked = false;
+      let closeTimer = 0;
+      let settleTimer = 0;
+      let fallbackTimer = 0;
+
+      function mountFrame() {
+        if (frame) return;
+        loader = hostDoc.createElement('div');
+        loader.className = 'acd-loading';
+        loader.innerHTML = '<span class="acd-spinner" aria-hidden="true"></span>';
+        bodyBox.appendChild(loader);
+
+        frame = hostDoc.createElement('iframe');
+        frame.className = 'acd-frame';
+        frame.title = '获取联系';
+        frame.src = CONTACT_URL;
+        frame.addEventListener('load', function () {
+          /* ⚠️ 先把 iframe 自己的滚动条隐蔽掉（不占位、但仍可滚）。
+             它一出现，内容宽度就少十几像素、文案重新折行、高度再报一次新的，
+             面板高度跟着变第二遍——正好落在入场动画中间，看起来就是
+             「打开时抖了一下」。用 scrollbar-width: none 而不是 overflow: hidden：
+             前者只是不占位，内容万一超出（窗口被拉得极矮）还能滚，不会被切掉。
+             跨域时拿不到 contentDocument，交给 try 兜住。 */
+          try {
+            frame.contentDocument.documentElement.style.scrollbarWidth = 'none';
+          } catch (e) { /* 跨域：只能让它自己滚 */ }
+
+          /* 淡出之后把占位层摘掉：留着就是一整块透明层压在 iframe 上面，
+             不出错也不好看，摘掉更干净 */
+          hostWin.setTimeout(function () {
+            if (loader && loader.parentNode) loader.parentNode.removeChild(loader);
+            loader = null;
+          }, 400);
+          try {
+            frame.contentWindow.postMessage({
+              type: 'annie-theme',
+              theme: hostDoc.documentElement.getAttribute('data-theme')
+            }, '*');
+          } catch (e) { /* 主题推不过去也只是颜色不同，不影响内容 */ }
+
+          /* 兜底：联系页万一没回报高度（脚本挂了 / 被拦），也得把面板放出来，
+             否则用户对着遮罩干等 */
+          hostWin.clearTimeout(fallbackTimer);
+          fallbackTimer = hostWin.setTimeout(function () {
+            if (!frameReady) revealPanel();
+          }, 700);
+        });
+        bodyBox.appendChild(frame);
+      }
+
+      /* 联系页在紧凑模式下会把自身高度 postMessage 上来，按真实高度收框；
+         上限交给面板的 max-height 兜底 */
+      hostWin.addEventListener('message', function (event) {
+        const data = event.data;
+        if (!data || data.type !== 'annie-contact-height' || !frame) return;
+        if (event.source && event.source !== frame.contentWindow) return;
+        const height = parseInt(data.height, 10);
+        if (!height || height < 0) return;
+        frameHeight = Math.min(height, 1200);
+        frame.style.height = frameHeight + 'px';
+        /* 高度可能连报两三次（滚动条消失、字体就位各触发一次）。
+           等它安静 80ms 再让面板入场，入场时尺寸已经是最终值，全程不动。 */
+        if (!frameReady) {
+          hostWin.clearTimeout(settleTimer);
+          settleTimer = hostWin.setTimeout(revealPanel, 80);
+        }
+      });
+
+      /* 外层切深浅色时只把消息发给文章，浮窗里的联系页收不到，这里转发一次 */
+      window.addEventListener('message', function (event) {
+        const data = event.data;
+        if (!data || data.type !== 'annie-theme' || !frame) return;
+        try { frame.contentWindow.postMessage(data, '*'); } catch (e) {}
+      });
+
+      function focusables() {
+        const nodes = panel.querySelectorAll('button, iframe, a[href], input, textarea, select, [tabindex]:not([tabindex="-1"])');
+        return Array.prototype.filter.call(nodes, function (el) {
+          return !el.disabled && el.offsetParent !== null;
+        });
+      }
+
+      /* Esc 关浮窗；Tab 在浮窗里循环，别跑到背后的文章页上 */
+      function onKeydown(event) {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          close();
+          return;
+        }
+        if (event.key !== 'Tab') return;
+        const list = focusables();
+        if (!list.length) return;
+        const first = list[0];
+        const last = list[list.length - 1];
+        if (event.shiftKey && hostDoc.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && hostDoc.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+
+      /* 面板入场：只在高度定稿后调用一次。
+         之前是 mountFrame 后立刻显示，用户先看到占位高度的面板，几十毫秒后
+         真实高度回来再改一次高度，垂直居中的面板就整体挪 half(差值)；
+         现在这一步只负责「把已经定稿的面板放出来」。 */
+      function revealPanel() {
+        if (frameReady || !isOpen) return;
+        frameReady = true;
+        hostWin.clearTimeout(settleTimer);
+        hostWin.clearTimeout(fallbackTimer);
+        settleTimer = 0;
+        fallbackTimer = 0;
+        modal.classList.add('is-ready');
+      }
+
+      /* 锁滚动：只把 html 设成 overflow: hidden（scrollY 保留、sticky 导航照常），
+         body 一点都不动 —— body 一旦 overflow: hidden 就成了滚动容器，sticky
+         导航会跟着文档滚走。
+         滚动条消失会让视口宽出十几像素、居中的内容整体横移半个滚动条宽，
+         所以补一条同宽的 padding-right 把内容盒钉回去。
+         用 scrollLocked 兜住重复调用：关闭动画没播完又点开时不能再存一次
+         「当前值」，否则会把 hidden 当成原始状态记下来，关掉后页面再也滚不动。 */
+      function lockScroll() {
+        if (scrollLocked) return;
+        const htmlEl = hostDoc.documentElement;
+        prevHtmlOverflow = htmlEl.style.overflow;
+        prevHtmlPaddingRight = htmlEl.style.paddingRight;
+        const scrollbarWidth = hostWin.innerWidth - htmlEl.clientWidth;
+        htmlEl.style.overflow = 'hidden';
+        if (scrollbarWidth > 0) {
+          htmlEl.style.paddingRight = scrollbarWidth + 'px';
+        }
+        /* 窄屏 sheet 的宽度要自己把这条缝算进去（见媒体查询里的 calc） */
+        modal.style.setProperty('--acd-gutter', scrollbarWidth + 'px');
+        scrollLocked = true;
+      }
+
+      function unlockScroll() {
+        if (!scrollLocked) return;
+        const htmlEl = hostDoc.documentElement;
+        htmlEl.style.overflow = prevHtmlOverflow;
+        htmlEl.style.paddingRight = prevHtmlPaddingRight;
+        scrollLocked = false;
+        /* 兜底：个别浏览器在切换 overflow 的瞬间会钳一下 scrollY，
+           开了 scroll-behavior: smooth 的话「还回去」会看到背景自己滑一段，
+           这里临时关掉 */
+        const prevBehavior = htmlEl.style.scrollBehavior;
+        htmlEl.style.scrollBehavior = 'auto';
+        if (Math.abs(hostWin.scrollY - prevScrollY) > 1) {
+          hostWin.scrollTo(0, prevScrollY);
+        }
+        htmlEl.style.scrollBehavior = prevBehavior;
+      }
+
+      function open() {
+        if (isOpen) return;
+        isOpen = true;
+        lastFocus = hostDoc.activeElement;
+        prevScrollY = Math.round(hostWin.scrollY);
+        /* 关闭动画还没播完就又点开：撤掉待执行的收尾，别让它把刚打开的面板藏掉 */
+        hostWin.clearTimeout(closeTimer);
+        closeTimer = 0;
+        mountFrame();
+        modal.classList.remove('is-closing');
+        modal.hidden = false;
+        document.documentElement.classList.add('acd-behind');
+        lockScroll();
+        closeBtn.focus({ preventScroll: true });
+        hostDoc.addEventListener('keydown', onKeydown, true);
+        /* 第二次打开：高度早就量过了，直接入场，不用再等；
+           没有（上次开得太快、还没回报就关了）就重新挂一次兜底，
+           否则 load 已经过去、不会再有第二次机会把面板放出来 */
+        if (frameReady || frameHeight > 0) {
+          revealPanel();
+        } else {
+          hostWin.clearTimeout(fallbackTimer);
+          fallbackTimer = hostWin.setTimeout(function () {
+            if (!frameReady) revealPanel();
+          }, 700);
+        }
+      }
+
+      function close() {
+        if (!isOpen) return;
+        isOpen = false;
+        hostDoc.removeEventListener('keydown', onKeydown, true);
+        hostWin.clearTimeout(settleTimer);
+        hostWin.clearTimeout(fallbackTimer);
+        settleTimer = 0;
+        fallbackTimer = 0;
+        document.documentElement.classList.remove('acd-behind');
+        if (frameReady) {
+          modal.classList.add('is-closing');
+          /* ⚠️ 解锁必须等关闭动画播完、面板真正 hidden 之后再执行：
+             提前还原 overflow 会让滚动条立刻回来，页面在遮罩还在淡出的这
+             200ms 里横向跳十几个像素 —— 就是「关闭时也抖一下」。 */
+          closeTimer = hostWin.setTimeout(function () {
+            closeTimer = 0;
+            modal.classList.remove('is-closing');
+            modal.hidden = true;
+            unlockScroll();
+          }, 220);
+        } else {
+          /* 还没露过面（首开、iframe 没回报高度就关了）：直接收。
+             这时候播关闭动画会先把一个 opacity: 0 的面板「点亮」再淡出，
+             反而闪一下。 */
+          modal.classList.remove('is-closing');
+          modal.hidden = true;
+          unlockScroll();
+        }
+        if (lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true });
+        lastFocus = null;
+      }
+
+      trigger.addEventListener('click', function (event) {
+        /* 修饰键 / 中键：交还浏览器，让它照常打开 contact.html */
+        if (event.defaultPrevented || event.button !== 0
+          || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+          return;
+        }
+        event.preventDefault();
+        open();
+      });
+
+      closeBtn.addEventListener('click', close);
+
+      modal.addEventListener('click', function (event) {
+        if (event.target.hasAttribute('data-acd-close')) close();
+      });
+    })();
+  </script>
+</body>
+</html>

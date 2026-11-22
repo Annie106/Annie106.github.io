@@ -3507,7 +3507,7 @@
         }
         .article-unavailable-notice {
             max-width: 860px;
-            margin: 24px auto 32px;
+            margin: 24px auto 8px;
         }
         .article-unavailable-notice[hidden] {
             display: none;

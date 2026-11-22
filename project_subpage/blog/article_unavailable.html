@@ -219,9 +219,9 @@
         <h1 class="unavailable-title" id="unavailableTitle">当前文章不对外开放</h1>
         <p class="unavailable-description">这篇文章正在构建中，暂时无法查看，感谢你的理解。</p>
         <div class="unavailable-actions">
-          <a href="../../index.html?view=feedback" class="unavailable-action" id="unavailableFeedbackLink" target="_top">
-            <i class="ri-feedback-line" aria-hidden="true"></i>
-            意见反馈
+          <a href="article_unavailable_reasons.html" class="unavailable-action" id="unavailableReasonsLink">
+            <i class="ri-question-line" aria-hidden="true"></i>
+            查看可能原因
           </a>
         </div>
       </section>
@@ -230,33 +230,19 @@
   <script src="../../js/theme.js"></script>
   <script>
     (function () {
-      // 反馈链接带上文章 id 和标题，反馈页会显示「反馈的文章：xxx」，
-      // 方便定位是哪篇文章出的问题。
-      // 参数名用 fa / ft：主页面的 ?article= 是「打开这篇文章」的意思，
-      // 这里混用会让点完反馈反而进了文章页。
-      const feedbackLink = document.getElementById('unavailableFeedbackLink');
-      if (!feedbackLink) return;
+      const reasonsLink = document.getElementById('unavailableReasonsLink');
+      if (!reasonsLink) return;
 
-      const params = new URLSearchParams(window.location.search);
-      // 被嵌进文章时，文章信息在父页面那边，从父页面地址栏 / 标题里取
-      let articleId = params.get('article');
-      let articleTitle = params.get('title');
-      try {
-        if (window.parent !== window) {
-          const parentParams = new URLSearchParams(window.parent.location.search);
-          articleId = articleId || parentParams.get('article');
-          articleTitle = articleTitle || parentParams.get('title');
-          if (!articleTitle) {
-            const parentTitle = window.parent.document.getElementById('articleTitle');
-            articleTitle = parentTitle ? parentTitle.textContent.trim() : '';
-          }
+      // 在 iframe 里直接点链接会往浏览器历史里多塞一条记录，占掉一次「返回」，
+      // 所以站内跳转用 location.replace()：只替换当前记录，不新增记录。
+      reasonsLink.addEventListener('click', function (event) {
+        if (event.defaultPrevented || event.button !== 0
+          || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+          return;
         }
-      } catch (e) { /* 跨域时读不到父页面，就用当前地址里的参数 */ }
-
-      const target = new URL(feedbackLink.getAttribute('href'), window.location.href);
-      if (articleId) target.searchParams.set('fa', articleId);
-      if (articleTitle) target.searchParams.set('ft', articleTitle);
-      feedbackLink.href = target.href;
+        event.preventDefault();
+        window.location.replace(reasonsLink.href);
+      });
     })();
   </script>
 </body>
