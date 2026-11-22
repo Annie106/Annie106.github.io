@@ -2,7 +2,7 @@
 
 > 由 AI 辅助构建
 
-原生 HTML + CSS + JavaScript 的静态博客）。构建是四步：`build-site.js`（校验图标 + 按白名单复制到 `dist/`）→ `build-comment-counts.js`（抓每篇文章的真实评论数）→ `build-posts.js`（每篇文章的 `/posts/<id>/` 静态页 + `sitemap.xml` + `robots.txt`）→ `minify.js`（压缩产物里的 JS/CSS）。一键：`npm run build`。
+原生 HTML + CSS + JavaScript 的静态博客。构建是四步：`build-site.js`（校验图标 + 按白名单复制到 `dist/`）→ `build-comment-counts.js`（抓每篇文章的真实评论数）→ `build-posts.js`（每篇文章的 `/posts/<id>/` 静态页 + `sitemap.xml` + `robots.txt`）→ `minify.js`（压缩产物里的 JS/CSS）。一键：`npm run build`。
 
 完整配置教程在站内「使用指南」文章（`project_subpage/blog/guide.html`），本文件只做速查。
 
@@ -55,8 +55,9 @@ images/manor_photos/        照图集
 css/style.css               全部样式与响应式
 fonts/icons.css             图标字体样式（由 style.css 引入的生成物）
 fonts/remixicon.woff2       图标字体子集，约 7 KB（只含用到的图标）
-新建文章.bat                双击写新文章：问标题和标签，建好 posts/<id>-<标题>.md 并打开
+open-md.bat                 双击写新文章：问标题和标签，建好 posts/<id>-<标题>.md 并打开
 重新构建.bat                双击重新构建：默认构建一次，也可以选「持续监听」自动重建
+check-icons.bat             双击检查图标：图标名写错会指出文件与行号（不需要 Python）
 _template.html              新建页面时复制这份，head 已经引对了样式
 feed.xml                    RSS 订阅源，由 tools/build-feed.js 生成
 .github/workflows/feed.yml  push 文章数据时自动重建并提交 feed.xml
@@ -90,8 +91,10 @@ js/theme.js                 深色模式
 js/touch-hover.js           触屏悬停修正
 js/background-music.js      首页背景音乐
 js/copyToClipboard.js       联系方式复制
+js/leave-confirm.js         外链「即将离开」确认弹窗（独立页各引一行）
+js/scroll-reveal.js         独立页 / 内嵌页的滚动出现（首页那套在 script.js）
 js/image-loading.js         图片占位、清晰化与高速/慢速直链（每张图每天 1 次高速）
-project_subpage/blog/       站点页：contact / guide / submission / thanks / 文章内嵌页 ...
+project_subpage/blog/       站点页：guide / contact / submission / thanks / 文章不可用提示与原因页 / 文章内嵌页 ...
 project_subpage/projects/   项目页：appeal-guide ...
 archive/                    留档的旧文件，不进产物（构建白名单里没有这个目录）
 ```
@@ -106,28 +109,32 @@ archive/                    留档的旧文件，不进产物（构建白名单�
 - 每篇公开文章使用 Giscus 展示 GitHub Discussions 评论；博客启动时会低优先级预载 Giscus 脚本和连接，打开文章时再加载对应讨论；文章卡片的「查看评论」切到站内评论视图（`/?view=comments`），讨论串按文章 ID 区分；仓库需启用 Discussions 并安装 Giscus App
 - 每个标签都有落地页 `/tags/<标签>/`：构建时生成真页面，能单独分享，也进 sitemap
 - 文章地址形如 `/posts/<id>/`（站内点卡片、分享、RSS、sitemap 全用它）；旧链接 `/?article=<id>` 仍然可用，打开后自动换回新地址。地址栏不留 `index.html`（启动时自动收敛成根路径）
-- `isPublic: false` 关闭单篇正文，改为 `true` 恢复
+- `isPublic: false` 关闭单篇正文：详情区嵌入 `project_subpage/blog/article_unavailable.html` 提示页，点「查看可能原因」再进 `article_unavailable_reasons.html`（六类原因 + 获取联系浮窗）；改为 `true` 恢复
 - 页面状态记忆：离开文章、切标签、关页后返回，恢复视图与滚动位置
 - 文章底部有「上一篇 / 下一篇」，按发布日期排序（置顶不参与顺序）；标签里带日期，避免对方向产生歧义
 - 长文辅助：正文小标题自动变成目录（桌面端右侧常驻、手机端折叠卡片，滚动时高亮当前一节，可单独分享某一节）；顶部阅读进度条；正文小 / 中 / 大三档字号，选择会被记住
 - 文末「相关文章」按标签重合度推荐（共同标签数 → 主标签是否相同 → 日期），没有重合标签就整块隐藏，不拿最新几篇硬凑
 - 支持「添加到主屏」：manifest + 三张 PNG 图标，安卓和 iOS 各有对应的图标尺寸
 - 正文链接加 `class="gated-link"` 后点击弹出「链接已停止访问」提示
+- 外链确认：`<a data-confirm-leave="站点名">` 点击先问「即将前往…」，可再用 `data-confirm-title` / `data-confirm-desc` 换整句文案；逻辑在 `js/leave-confirm.js`，不引 script.js 的独立页要自己引一行
+- 滚动出现：首页、文章列表、文章页、归档、关于的元素滚进视口才淡入；独立页用 `js/scroll-reveal.js` + `data-reveal-targets`，可选 `data-reveal-stagger` / `-distance` / `-duration` / `-inset`，隐藏态只由脚本添加
 - 独立视频页：侧边播放列表、加载动画、水印，附验证码 / 地区限制 / 解码失败等错误提示
 - 点击图标复制微信号、QQ 号、邮箱
 - 反馈表单：文章问题、Bug、功能建议、排版样式、其他
-- 「获取联系」页（`project_subpage/blog/contact.html`）：微信号 / QQ 号一键复制、主邮箱 + 备用邮箱；404 页点「获取联系」时以浮窗形式加载它，支持 Esc / 遮罩 / 右上角 × / 浏览器返回四种关闭方式
+- 「获取联系」页（`project_subpage/blog/contact.html`）：微信号 / QQ 号一键复制、主邮箱 + 备用邮箱；404 页和文章不可用原因页点「获取联系」时都以浮窗加载它（404 支持 Esc / 遮罩 / 右上角 × / 浏览器返回四种关闭方式；原因页那份是独立实现，支持前三种）
 
 ## 修改
 
 | 想改什么 | 改哪里 |
 | --- | --- |
 | 姓名、简介、头像、联系方式、关于页 | `index.html` 与 `js/script.js` 的 `siteConfig` |
-| 写新文章 | 双击根目录 `新建文章.bat`，或 `node tools/new-post.js "标题" --tags 随笔` |
+| 写新文章 | 双击根目录 `open-md.bat`，或 `node tools/new-post.js "标题" --tags 随笔` |
 | 改完要重新构建 | 双击 `重新构建.bat`（约 2 秒）；想边改边看就选里面的「持续监听」 |
 | 文章 | `posts/*.md`（正文和元信息都在这里，改完跑 `npm run build`） |
 | 置顶 | 改那篇 md 里的 `pinned`（默认 `false`，改成 `true` 即可） |
-| 置顶 | 改那篇 md 里的 `pinned`（默认 `false`，改成 `true` 即可） |
+| 外链确认 | 给链接加 `data-confirm-leave`，并确认页面引了 `js/leave-confirm.js` |
+| 滚动出现 | 独立页引 `js/scroll-reveal.js`，选择器写在 `data-reveal-targets` |
+| 文章不可用提示 / 原因页 | `project_subpage/blog/article_unavailable.html` / `article_unavailable_reasons.html` |
 | 文章卡片菜单 | `js/script.js` 的 `articleMenus`（按文章 id） |
 | 背景音乐 | `js/background-music.js` 的 `musicList` |
 | 视频列表 | `movie.html` 的 `VIDEO_LIST` |
@@ -161,6 +168,8 @@ node tools/check-icons.js
 - 改文章 `id` 会让已分享的链接失效。
 - 首页标签：`最新` / `全部` 由 `renderTagPills` 固定，其余由 `HOME_TAGS` 决定；分页每页 8 篇（`HOME_PAGE_SIZE`）或 6 篇（`HOME_POST_LIMIT`），超过一页才出现控件。
 - 移动或重命名子页面后，同步 `embeddedPage` 与 `articleMenus` 的路径。
+- 被 `embeddedPage` 嵌进文章时，页面必须自己清掉站点外壳：`body` 的 `min-height: 100vh`、`display: flex`、左右 padding，以及 `body::before` / `::after` 那两个固定虚化层（否则 iframe 越量越高、内容一直往上跑）。判断是否在 iframe 里，再打 `is-standalone` / `is-inline-embed` 之类的标记；高度用 `postMessage` 报给外层（`manor_photo.html`、`contact.html`、`article_unavailable_reasons.html` 都是现成例子）。`?embedded=1` 是浮窗 / 内嵌面板的紧凑模式（404、原因页的联系浮窗与投稿成功页会带），正文内嵌不带它。
+- 独立页要用外链确认，自己引一行 `js/leave-confirm.js`（`style.css` 不会带它），否则 `data-confirm-*` 静默失效；要用滚动出现，引 `js/scroll-reveal.js` 并写 `data-reveal-targets`，别在 HTML / CSS 里预置隐藏态。
 
 ## 本地预览
 
@@ -193,13 +202,14 @@ node tools/serve.js
 
 ```bash
 npm install                        # 只需一次：装 esbuild（压缩用）
+node tools/build-posts-data.js     # 前置：由 posts/*.md 生成 js/posts-data.js
 node tools/build-site.js           # 第一步：生成 dist/，白名单在脚本顶部
 node tools/build-comment-counts.js # 第二步：抓真实评论数（会联网，失败按 0 处理）
 node tools/build-posts.js          # 第三步：生成文章静态页 + sitemap + robots
 node tools/minify.js               # 第四步：压缩 dist/ 里的 JS 和 CSS
 ```
 
-- 该发布的文件由 `tools/build-site.js` 的白名单决定，开发文件（`AGENTS.md`、`README.md`、`tools/`、`check-icons.bat`、`新建文章.bat`）不会进入产物 —— 线上访问它们是 404。
+- 该发布的文件由 `tools/build-site.js` 的白名单决定，开发文件（`AGENTS.md`、`README.md`、`tools/`、`check-icons.bat`、`open-md.bat`、`重新构建.bat`）不会进入产物 —— 线上访问它们是 404。
 - 新页面放在 `project_subpage/` 里会自动带上；放在根目录、新建根级目录、或者 `archive/` 这种**故意不发布**的目录才要动白名单。**忘了加不会静默放过**：脚本会比对仓库里的 `.html` 和产物，发现有源码没产物的页面就报错退出。
 - push 到 main 后 `.github/workflows/deploy.yml` 自动构建并发布 `dist/`。
 - ⚠️ 仓库设置的 Pages → Source 必须是「GitHub Actions」。改成网页上那一步只能人工做；如果源还是分支发布，站点会由旧的 Jekyll 流程提供，新产物不会生效。

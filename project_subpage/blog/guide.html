@@ -966,14 +966,23 @@
 ├── 404.html                 ← 找不到页面时的提示与旧链接兜底
 ├── favicon.svg              ← 浏览器标签页上的小图标
 ├── share_cover.jpg          ← 分享给微信/QQ 时的封面缩略图
+├── posts/                   ← 文章本体：每篇一个 .md（构建时生成 js/posts-data.js）
 ├── README.md                ← 说明书，不影响网页
 ├── AGENTS.md                ← 给 AI 助手看的项目约定，不影响网页
+├── open-md.bat              ← 双击写新文章（问标题和标签）
+├── 重新构建.bat             ← 双击重新构建（也可开「持续监听」）
+├── check-icons.bat          ← 双击检查图标名
 ├── .gitignore               ← 让 Git 忽略 dist/ 等产物
 │
 ├── tools/                   ← 构建与检查脚本（不会发布到线上）
+│   ├── build-posts-data.js  ← 由 posts/*.md 生成 js/posts-data.js（构建前置）
 │   ├── build-site.js        ← 先校验图标，再按白名单生成 dist/
+│   ├── build-comment-counts.js ← 抓每篇文章的真实评论数
 │   ├── build-posts.js       ← 给每篇文章生成 /posts/&lt;id&gt;/ 静态页 + sitemap + robots
 │   ├── minify.js            ← 压缩 dist/ 里的 JS 和 CSS（需要 npm install）
+│   ├── build-watch.js       ← 「重新构建.bat」背后的构建与监听
+│   ├── serve.js             ← 本地预览 dist/（带 CORS 头）
+│   ├── new-post.js          ← 新建 / 导入文章（open-md.bat 调它）
 │   ├── build-feed.js        ← 从文章数据生成 feed.xml
 │   ├── check-icons.js       ← 检查图标名写错、CDN 残留
 │   ├── subset-icons.py      ← 裁图标字体：只保留站内用到的图标
@@ -1003,7 +1012,8 @@
 │   └── remixicon.woff2      ← 字体文件，约 7 KB
 │
 ├── js/
-│   ├── posts-data.js        ← 全部文章数据
+│   ├── posts-data.js        ← 全部文章数据（由 posts/*.md 生成，不要手改）
+│   ├── markdown.js          ← 正文 Markdown 渲染器（浏览器和构建脚本共用）
 │   ├── tweaks-data.js       ← 博客更新记录（首页与折腾视图共用）
 │   ├── script.js            ← 页面切换、筛选、搜索与文章渲染
 │   ├── theme.js             ← 深色模式切换
@@ -1011,17 +1021,19 @@
 │   ├── background-music.js  ← 背景音乐
 │   ├── image-loading.js     ← 图片加载策略
 │   ├── leave-confirm.js     ← 外链「即将离开」确认弹窗（见 6.21）
+│   ├── scroll-reveal.js     ← 独立页 / 内嵌页的滚动出现（见 6.8）
 │   └── copyToClipboard.js   ← 点图标复制联系方式
 │
 ├── project_subpage/         ← 子页面都放这里
 │   ├── blog/                ← 博客自带的页面
-│   │   ├── article_unavailable.html ← 未开放文章的提示页
+│   │   ├── article_unavailable.html ← 未开放文章的提示页（详情区自动嵌入）
+│   │   ├── article_unavailable_reasons.html ← 「查看可能原因」的原因清单与联系入口
 │   │   ├── article_14_baidu.html ← 文章 14 的内嵌页面
 │   │   ├── manor_photo.html ← 文章 11 的内嵌图文页
 │   │   ├── submission.html  ← 电影投稿表单
 │   │   ├── thanks.html      ← 投稿成功页（电影投稿面板还在用）
 │   │   ├── guide.html       ← 你正在看的这份指南
-│   │   ├── contact.html     ← 「获取联系」页（404 页的浮窗装的就是它）
+│   │   ├── contact.html     ← 「获取联系」页（404 页和原因页的浮窗装的就是它）
 │   │   └── building.html    ← 未完成项目提示页
 │   └── projects/            ← 你自己的项目页
 │       └── appeal-guide/
@@ -1059,8 +1071,8 @@
                     <i class="ri-code-line"></i>
                     js 文件夹
                 </h3>
-                <p><code>posts-data.js</code> 里的 <code>window.BLOG_POSTS</code> 才是文章数据；首页、文章列表和归档共用它。<code>tweaks-data.js</code> 保存博客更新记录，首页卡片和「本周折腾」视图共用它。<code>script.js</code> 负责筛选、搜索、页面切换和文章渲染，不存文章正文。</p>
-                <p><code>theme.js</code> 管深浅色切换，还会记住访客的选择。<code>touch-hover.js</code> 修的是「手机上点一下按钮，按钮就一直亮着不恢复」的问题，它给页面加一个标记，样式表据此决定要不要显示鼠标悬停效果。<code>image-loading.js</code> 管图片加载：先用模糊占位顶上，图加载完再淡入变清晰，也负责 <code>data-fast-src</code> / <code>data-slow-src</code> 那套高速/慢速链接的切换。<code>background-music.js</code> 管背景音乐，歌单在文件最开头。电影板块的停服公告写在 <code>movie.html</code> 自己里面。<code>copyToClipboard.js</code> 就是「点一下微信图标自动复制」那个功能。<code>leave-confirm.js</code> 管外链的「即将离开」确认弹窗（怎么用见 6.21）。</p>
+                <p>文章本体在 <code>posts/</code> 里，每篇一个 <code>.md</code> 文件；<code>posts-data.js</code> 里的 <code>window.BLOG_POSTS</code> 是它生成的产物（<strong>不要手改</strong>），首页、文章列表和归档共用这份数据。<code>markdown.js</code> 负责把正文 Markdown 渲染成 HTML，浏览器和构建脚本共用同一份。<code>tweaks-data.js</code> 保存博客更新记录，首页卡片和「本周折腾」视图共用它。<code>script.js</code> 负责筛选、搜索、页面切换和文章渲染，不存文章正文。</p>
+                <p><code>theme.js</code> 管深浅色切换，还会记住访客的选择。<code>touch-hover.js</code> 修的是「手机上点一下按钮，按钮就一直亮着不恢复」的问题，它给页面加一个标记，样式表据此决定要不要显示鼠标悬停效果。<code>image-loading.js</code> 管图片加载：先用模糊占位顶上，图加载完再淡入变清晰，也负责 <code>data-fast-src</code> / <code>data-slow-src</code> 那套高速/慢速链接的切换。<code>background-music.js</code> 管背景音乐，歌单在文件最开头。电影板块的停服公告写在 <code>movie.html</code> 自己里面。<code>copyToClipboard.js</code> 就是「点一下微信图标自动复制」那个功能。<code>leave-confirm.js</code> 管外链的「即将离开」确认弹窗（怎么用见 6.21）。<code>scroll-reveal.js</code> 管独立页 / 内嵌页的滚动出现（怎么用见 6.8）。</p>
                 <p><code>archive/</code> 文件夹里是留档的旧文件，<strong>整个目录不进产物</strong>（<code>tools/build-site.js</code> 的发布白名单里没有它），线上访问不到，页面也不会加载它们。<code>music-player.js</code> 是旧版播放器（现在用 <code>background-music.js</code>），<code>feedback-tx.html</code> 是旧版腾讯问卷反馈页。<code>feedback.html</code> 和 <code>comments.html</code> 是从 <code>project_subpage/blog/</code> 挪过来的跳转桩——反馈页和评论区早就并进主页面了（<code>?view=feedback</code> / <code>?view=comments</code>），旧链接由根目录的 <code>404.html</code> 接住再送过去。不用管它们，删了也不影响网页；往这个目录里加页面时，记得把文件名同步进 <code>build-site.js</code> 的 <code>IGNORE_HTML</code>，否则构建会因为「有源码、没产物」报错。</p>
 
                 <div class="guide-tip">
@@ -1068,8 +1080,8 @@
                         <i class="ri-folder-open-line"></i>
                         关于 project_subpage
                     </div>
-                    <p><code>project_subpage/</code> 下面分成两个文件夹：<code>blog/</code> 是博客自带的页面（没做完的项目、未开放文章提示页、反馈表单、反馈成功页、这份指南），<code>projects/</code> 是放你自己项目页的地方。想加新页面，在 <code>projects/</code> 里建一个文件夹放 <code>index.html</code> 就行。</p>
-                    <p>这些页面可以配置成「把子页面嵌进来显示」或「点一下跳过去」，写法在 6.6 节。移动或改名之后，记得同步改 <code>js/posts-data.js</code> 中的页面路径，或对应的 <code>articleMenus</code> 配置，否则会 404。</p>
+                    <p><code>project_subpage/</code> 下面分成两个文件夹：<code>blog/</code> 是博客自带的页面（没做完的项目、未开放文章提示页与原因页、投稿表单与成功页、这份指南），<code>projects/</code> 是放你自己项目页的地方。想加新页面，在 <code>projects/</code> 里建一个文件夹放 <code>index.html</code> 就行。</p>
+                    <p>这些页面可以配置成「把子页面嵌进来显示」或「点一下跳过去」，写法在 6.6 节。移动或改名之后，记得同步改 <code>posts/*.md</code> 里对应文章的 <code>embeddedPage</code> / <code>externalPage</code>（改完重新生成 <code>posts-data.js</code>），或对应的 <code>articleMenus</code> 配置，否则会 404。</p>
                 </div>
             </div>
         </section>
@@ -1086,7 +1098,7 @@
                         <i class="ri-error-warning-line"></i>
                         动手之前先备份
                     </div>
-                    <p>动手前先备份准备修改的文件；通常至少备份 <code>index.html</code>、<code>js/posts-data.js</code> 和 <code>js/script.js</code>，名字后面加个「备份」。改坏了随时能拿回来。</p>
+                    <p>动手前先备份准备修改的文件；通常至少备份 <code>index.html</code>、<code>posts/</code> 这个文章文件夹和 <code>js/script.js</code>，名字后面加个「备份」。改坏了随时能拿回来。</p>
                 </div>
 
                 <div class="guide-tip">
@@ -1222,36 +1234,39 @@
                     <i class="ri-article-line"></i>
                     6.6 写文章、改文章
                 </h3>
-                <p>文章数据在 <code>js/posts-data.js</code>。打开它，搜索 <code>window.BLOG_POSTS</code>，数组里的每一项就是一篇文章；<code>js/script.js</code> 会读取这份数据并负责显示：</p>
-                <pre><code>{
-    id: 1,
-    title: '文章标题',
-    date: '2026-05-03',
-    excerpt: '这里写摘要，会显示在文章卡片上',
-    tags: ['随笔'],
-    pinned: false,
-    content: `
-        &lt;p&gt;正文第一段&lt;/p&gt;
-        &lt;h2&gt;一个小标题&lt;/h2&gt;
-        &lt;p&gt;正文第二段&lt;/p&gt;
-    `,
-},</code></pre>
+                <p>文章本体在 <code>posts/</code> 文件夹：每篇一个 <code>.md</code> 文件，开头 <code>---</code> 之间写元信息，后面写 Markdown 正文。新建一篇最省事的办法是双击根目录的 <code>open-md.bat</code>（会问标题和标签）；也可以执行 <code>node tools/new-post.js "标题" --tags 随笔</code>。手写的话照这个格式：</p>
+                <pre><code>---
+id: 1
+title: 文章标题
+date: 2026-05-03
+excerpt: 这里写摘要，会显示在文章卡片上
+tags: 随笔, 阅读
+pinned: false
+---
+正文第一段，普通文字直接写；**加粗**、`行内代码`、[链接](https://example.com) 都按 Markdown 写。
 
-                <p>各字段的意思：</p>
+## 一个小标题
+
+&gt; 引用写在一行的开头。
+
+- 列表项一
+- 列表项二</code></pre>
+
+                <p>改完跑一次 <code>node tools/build-posts-data.js</code>（或直接 <code>npm run build</code>），它会把所有 md 合成 <code>js/posts-data.js</code>。<strong>那个 JS 是生成物，不要手改</strong>，手改会在下次生成时被覆盖。各字段的意思：</p>
                 <ul>
                     <li><code>id</code>：文章编号，<strong>不能跟别的文章重复</strong></li>
                     <li><code>title</code> / <code>date</code> / <code>excerpt</code>：标题、发布日期（<code>YYYY-MM-DD</code>）和摘要。首页按日期倒序取最近 6 篇；「文章」视图按数据数组顺序显示（置顶文章排前面），「归档」按日期倒序</li>
-                    <li><code>tags</code>：标签，用来看筛选按钮，可以有多个，写成 <code>['随笔', '阅读']</code></li>
+                    <li><code>tags</code>：标签，用来看筛选按钮，可以有多个，用逗号隔开，写成 <code>随笔, 阅读</code>（中英文逗号都行）</li>
                     <li><code>pinned</code>：写 <code>true</code> 就是置顶</li>
                     <li><code>updated</code>：可选。填最近一次改这篇的日期（格式同 <code>date</code>）。写了之后，文章卡片和详情页的日期都优先显示它，详情页还会在下面补一行「发布于 原发布日」；不写、或跟 <code>date</code> 一样就只显示 <code>date</code>。首页排序、时间线和归档分组也用这个日期算</li>
-                    <li><code>isPublic</code>：可选。设为 <code>false</code> 后，文章详情区域会显示“当前文章不对外开放”，并隐藏文章标题、元信息和正文；改为 <code>true</code> 或删掉此字段即可重新开放。没有设置时默认开放</li>
-                    <li><code>content</code>：正文，写在反引号（键盘左上角 <span class="guide-kbd">`</span> 那个键）中间，可以用 <code>&lt;p&gt;</code> 分段、<code>&lt;h2&gt;</code> 加小标题</li>
-                    <li><code>embeddedPage</code>：填相对路径如 <code>'project_subpage/projects/xxx/index.html'</code>，这篇文章会把那个网页嵌进来显示</li>
+                    <li><code>isPublic</code>：可选。设为 <code>false</code> 后，文章详情区域会嵌入 <code>project_subpage/blog/article_unavailable.html</code>（“当前文章不对外开放”），并隐藏文章标题、元信息和正文；页面上的「查看可能原因」会打开同目录的原因清单。改为 <code>true</code> 或删掉此字段即可重新开放。没有设置时默认开放</li>
+                    <li>正文：<code>---</code> 之后的部分就是 Markdown 正文，支持标题、列表、引用、代码块、表格和行内 HTML；需要给链接加 <code>data-confirm-leave</code> 这类属性时，直接写 <code>&lt;a&gt;</code></li>
+                    <li><code>embeddedPage</code>：填相对路径如 <code>project_subpage/projects/xxx/index.html</code>（front matter 里是纯文本，不写引号），这篇文章会把那个网页嵌进来显示；内嵌页的坑见 6.8</li>
                     <li><code>externalPage</code>：填路径，点文章直接跳过去。跟上面那个二选一</li>
                 </ul>
                 <p>文章正文和通过博客打开的同源内嵌页面里的图片，都会自动使用模糊占位和加载完成后的清晰化动画。普通图片写 <code>&lt;img src="..." alt="..." width="..." height="..." loading="lazy"&gt;</code> 即可；建议填写图片实际宽高，减少加载时的页面跳动。需要高速链接时，同时写 <code>data-fast-src</code>（高速直链）和 <code>data-slow-src</code>（慢速直链/大图预览）：默认优先走高速，但<strong>每张图每天只用 1 次高速</strong>，用过之后当天都走慢速；没配高速、或高速加载失败会立刻回退慢速（失败不占当天额度）。到底走了哪条链接，可以在浏览器控制台看到 <code>[图片加载·高速直链]</code> / <code>[图片加载·慢速直链]</code> 的彩色日志；头像和背景音乐用的 CDN 不参与这套策略。想要贴合图片的占位效果，可再加 <code>data-tone="#8c806b"</code> 和小尺寸图片的 <code>data-lqip="data:image/jpeg;base64,..."</code>。</p>
 
-                <p>加新文章就复制一整段（从 <code>{</code> 到 <code>},</code>），粘到数组里改掉内容和 <code>id</code>。</p>
+                <p>加新文章不必从头写：复制一个现成的 <code>.md</code> 文件改名，把 <code>id</code> 改成一个没被占用的数字，再换标题、日期、摘要和正文即可。文件名随意，但 <code>id</code> 不能重复。</p>
                 <div class="guide-warning">
                     <div class="guide-warning-title">
                         <i class="ri-lock-line"></i>
@@ -1336,7 +1351,7 @@
                 <ul>
                     <li>页面文件：<code>project_subpage/blog/manor_photo.html</code></li>
                     <li>图片：根目录 <code>images/manor_photos/</code>（<code>manor_01.jpg</code> / <code>manor_02.jpg</code>）</li>
-                    <li>文章数据：<code>js/posts-data.js</code> 里 id 为 11 的那一项，<code>embeddedPage: 'project_subpage/blog/manor_photo.html'</code></li>
+                    <li>文章数据：<code>posts/</code> 里 id 为 11 的那篇 md，在开头的元信息里写 <code>embeddedPage: project_subpage/blog/manor_photo.html</code>（生成后才会出现在 <code>posts-data.js</code>）</li>
                 </ul>
 
                 <p>换照片只改两处 <code>&lt;img&gt;</code>。因为页面在 <code>project_subpage/blog/</code>、图片在根目录的 <code>images/</code>，所以要往上退两级：</p>
@@ -1344,6 +1359,16 @@
      alt="第五人格归宿花房，两个角色站在绣球花与白色玩偶之间"
      width="1728" height="1079"&gt;</code></pre>
                 <p>路径规则：<strong>页面在哪个文件夹，往上数几层才到根目录，就写几个 <code>../</code></strong>。<code>project_subpage/blog/</code> 是两层，所以是 <code>../../images/...</code>；<code>project_subpage/projects/appeal-guide/</code> 是三层，就是 <code>../../../images/...</code>。图片名和文件夹名<strong>区分大小写</strong>，线上 <code>Images/</code> 和 <code>images/</code> 是两个不同的东西。</p>
+
+                <div class="guide-warning">
+                    <div class="guide-warning-title">
+                        <i class="ri-error-warning-line"></i>
+                        内嵌页必须先清掉 100vh
+                    </div>
+                    <p>站点样式表给 <code>body</code> 设了 <code>min-height: 100vh</code>、<code>display: flex</code> 和左右 padding。文章页是按「内容有多高」来撑 iframe 的：如果内嵌页还留着 100vh，iframe 会先被自己当前高度顶住，外层量到的高度里又包含这个 100vh，于是越撑越高、内容一直往上跑，卡片上下还会空出一整屏。</p>
+                    <p>做法：在页面里判断 <code>window.parent !== window</code>，给 <code>html</code> 打一个标记（本站用 <code>is-standalone</code> 表示「单独打开」，<code>is-inline-embed</code> 表示「被正文 iframe 嵌着」），再用这个标记把 <code>html</code> / <code>body</code> 的 <code>min-height</code>、<code>height</code>、<code>display</code>、padding 清掉，并关掉 <code>body::before</code> / <code>::after</code> 那两个固定虚化层。最后用 <code>postMessage</code> 把内容高度报给外层（<code>manor_photo.html</code> 用 <code>annie-embedded-height</code>，<code>contact.html</code> 用 <code>annie-contact-height</code>）。</p>
+                    <p><code>?embedded=1</code> 是「浮窗 / 内嵌面板」的紧凑模式：404 页和原因页的联系浮窗、投稿成功页都会带它；文章正文里的 iframe 不带这个参数，走的是另一套 <code>is-inline-embed</code> 样式。改 <code>contact.html</code> 时别把两者混在一起。现成例子：<code>contact.html</code>、<code>article_unavailable_reasons.html</code>、<code>guide.html</code> 自己。</p>
+                </div>
 
                 <div class="guide-tip">
                     <div class="guide-tip-title">
@@ -1396,7 +1421,7 @@
                     </div>
                     <p>微信会<strong>长期缓存</strong>抓取结果，同一个链接可能一直显示旧图、甚至一直是灰图标。测试时务必换一个<strong>从没分享过的链接</strong>（比如在网址后面加 <code>?v=2</code>），否则很容易误判成"改了没用"。</p>
                     <p>以前所有文章共用 <code>index.html?article=N</code> 一个页面、靠 JavaScript 换内容，而微信不会执行 JavaScript 后再抓取，所以标题和封面都抓不到。现在每篇文章都有自己的静态页 <code>/posts/&lt;id&gt;/</code>，标题、摘要、正文都是烤好的，抓取正常。</p>
-                    <p>只有<strong>封面图</strong>还是全站共用一张：没在文章数据里写 <code>cover</code> 的话，分享卡片就显示 <code>share_cover.jpg</code>。想让某篇换封面，在那篇文章的数据里加一行 <code>cover: 'images/xxx.jpg'</code> 即可（RSS 用的也是这一张）。</p>
+                    <p>只有<strong>封面图</strong>还是全站共用一张：没写 <code>cover</code> 的话，分享卡片就显示 <code>share_cover.jpg</code>。想让某篇换封面，在那篇 md 的开头元信息里加一行 <code>cover: images/xxx.jpg</code> 即可（改完重新生成；RSS 用的也是这一张）。</p>
                 </div>
 
                 <!-- 6.10 音乐 -->
@@ -1685,7 +1710,7 @@ html:not(.is-touch-input) .options:hover {
                     6.21 给外链加「即将离开」确认弹窗
                 </h3>
                 <p>指向站外的链接可以先问一句「即将前往 GitHub，是否继续？」，避免访客误点跳走。<strong>任何页面都能用，两步：</strong></p>
-                <p>第一步，确认这个页面引了 <code>js/leave-confirm.js</code>（<code>index.html</code> 和本页已经引了，新页面照抄一行，路径按自己的层级写）：</p>
+                <p>第一步，确认这个页面引了 <code>js/leave-confirm.js</code>（<code>index.html</code> 和本页已经引了，新页面照抄一行，路径按自己的层级写）。<strong>被 iframe 内嵌的独立页也要自己引</strong> —— <code>style.css</code> 只带样式、不带这段逻辑；<code>article_14_baidu.html</code> 就是在加外链的同时补了这行。漏了不会报错，只会静默失效：</p>
                 <pre><code>&lt;script src="../../js/leave-confirm.js"&gt;&lt;/script&gt;</code></pre>
                 <p>第二步，给链接加属性。<code>data-confirm-leave</code> 的值就是弹窗里出现的站点名，省略就当「外部网站」：</p>
                 <pre><code>&lt;a href="https://github.com/Annie106" target="_blank" rel="noopener noreferrer"
@@ -1854,14 +1879,15 @@ git push</code></pre>
                     <i class="ri-terminal-line"></i>
                     本地看「真正会上线的那一份」
                 </h3>
-                <p>线上跑的是 <code>dist/</code> 里的内容，不是仓库根目录。想确认发布后的样子，或者排查「本地好好的、线上却不对」，先构建一次（<strong>四步，顺序不能反</strong>）：</p>
+                <p>线上跑的是 <code>dist/</code> 里的内容，不是仓库根目录。想确认发布后的样子，或者排查「本地好好的、线上却不对」，先构建一次（<strong>四步，顺序不能反</strong>；前面还会先跑一步生成文章数据）：</p>
                 <pre><code>npm install                        # 只需一次
+node tools/build-posts-data.js     # 由 posts/*.md 生成 js/posts-data.js
 node tools/build-site.js
 node tools/build-comment-counts.js
 node tools/build-posts.js
 node tools/minify.js</code></pre>
-                <p>第一条按白名单把文件复制进 <code>dist/</code>（会先清空它），第二条上网抓每篇文章的真实评论数（giscus，失败按 0 处理），第三条给每篇文章生成 <code>dist/posts/&lt;id&gt;/</code> 静态页并写出 <code>sitemap.xml</code> 和 <code>robots.txt</code>，第四条把产物里的 JS/CSS 压掉注释和空白（gzip 大约省一半）。</p>
-                <p><strong>顺序不能变</strong>：第一条会清空 <code>dist/</code>，所以后面几步必须排在它后面；第二条要在压缩之前，否则数据文件不会被压；压缩必须排最后，否则压完又被复制覆盖。嫌麻烦就 <code>npm run build</code>，它按顺序跑完这四条。</p>
+                <p><code>build-posts-data.js</code> 先把 <code>posts/*.md</code> 合成 <code>js/posts-data.js</code>；接着 <code>build-site.js</code> 按白名单把文件复制进 <code>dist/</code>（会先清空它）；然后上网抓每篇文章的真实评论数（giscus，失败按 0 处理）；再给每篇文章生成 <code>dist/posts/&lt;id&gt;/</code> 静态页并写出 <code>sitemap.xml</code> 和 <code>robots.txt</code>；最后把产物里的 JS/CSS 压掉注释和空白（gzip 大约省一半）。</p>
+                <p><strong>顺序不能变</strong>：<code>build-site.js</code> 那步会清空 <code>dist/</code>，所以它后面的步骤必须排在它之后；抓评论数要在压缩之前，否则数据文件不会被压；压缩必须排最后，否则压完又被复制覆盖。嫌麻烦就 <code>npm run build</code>，它会先跑数据生成，再按顺序跑完这四条。</p>
                 <p>然后把静态服务器<strong>指向 <code>dist/</code> 这个文件夹</strong>（不是仓库根目录）再预览。这一点比以前重要：文章页只存在于 <code>dist/</code> 里，对着仓库根起服务器点进文章会 404。</p>
                 <p>这一步要装的东西列在这儿。<strong>访客的浏览器什么都不用装</strong>（站点是纯静态文件，运行时零依赖），只有「要在本地构建或部署」的人才需要下面这些：</p>
 
@@ -2051,6 +2077,22 @@ rm -rf "$TMP"</code></pre>
                                 <td>点微信、QQ、邮箱图标没反应。不报错，就是没效果。</td>
                             </tr>
                             <tr>
+                                <td><code>js/leave-confirm.js</code></td>
+                                <td>带 <code>data-confirm-leave</code> 的外链不再询问，点了直接跳走。不报错，很难自己发现。</td>
+                            </tr>
+                            <tr>
+                                <td><code>js/scroll-reveal.js</code></td>
+                                <td>独立页（guide、article_14_baidu 等）的滚动淡入没了；内容仍然全部可见，只是不再有入场动画。</td>
+                            </tr>
+                            <tr>
+                                <td><code>js/markdown.js</code></td>
+                                <td>文章正文渲染不出来（文章页和构建脚本共用这一份），详情区会空掉。</td>
+                            </tr>
+                            <tr>
+                                <td><code>project_subpage/blog/article_unavailable.html</code></td>
+                                <td><code>isPublic: false</code> 的文章详情区会空掉：脚本固定嵌这个提示页，删了就是 iframe 404。</td>
+                            </tr>
+                            <tr>
                                 <td><code>js/image-loading.js</code></td>
                                 <td>网页不会坏，但文章图片会直接硬加载：没有模糊占位，加载时页面会跳一下，高速/慢速链接的自动切换也失效。</td>
                             </tr>
@@ -2109,7 +2151,7 @@ rm -rf "$TMP"</code></pre>
                 九成是浏览器缓存，按 <span class="guide-kbd">Ctrl</span> + <span class="guide-kbd">F5</span> 强制刷新。还不行就看看文件是不是真保存了——VS Code 里文件名旁边有小圆点就表示没保存。</p>
 
                 <p><strong>网页突然一片空白或文章不见了？</strong><br>
-                页面功能异常时检查 <code>js/script.js</code>；文章列表为空时检查 <code>js/posts-data.js</code> 是否存在、是否被正确加载，以及文章对象之间的逗号和引号。按 <span class="guide-kbd">F12</span> 打开开发者工具切到 Console，红色报错通常会指出问题位置。</p>
+                页面功能异常时检查 <code>js/script.js</code>；文章列表为空时先确认 <code>js/posts-data.js</code> 存在并被正确加载，改过 <code>posts/*.md</code> 的话重新跑一次 <code>node tools/build-posts-data.js</code>（md 的元信息格式写错时，这个脚本会直接报出文件名和原因）。按 <span class="guide-kbd">F12</span> 打开开发者工具切到 Console，红色报错通常会指出问题位置。</p>
 
                 <p><strong>图片不显示？</strong><br>
                 检查路径拼写（大小写敏感，<code>Images/a.jpg</code> 和 <code>images/a.jpg</code> 是两个东西）、图片是否真在那个文件夹、网络图片的网址能否直接打开。</p>
@@ -2134,9 +2176,9 @@ rm -rf "$TMP"</code></pre>
                     <li>下载源码：Download ZIP 解压，或者 Fork 一份</li>
                     <li>装 VS Code + 中文包 + Live Server</li>
                     <li>用 VS Code 打开博客文件夹，点 Go Live 确认能打开</li>
-                    <li>备份 <code>index.html</code>、<code>js/posts-data.js</code> 和 <code>js/script.js</code></li>
+                    <li>备份 <code>index.html</code>、<code>posts/</code> 和 <code>js/script.js</code></li>
                     <li>在 <code>index.html</code> 里改头像、名字、导航、社交图标、页脚</li>
-                    <li>在 <code>js/posts-data.js</code> 里写文章（id 别重复）</li>
+                    <li>双击 <code>open-md.bat</code>，或在 <code>posts/</code> 里写一篇 <code>.md</code> 文章（id 别重复），改完重新生成</li>
                     <li>在 <code>css/style.css</code> 里调配色和字号</li>
                     <li>传到 GitHub，Settings → Pages 开启，拿到网址</li>
                     <li>把网址发给朋友</li>

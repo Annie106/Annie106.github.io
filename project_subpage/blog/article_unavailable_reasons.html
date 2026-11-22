@@ -606,6 +606,15 @@
            只锁 html 时 scrollY 保持不变、sticky 照常生效，页面一格都不动。 */
         .acd-modal[hidden] { display: none; }
 
+        /* 预热态：模态框已经挂进 DOM、参与布局，但完全不可见也不吃点击。
+           必须用 visibility: hidden 而不是 display: none —— 后者根本不排版，
+           iframe 量不出真实高度，等于没预热；visibility: hidden 的元素也不会
+           出现在焦点顺序和读屏树里，背后那页的交互不受影响。 */
+        .acd-modal.is-standby {
+          visibility: hidden;
+          pointer-events: none;
+        }
+
         .acd-backdrop {
           /* 用 100vw 而不是 inset: 0：锁滚动时滚动条被拿掉，视口右侧会留下
              一条十几像素的空白（position: fixed 只到布局视口，盖不到那里），
@@ -619,6 +628,12 @@
           background: rgba(20, 20, 18, .58);
           -webkit-backdrop-filter: blur(5px) saturate(115%);
           backdrop-filter: blur(5px) saturate(115%);
+          /* 淡入必须挂在 is-ready 上：预热阶段模态框已经挂进 DOM 了，
+             动画写在这里会在预热时就播完，点开时遮罩变成「啪」一下直接出现 */
+          opacity: 0;
+        }
+        .acd-modal.is-ready .acd-backdrop {
+          opacity: 1;
           animation: acdFade .22s ease both;
         }
         html[data-theme="dark"] .acd-backdrop {
@@ -765,16 +780,19 @@
           background: var(--color-bg, #fff);
         }
 
-        /* 初始高度只是「还没量到真实高度」时的占位，面板此时不可见，
-           所以这里绝不要挂 transition：首帧定高要是动画过渡，面板又在
-           入场动画中途继续长高，看起来就是「一边淡入一边上下挪」。
-           之后的尺寸变化（窗口缩放、字号倍率）才平滑过渡。 */
+        /* 占位高度按 contact.html 的两套列布局给（双列实测 284、单列 466），
+           误差只剩十几像素，内容到位那一下基本看不出来。
+           ⚠️ 660px 是 contact.html 里 auto-fit minmax(300px, 1fr) 的分界
+           （2×300 + 12 间隙），改那页的列宽/内边距要回来对一次。 */
         .acd-frame {
           display: block;
           width: 100%;
-          height: 272px;
+          height: 284px;
           border: 0;
           background: transparent;
+        }
+        @media (max-width: 659px) {
+          .acd-frame { height: 466px; }
         }
         .acd-modal.is-ready .acd-frame {
           transition: height .24s cubic-bezier(.4, 0, .2, 1);
@@ -786,13 +804,25 @@
           position: absolute;
           inset: 0;
           z-index: 1;
-          display: grid;
-          place-items: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
           background: var(--color-bg, #fff);
           pointer-events: none;
           transition: opacity .24s ease;
         }
-        .acd-modal.is-ready .acd-loading { opacity: 0; }
+        .acd-loading-text {
+          font-family: var(--font-sans, inherit);
+          font-size: 12.5px;
+          line-height: 1.5;
+          letter-spacing: .02em;
+          color: var(--color-text-tertiary, #999);
+        }
+        /* 注意挂的是 is-loaded（内容真的到了），不是 is-ready（面板入场了）：
+           面板现在一点开就入场，内容往往还没到，转圈得留着 */
+        .acd-modal.is-loaded .acd-loading { opacity: 0; }
         .acd-spinner {
           width: 18px;
           height: 18px;
@@ -843,14 +873,14 @@
           }
           /* 入场 keyframes 挂在 is-ready 上，这里的选择器要跟着升一级，
              否则会被 .acd-modal.is-ready .acd-panel 的 acdRise 压回去。
-             时长比桌面版（.34s）长一点：从底下浮上来这段位移只有 28px，
-             太快的话那一趟「上升」几乎看不见，0.44s 能看清又不拖 */
+             0.46s 比桌面版（0.34s）长一点：整块从屏幕下沿推上来，
+             太快会显得像「闪」进来 */
           .acd-modal.is-ready .acd-panel {
             animation-name: acdSheetIn;
             animation-duration: 0.46s;
-            /* 减速曲线用 .32/.72 而不是桌面版的 .16/1：位移从 28px 变成整屏高，
-               (.16,1,.3,1) 会在头 100ms 冲完 80%，后半程几乎不动（还是不像「逐渐」）；
-               这条曲线前段慢一点、后段收得稳，整段上升看得完整 */
+            /* 曲线比桌面版的 .16/1 缓：位移是整块面板高度（几百像素），
+               (.16,1,.3,1) 会在头 100ms 冲完 80%、后半程几乎不动，读起来还是「一下到位」；
+               这条前段稍缓、后段收稳，整段上升看得完整 */
             animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
           }
           /* 收起只给 0.22s：close() 里的收尾定时器就是 220ms，
@@ -862,7 +892,6 @@
           }
           .acd-head { padding: 13px 12px 13px 16px; }
           .acd-body { padding-bottom: env(safe-area-inset-bottom); }
-          .acd-frame { height: 450px; }
           .acd-loading { padding-bottom: env(safe-area-inset-bottom); }
         }
 
@@ -884,6 +913,8 @@
         @media (prefers-reduced-motion: reduce) {
           .acd-backdrop,
           .acd-panel,
+          /* is-ready 那两条权重更高，必须一起写，否则「减少动态」关不掉 */
+          .acd-modal.is-ready .acd-backdrop,
           .acd-modal.is-ready .acd-panel,
           .acd-modal.is-closing .acd-backdrop,
           .acd-modal.is-closing .acd-panel { animation: none; }
@@ -941,21 +972,22 @@
       let prevHtmlOverflow = '';
       let prevHtmlPaddingRight = '';
       let prevScrollY = 0;
-      /* 面板是否已经能显示（真实高度已定稿） */
+      /* 面板是否已经入过场（is-ready 加上就不再摘，重开靠 display 切换重播动画） */
       let frameReady = false;
-      /* 已量到的 iframe 高度，第二次打开直接用它，不用再等 */
+      /* 已量到的 iframe 高度 */
       let frameHeight = 0;
       /* 滚动锁状态：关闭动画播完才解锁，见 close() */
       let scrollLocked = false;
       let closeTimer = 0;
-      let settleTimer = 0;
-      let fallbackTimer = 0;
+      let loadFallbackTimer = 0;
 
       function mountFrame() {
         if (frame) return;
         loader = hostDoc.createElement('div');
         loader.className = 'acd-loading';
-        loader.innerHTML = '<span class="acd-spinner" aria-hidden="true"></span>';
+        loader.setAttribute('role', 'status');
+        loader.innerHTML = '<span class="acd-spinner" aria-hidden="true"></span>'
+          + '<span class="acd-loading-text">正在打开联系方式…</span>';
         bodyBox.appendChild(loader);
 
         frame = hostDoc.createElement('iframe');
@@ -973,12 +1005,6 @@
             frame.contentDocument.documentElement.style.scrollbarWidth = 'none';
           } catch (e) { /* 跨域：只能让它自己滚 */ }
 
-          /* 淡出之后把占位层摘掉：留着就是一整块透明层压在 iframe 上面，
-             不出错也不好看，摘掉更干净 */
-          hostWin.setTimeout(function () {
-            if (loader && loader.parentNode) loader.parentNode.removeChild(loader);
-            loader = null;
-          }, 400);
           try {
             frame.contentWindow.postMessage({
               type: 'annie-theme',
@@ -986,12 +1012,10 @@
             }, '*');
           } catch (e) { /* 主题推不过去也只是颜色不同，不影响内容 */ }
 
-          /* 兜底：联系页万一没回报高度（脚本挂了 / 被拦），也得把面板放出来，
-             否则用户对着遮罩干等 */
-          hostWin.clearTimeout(fallbackTimer);
-          fallbackTimer = hostWin.setTimeout(function () {
-            if (!frameReady) revealPanel();
-          }, 700);
+          /* 兜底：联系页万一没回报高度（脚本挂了 / 被拦），
+             也得把转圈收掉，别让用户对着一个空面板等 */
+          hostWin.clearTimeout(loadFallbackTimer);
+          loadFallbackTimer = hostWin.setTimeout(markLoaded, 900);
         });
         bodyBox.appendChild(frame);
       }
@@ -1006,13 +1030,22 @@
         if (!height || height < 0) return;
         frameHeight = Math.min(height, 1200);
         frame.style.height = frameHeight + 'px';
-        /* 高度可能连报两三次（滚动条消失、字体就位各触发一次）。
-           等它安静 80ms 再让面板入场，入场时尺寸已经是最终值，全程不动。 */
-        if (!frameReady) {
-          hostWin.clearTimeout(settleTimer);
-          settleTimer = hostWin.setTimeout(revealPanel, 80);
-        }
+        markLoaded();
       });
+
+      /* 内容真的到了：转圈淡出，把 iframe 露出来。
+         和「面板入场」分开——入队是点开就播，内容什么时候到是另一回事。 */
+      function markLoaded() {
+        if (modal.classList.contains('is-loaded')) return;
+        hostWin.clearTimeout(loadFallbackTimer);
+        loadFallbackTimer = 0;
+        modal.classList.add('is-loaded');
+        /* 淡出之后把占位层摘掉：留着就是一整块透明层压在 iframe 上面 */
+        hostWin.setTimeout(function () {
+          if (loader && loader.parentNode) loader.parentNode.removeChild(loader);
+          loader = null;
+        }, 400);
+      }
 
       /* 外层切深浅色时只把消息发给文章，浮窗里的联系页收不到，这里转发一次 */
       window.addEventListener('message', function (event) {
@@ -1049,19 +1082,38 @@
         }
       }
 
-      /* 面板入场：只在高度定稿后调用一次。
-         之前是 mountFrame 后立刻显示，用户先看到占位高度的面板，几十毫秒后
-         真实高度回来再改一次高度，垂直居中的面板就整体挪 half(差值)；
-         现在这一步只负责「把已经定稿的面板放出来」。 */
+      /* 面板入场：点开就调用，不再等 iframe 回报高度。
+         以前要等「高度回报 + 80ms 静默」才入场，等的那几百毫秒里屏幕上只有
+         一层遮罩，看起来就是「点了没反应、动画没出来」。现在高度由预热提前
+         量好（或者在这一趟里补上），入场动画从点击那一帧就开始走。 */
       function revealPanel() {
-        if (frameReady || !isOpen) return;
+        if (frameReady) return;
         frameReady = true;
-        hostWin.clearTimeout(settleTimer);
-        hostWin.clearTimeout(fallbackTimer);
-        settleTimer = 0;
-        fallbackTimer = 0;
         modal.classList.add('is-ready');
       }
+
+      /* ---------------- 预热 ----------------
+         点开之前先把联系页装进 iframe：模态框以 is-standby 挂进 DOM
+         （visibility: hidden 仍参与布局，所以 iframe 有真实宽度、能量出高度），
+         内容下载完、高度也报上来了。等用户点开时，动画一帧都不等、尺寸一次
+         都不改，是干净的「整块推上来」。
+         省流模式下跳过——为了一个可能不点的按钮多下 80KB 不划算。 */
+      function prewarm() {
+        if (frame || !hostDoc.body) return;
+        if (navigator.connection && navigator.connection.saveData) return;
+        modal.classList.add('is-standby');
+        modal.hidden = false;
+        mountFrame();
+      }
+
+      (function schedulePrewarm() {
+        /* 用固定延时而不是 requestIdleCallback：后者在后台标签页、省电模式下
+           可能很久都不触发，等到用户点了才预热，等于白做。400ms 足够让本页
+           自己的样式/字体先落地，也不至于和文章正文抢带宽。 */
+        const run = function () { hostWin.setTimeout(prewarm, 400); };
+        if (hostDoc.readyState === 'complete') run();
+        else hostWin.addEventListener('load', run, { once: true });
+      })();
 
       /* 锁滚动：只把 html 设成 overflow: hidden（scrollY 保留、sticky 导航照常），
          body 一点都不动 —— body 一旦 overflow: hidden 就成了滚动容器，sticky
@@ -1111,33 +1163,22 @@
         hostWin.clearTimeout(closeTimer);
         closeTimer = 0;
         mountFrame();
-        modal.classList.remove('is-closing');
+        /* 预热态可能还挂着：撤掉它，面板才可见 */
+        modal.classList.remove('is-closing', 'is-standby');
         modal.hidden = false;
         document.documentElement.classList.add('acd-behind');
         lockScroll();
         closeBtn.focus({ preventScroll: true });
         hostDoc.addEventListener('keydown', onKeydown, true);
-        /* 第二次打开：高度早就量过了，直接入场，不用再等；
-           没有（上次开得太快、还没回报就关了）就重新挂一次兜底，
-           否则 load 已经过去、不会再有第二次机会把面板放出来 */
-        if (frameReady || frameHeight > 0) {
-          revealPanel();
-        } else {
-          hostWin.clearTimeout(fallbackTimer);
-          fallbackTimer = hostWin.setTimeout(function () {
-            if (!frameReady) revealPanel();
-          }, 700);
-        }
+        /* ⚠️ 立即入场，不等任何加载：点击的同一帧就开始上滑，
+           内容没到就先显示转圈，到了再淡入——反馈和动画都不缺 */
+        revealPanel();
       }
 
       function close() {
         if (!isOpen) return;
         isOpen = false;
         hostDoc.removeEventListener('keydown', onKeydown, true);
-        hostWin.clearTimeout(settleTimer);
-        hostWin.clearTimeout(fallbackTimer);
-        settleTimer = 0;
-        fallbackTimer = 0;
         document.documentElement.classList.remove('acd-behind');
         if (frameReady) {
           modal.classList.add('is-closing');
