@@ -478,6 +478,9 @@
     <header class="site-header">
         <!-- 品牌区整块可点，回到首页；比只点文字更容易命中 -->
         <a class="site-branding" id="homeLink" href="#" aria-label="Annie · 返回首页">
+            <!-- 头像刻意走单独通道：不接 image-loading.js、不占高速直链额度，
+                 也不打任何控制台日志。主链接失败就换备用，两个都失败退回透明占位图。
+                 要临时看它加载成没成，自己在这里加一行 log，别接进全站日志体系。 -->
             <img
             class="avatar"
             src="https://1837491863.cdn.123clouddisk.com/1837491863/46000074#"
@@ -486,7 +489,7 @@
             width="38"
             height="38"
             decoding="async"
-            onerror="if(this.dataset.fallbackSrc){this.src=this.dataset.fallbackSrc;delete this.dataset.fallbackSrc;console.info('%c[头像] 主链接加载失败，已切换到备用链接','color:#f08c00;font-weight:600;');}else{this.onerror=null;this.src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';}"
+            onerror="if(this.dataset.fallbackSrc){this.src=this.dataset.fallbackSrc;delete this.dataset.fallbackSrc;}else{this.onerror=null;this.src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';}"
             />
             <span class="site-title-group">
                 <span class="site-title">Annie</span>
@@ -867,12 +870,13 @@
             </section>
 
             <!-- ==================== 标签云 ==================== -->
-            <!-- 取篇数最多的 4 个标签，点一下直接去文章页筛到这个标签。
+            <!-- 只取 2 篇以上的标签，篇数多的排在左边，最多 9 个；而且只占一行，
+                 一行放不下的从末尾隐掉（script.js 的 fitTagCloud）。
                  数据由 js/script.js 的 getTagStats() 算，排序和文章页标签栏一致。 -->
             <section class="tagcloud-section" id="tagCloudSection" aria-labelledby="tagCloudTitle">
                 <div class="tweak-head">
                     <h2 class="tweak-title" id="tagCloudTitle">标签云</h2>
-                    <!-- 标签云只摊开前 4 个，而且点了是「原地筛选」。
+                    <!-- 一排里放得下几个就显示几个，点了是「原地筛选」。
                          想拿一个能分享的标签页，从这里进总览页，
                          每个标签点进去就是 /tags/<标签>/ 那个真页面。 -->
                     <a class="tweak-all" id="tagAll" href="index.html?view=tags">
@@ -1024,7 +1028,7 @@
             </section>
 
             <!-- 版本号：从页脚挪到这里，收在关于页右下角 -->
-            <p class="about-version">版本 0.4.26.078</p>
+            <p class="about-version">版本 0.4.26.083</p>
         </div>
 
         <!-- ==================== 文章详情视图 ==================== -->
@@ -1142,6 +1146,11 @@
                      redirect 值由 script.js 补成绝对地址（web3forms 只认绝对 https）。 -->
                 <form class="feedback-form" id="feedbackForm" action="https://api.web3forms.com/submit" method="POST">
                     <input type="hidden" name="access_key" value="14cc0dde-c616-4604-a802-84686ae0c843">
+                    <!-- 蜜罐（honeypot）：真人看不见，脚本会顺手勾上。web3forms 收到
+                         勾选过的请求直接丢弃。access_key 天生是公开的，前端限流只能
+                         防君子，这一行才是挡批量提交的。别加 tabindex 之外的可用性
+                         改动，也别让它变成 visible —— 被脚本跳过就失效了。 -->
+                    <input type="checkbox" name="botcheck" style="display:none" tabindex="-1" autocomplete="off" aria-hidden="true">
                     <input type="hidden" name="redirect" value="index.html?view=thanks">
                     <input type="hidden" name="subject" value="博客问题反馈">
                     <input type="hidden" name="from_name" value="Annie 的博客">

@@ -2425,6 +2425,10 @@
             display: flex;
             align-items: center;
             gap: 6px;
+            /* 页码最多 5 个槽位（1 … 当前 … N），极窄屏放不下时整组换行，
+               而不是把「下一页」挤出屏幕 */
+            flex-wrap: wrap;
+            justify-content: center;
         }
         .home-pager[hidden] {
             display: none;
@@ -6147,14 +6151,22 @@
         }
         .tag-cloud {
             display: flex;
-            flex-wrap: wrap;
+            /* 只占一行：放不下的由 script.js 的 fitTagCloud() 从末尾隐掉，
+               这里绝不能改回 wrap —— 一换行就变成两排参差的小胶囊 */
+            flex-wrap: nowrap;
             align-items: center;
             gap: 12px;
+            overflow: hidden;
+        }
+        /* hidden 要单独补 display:none：.tag-pill 自己是 inline-flex，
+           会盖掉 [hidden] 的默认 display:none */
+        .tag-cloud .tag-pill[hidden] {
+            display: none;
         }
         .tag-cloud .tag-pill {
             cursor: pointer;
-            /* 四个标签保持同一字号，不再按名次缩放大：大小不一会显得参差，
-               而且标签越多越乱。 */
+            /* 一排里最多 9 个，字号一律相同：按名次把字放大缩小会显得参差，
+               标签一多更乱。大小关系靠「谁排在前面」表达就够了。 */
             font-size: 0.8rem;
         }
         .tl-year + .tl-year {

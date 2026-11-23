@@ -565,6 +565,9 @@
 
       <form class="feedback-form" id="movieForm" action="https://api.web3forms.com/submit" method="POST">
         <input type="hidden" name="access_key" value="14cc0dde-c616-4604-a802-84686ae0c843">
+        <!-- 蜜罐：真人看不见，脚本会顺手勾上，web3forms 见到勾选就直接丢弃。
+             和 index.html 里反馈表单那份是同一个道理，两处要一起保留。 -->
+        <input type="checkbox" name="botcheck" style="display:none" tabindex="-1" autocomplete="off" aria-hidden="true">
         <!-- 提交成功后的跳转由页内脚本自己做（见底部 THANKS_HREF）。
              web3forms 的 redirect 免费版还要求「绝对 https + 同域」，
              线上也出现过静默失效，所以不再放 redirect 隐藏字段。 -->

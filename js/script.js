@@ -36,21 +36,6 @@
                 //],
             };
 
-            // ==================== ★★★ 修改个人信息 ★★★ ====================
-            const siteConfig = {
-                authorName: 'Annie',              // 你的名字
-                subtitle: '思考 · 记录 · 创造',
-                bio: '敏感、真实、讨厌冷暴力与敷衍',
-                location: '辽宁',
-                occupation: '自由撰稿',
-                blogStartYear: '2026',
-                email: 'anniedv106@gmail.com',
-                aboutText: `
-                        <p>我是 Annie，一个用文字整理思绪的人。</p>
-                        <p>这个博客是我记录阅读、成长和日常灵感的地方。相信简单的记录也可以汇聚成光。</p>
-                    `,
-            };
-
             // ==================== DOM 引用 ====================
             const $ = (sel) => document.querySelector(sel);
             const $$ = (sel) => document.querySelectorAll(sel);
@@ -1307,7 +1292,9 @@
                     tagLine: (post.tags || []).map(tag => normalizeText(tag)).join(' '),
                     // 正文只在需要时才算：embeddedPage 是 iframe，
                     // 外站内容读不到，只能靠标题/摘要/标签匹配。
-                    // 搜索匹配的是「读者看到的字」，所以先剥掉 Markdown 记法
+                    // 搜索匹配的是「读者看到的字」，所以先剥掉 Markdown 记法。
+                    // isPublic: false 的文章压根没有 content（生成脚本不下发），
+                    // toPlainText 对空值返回空串，这里不用再判一次。
                     content: normalizeText(MARKDOWN.toPlainText(post.content)),
                     date: String(post.date || ''),
                 };
@@ -1456,9 +1443,13 @@
             // 首页标签行固定展示的筛选项（「最新」「全部」由代码单独处理）
             const HOME_TAGS = ['置顶', '随笔'];
 
-            /* 首页标签云显示几个标签。想多显示几个就改这个数字（比如 6），
-               标签会自动换行，不用管样式。 */
-            const TAG_CLOUD_LIMIT = 4;
+            /* 首页标签云的规则：
+                 · 只列 2 篇以上的标签（和标签总览页 /tags/<标签>/ 的收录门槛一致）
+                 · 按篇数从多到少，左边大、右边小
+                 · 候选最多 9 个，但**必须挤在一行里** —— 真正露出几个由
+                   fitTagCloud() 按可用宽度决定，放不下的从末尾隐掉，不会换行。 */
+            const TAG_CLOUD_LIMIT = 9;
+            const TAG_CLOUD_MIN_POSTS = 2;
 
             function renderTagPills(containerId) {
                 const container = document.getElementById(containerId);
@@ -1951,18 +1942,18 @@
             }
 
             /* 分页控件：只要不止一页就出现（不限「全部」）。
-               页数少时全列出来；多了就留首尾 + 当前页前后，中间用「…」，
-               宽度不会随文章数无限长下去。 */
+               页码区最多 4 个槽位，超出的用「…」省略：
+                 总页数 ≤ 4      全列         1 2 3 4
+                 当前在前 3 页    1 2 3 … N
+                 当前在后 3 页    1 … N-2 N-1 N
+                 当前在中间       1 … 当前 … N
+               后两行是必须的：如果永远只显示「1 2 3 … N」，翻到第 5 页时页码区
+               里没有一页是高亮的，人会不知道自己站在哪。 */
             function buildPagerPages(current, total) {
-                if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-                const pages = [1];
-                const start = Math.max(2, current - 1);
-                const end = Math.min(total - 1, current + 1);
-                if (start > 2) pages.push('gap');
-                for (let page = start; page <= end; page += 1) pages.push(page);
-                if (end < total - 1) pages.push('gap');
-                pages.push(total);
-                return pages;
+                if (total <= 4) return Array.from({ length: total }, (_, i) => i + 1);
+                if (current <= 3) return [1, 2, 3, 'gap', total];
+                if (current >= total - 2) return [1, 'gap', total - 2, total - 1, total];
+                return [1, 'gap', current, 'gap', total];
             }
 
             /* 页码按当前状态重画：上一页 / 下一页走到头就禁用，
@@ -2478,16 +2469,25 @@
                 });
             }
 
-            /* 首页时间线下面的标签云：取篇数最多的 4 个标签。
+            /* 首页时间线下面的标签云：2 篇以上的标签，篇数多的在前，最多 9 个。
                排序直接用 getTagStats()，和文章页标签栏是同一套规则
                （篇数 → 更新时间 → 拼音），两处不会打架。
                点一下等于「去文章页 + 筛到这个标签」，省得自己再找一遍。 */
             function renderTagCloud() {
                 const mount = document.getElementById('tagCloud');
                 if (!mount) return;
+                const section = document.getElementById('tagCloudSection');
 
-                const top = getTagStats().slice(0, TAG_CLOUD_LIMIT);
-                if (!top.length) { mount.innerHTML = ''; return; }
+                const top = getTagStats()
+                    .filter(item => item.count >= TAG_CLOUD_MIN_POSTS)
+                    .slice(0, TAG_CLOUD_LIMIT);
+                if (!top.length) {
+                    mount.innerHTML = '';
+                    // 一个够格的标签都没有时，连标题和「全部标签」一起收起来
+                    if (section) section.hidden = true;
+                    return;
+                }
+                if (section) section.hidden = false;
 
                 mount.innerHTML = top.map(item =>
                     `<button type="button" class="tag-pill" data-cloud-tag="${escapeHtml(item.name)}">${escapeHtml(item.name)}<span class="tag-pill-count">#${item.count}</span></button>`
@@ -2504,6 +2504,36 @@
                         navigateToView('blog');
                         window.scrollTo({ top: 0, behavior: 'instant' });
                     });
+                });
+
+                fitTagCloud();
+            }
+
+            /* 标签云只占一行：按实际宽度决定露出几个。
+               为什么不用 CSS 的 nowrap + overflow 了事：那样右边缘会把胶囊切一半，
+               而且露出几个是浏览器决定的、脚本不知道。
+               做法是把全部候选先显示出来量一遍（hidden 的元素量出来是 0，会误判），
+               再从第一个越界的开始，把它和它后面的全部隐掉。 */
+            function fitTagCloud() {
+                const mount = document.getElementById('tagCloud');
+                if (!mount) return;
+                /* 首页视图还是 display:none 时量出来全是 0，照这么算会把 9 个标签
+                   全隐掉。等 switchView 把它显示出来再算（那里有第二次调用）。 */
+                if (!mount.clientWidth) return;
+                const items = Array.from(mount.querySelectorAll('[data-cloud-tag]'));
+                if (!items.length) return;
+
+                items.forEach(item => { item.hidden = false; });
+                const rightEdge = mount.getBoundingClientRect().right;
+
+                let overflowed = false;
+                items.forEach(item => {
+                    /* 一旦有一个放不下，后面的就不能再靠「量出来还在容器里」来判断：
+                       hidden 会让后面的元素前移，逐个判断会得出「它挤得下」的错觉。 */
+                    if (overflowed || item.getBoundingClientRect().right > rightEdge + 1) {
+                        overflowed = true;
+                        item.hidden = true;
+                    }
                 });
             }
 
@@ -5365,6 +5395,8 @@
                     renderPostsList('postsListHome');
                     // 首页重新显示，尺寸要等到下一帧才准
                     scheduleSearchTriggerFit();
+                    // 首页藏起来时标签云量不出宽度，这里补一次
+                    fitTagCloud();
                 } else if (viewName === 'blog') {
                     viewBlog.style.display = 'block';
                     viewBlog.classList.add('active-view');
@@ -6080,6 +6112,8 @@
                     updateNavPill();
                     // 视口高度变了，正文的「可滚动比例」跟着变
                     syncReadingUi();
+                    // 宽度变了，标签云这一行能露几个也跟着变
+                    fitTagCloud();
                     // 版面重排后目录跳转的目标位置也变了，动画别按旧坐标继续跑
                     cancelTocScroll();
                 });
@@ -6087,7 +6121,11 @@
 
             // 字体加载完成后文字宽度会变，再量一次
             if (document.fonts && document.fonts.ready) {
-                document.fonts.ready.then(updateNavPill).catch(function() {});
+                document.fonts.ready.then(function () {
+                    updateNavPill();
+                    // 字体一换字宽也换，标签云能露几个跟着重算
+                    fitTagCloud();
+                }).catch(function () {});
             }
             updateNavPill();
 
@@ -6491,8 +6529,4 @@
             hideBootLoading();
 
             console.log('✅ Annie 的个人博客已就绪！');
-            // console.log('📝 修改文章内容：编辑 blogPosts 数组');
-            // console.log('👤 修改个人信息：编辑 siteConfig 对象');
-            // console.log('🖼️ 修改头像：替换 .avatar 的 src 属性');
-            // console.log('🔗 修改社交链接：编辑 .social-links 中的 href');
         })();

@@ -13,7 +13,7 @@
        node tools/build-posts.js
        node tools/minify.js
 
-   ⚠️ 三个刻意的决定：
+   ⚠️ 四个刻意的决定：
 
    1. **不重命名任何标识符**（不开 minifyIdentifiers）。
       index.html 里那三处 onclick="copyToClipboard(...)" 靠的是「顶层函数名
@@ -26,6 +26,10 @@
 
    3. **只改 dist/，源码保持可读。** 所以这个脚本必须在 build-site.js
       之后跑 —— 它会复制源码到 dist/，顺序反了压缩就被覆盖掉。
+
+   4. **不动 console。** 线上排查图片链路时，控制台日志是唯一线索，
+      在压缩阶段删掉等于把现场也删了。噪音改由源码自己收敛（浅灰、写清原因、
+      每张图只在选链和结果时各一条），不是靠这一步静默丢弃。
 
    压缩后 dist/ 里的文件不再可读，出问题请对着源码看（也就没必要发布
    sourcemap：生产的报错行号对不上，但本地永远跑的是源码）。
@@ -117,7 +121,7 @@ async function main() {
             const file = path.join(DIST, relPath);
             const source = fs.readFileSync(file, 'utf8');
 
-            const result = await esbuild.transform(source, {
+            const options = {
                 loader: target.loader,
                 // 只删注释、空白，做等价的语法收缩；**不动名字**
                 minifyWhitespace: true,
@@ -128,7 +132,15 @@ async function main() {
                    变成 6 个字符，posts-data.js 反而胖了 10KB。站点本来就是
                    UTF-8（<meta charset> + 服务器 Content-Type 都对），必须显式写 utf8。 */
                 charset: 'utf8',
-            });
+            };
+
+            /* 这里**不要**加 drop/pure 去删 console。
+               曾经试过 pure: ['console.info', …] 把图片加载日志从产物里抹掉，
+               结果线上出问题（图走错链、头像挂了）时没有任何线索，而 2026-11-23
+               的结论是「日志要留，只要别刺眼」—— 所以噪音改在源码里解决：
+               js/image-loading.js 的日志统一浅灰、走慢速时写清「原因：」，
+               后台预加载只在失败时才打。 */
+            const result = await esbuild.transform(source, options);
 
             const output = result.code;
             assertIntact(relPath, output);

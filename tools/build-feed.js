@@ -122,7 +122,11 @@ function loadPosts() {
     if (!Array.isArray(posts) || !posts.length) {
         throw new Error('js/posts-data.js 里没拿到 window.BLOG_POSTS，格式是不是被改过？');
     }
-    return posts;
+    /* 不公开的文章不进 feed。除了「不该推出去」，还有个具体后果：它没有
+       /posts/<id>/ 静态页（tools/build-posts.js 会跳过），留在 feed 里就是一条
+       点开 404 的死链。过滤放在上面那个 length 检查之后 —— 就算哪天所有文章都
+       被设成不公开，报错也仍然是「数据没读到」而不是「文章为空」。 */
+    return posts.filter(function (post) { return post.isPublic !== false; });
 }
 
 /* 排序键：有 updated 就用 updated（和页面上显示、时间线分组保持一致），

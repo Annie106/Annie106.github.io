@@ -10,14 +10,18 @@
     //   · 没配高速直链、或高速直链加载失败 → 立刻回退慢速直链
     //   · 失败不占用当天额度：这次不算"用过"，下次进来还能再试一次高速
     //   · 每次选链、成功、回退都会在控制台打日志（前缀 [图片加载·高速直链] /
-    //     [图片加载·慢速直链] / [图片加载·回退]），方便核对到底走了哪条
+    //     [图片加载·慢速直链] / [图片加载·回退]），方便核对到底走了哪条。
+    //     日志统一浅灰、不加粗：这是调试信息，不该看着像报错。
+    //     走慢速时一律以「原因：」开头，好区分是没配高速直链、今天额度用完，
+    //     还是同一张图正在加载（详见 chooseSource）。
     // 记录以「本地日期 + 图片地址」为粒度，存在 localStorage：
     //   { "date": "2026-11-14", "images": ["<data-fast-src 的值>", ...] }
     // 过一天自动作废（date 不匹配即视为新的一天），不会无限增长。
     // localStorage 不可用（隐私模式等）时依次退回 sessionStorage、内存。
     // ==================================================================
     // 不在本策略里的图片（不占额度、也不打日志）：
-    //   · 头像 .avatar（首页/文章作者头像，走的是媒体 CDN，跟高速直链无关）
+    //   · 头像 .avatar（首页/文章作者头像，走的是媒体 CDN，跟高速直链无关；
+    //     它有自己的内联 onerror 兜底，也不打日志）
     //   · 音乐播放器区域（音频是 <audio>，本来就不会进这里；封面图同样放过）
     //   · 任何显式标了 data-image-loading="off" / data-fast-quota="off" 的区域
     var EXCLUDED_SELECTOR = '.avatar, .music-player-card, ' +
@@ -30,29 +34,29 @@
     var fastInFlight = Object.create(null); // 本页正在请求高速的图片，避免同一张图重复消耗额度
     var storageName = 'localStorage';
 
-    var STYLE_FAST = 'color:#37b24d;font-weight:600;';
-    var STYLE_SLOW = 'color:#f08c00;font-weight:600;';
-    var STYLE_FALLBACK = 'color:#e03131;font-weight:600;';
-    var STYLE_INFO = 'color:#8a8a8a;';
+    /* 日志一律浅灰。这些是「这张图最后走了哪条链、为什么」的调试信息，不是警告：
+       彩色 + 加粗会让打开控制台的人以为网站出错了。
+       状态靠前缀区分（高速直链 / 慢速直链 / 回退 / 失败），不靠颜色。 */
+    var STYLE_LOG = 'color:#8a8a8a;';
 
     function logFast(message, url) {
-        console.info('%c[图片加载·高速直链] ' + message, STYLE_FAST, url || '');
+        console.info('%c[图片加载·高速直链] ' + message, STYLE_LOG, url || '');
     }
 
     function logSlow(message, url) {
-        console.info('%c[图片加载·慢速直链] ' + message, STYLE_SLOW, url || '');
+        console.info('%c[图片加载·慢速直链] ' + message, STYLE_LOG, url || '');
     }
 
     function logFallback(message, url) {
-        console.warn('%c[图片加载·回退] ' + message, STYLE_FALLBACK, url || '');
+        console.info('%c[图片加载·回退] ' + message, STYLE_LOG, url || '');
     }
 
     function logFail(message, url) {
-        console.warn('%c[图片加载·失败] ' + message, STYLE_FALLBACK, url || '');
+        console.info('%c[图片加载·失败] ' + message, STYLE_LOG, url || '');
     }
 
     function logInfo(message, url) {
-        console.info('%c[图片加载] ' + message, STYLE_INFO, url || '');
+        console.info('%c[图片加载] ' + message, STYLE_LOG, url || '');
     }
 
     function pad2(value) {
@@ -92,7 +96,7 @@
             return session || empty;
         } catch (sessionError) {
             storageName = 'memory';
-            console.warn('[图片加载] 无法读取高速直链使用记录，当天额度只在当前页面内生效。');
+            logInfo('无法读取高速直链使用记录（隐私模式？），当天额度只在当前页面内生效');
             return empty;
         }
     }
@@ -112,7 +116,7 @@
             return;
         } catch (sessionError) {
             storageName = 'memory';
-            console.warn('[图片加载] 无法持久化高速直链使用记录，当天额度只在当前标签页内生效。');
+            logInfo('无法保存高速直链使用记录，当天额度只在当前标签页内生效');
         }
     }
 
@@ -131,21 +135,25 @@
         persistFastDaily(state);
     }
 
-    // 每张图（以 data-fast-src 的地址区分）决定这次走哪条链接
+    /* 每张图（以 data-fast-src 的地址区分）决定这次走哪条链接。
+       三条「走慢速」的原因要一眼分得开，所以统一以「原因：」开头：
+         1. 未配置高速直链
+         2. 今天这张图的额度已经用完
+         3. 同一张图的高速直链还在加载中（少见，防重复消耗额度） */
     function chooseSource(fastSrc, slowSrc) {
         if (!fastSrc) {
-            logSlow('未配置高速直链，使用慢速直链', slowSrc);
+            logSlow('原因：没有配置高速直链（缺 data-fast-src）', slowSrc);
             return { src: slowSrc, fast: false };
         }
         if (hasUsedFastToday(fastSrc)) {
-            logSlow('今日这张图的高速直链额度已用完，改用慢速直链', slowSrc);
+            logSlow('原因：今天这张图的高速额度已用完', slowSrc);
             return { src: slowSrc, fast: false };
         }
         if (fastInFlight[fastSrc]) {
-            logSlow('同一张图的高速直链正在加载中，本次改用慢速直链', slowSrc);
+            logSlow('原因：同一张图的高速直链正在加载中', slowSrc);
             return { src: slowSrc, fast: false };
         }
-        logFast('今日首次加载，优先使用高速直链（记录存储：' + storageName + '）', fastSrc);
+        logFast('原因：今天首次加载，优先走高速直链（记录存储：' + storageName + '）', fastSrc);
         return { src: fastSrc, fast: true };
     }
 
@@ -180,11 +188,10 @@
         var preview = doc.createElement('img');
         preview.decoding = 'async';
         if ('fetchPriority' in preview) preview.fetchPriority = 'low';
-        preview.addEventListener('load', function () {
-            logSlow('大图已在后台预加载完成', slowSrc);
-        }, { once: true });
+        /* 预加载成功不打日志：每张图都来一条会把「选链原因」淹掉。
+           失败要打 —— 那说明慢速直链也不可用，值得知道。 */
         preview.addEventListener('error', function () {
-            logSlow('大图后台预加载失败', slowSrc);
+            logInfo('大图后台预加载失败（慢速直链）', slowSrc);
         }, { once: true });
         slowPreviewImages.set(img, preview);
         preview.src = slowSrc;
@@ -243,7 +250,7 @@
             if (fastSrc) img.setAttribute('data-slow-src', slowSrc);
         }
         if (!slowSrc && fastSrc) {
-            console.warn('[图片加载] 配置了高速直链但缺少 data-slow-src，已跳过该图片。', fastSrc);
+            logFail('配置不完整：有 data-fast-src 但没有 data-slow-src，已跳过这张图', fastSrc);
             return;
         }
         if (!slowSrc) return;
@@ -264,9 +271,9 @@
                 return;
             }
             if (img.getAttribute('data-fast-active') === 'true') {
-                logFast('加载成功', url);
+                logFast('高速直链加载成功', url);
             } else {
-                logSlow('加载成功', url);
+                logSlow('慢速直链加载成功', url);
             }
         }
 

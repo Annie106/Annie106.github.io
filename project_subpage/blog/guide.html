@@ -1123,7 +1123,7 @@
     loading="lazy"
 /&gt;</code></pre>
                 <p>改 <code>src</code> 引号里的东西就行。填网络图片的网址（要 <code>https://</code> 开头），或者把图片放进博客文件夹再填相对路径，比如 <code>images/avatar.jpg</code>。第二种更稳，网络图片哪天挂了就显示不出来。</p>
-                <p><code>data-fallback-src</code> 是备用链接：主链接加载失败时头像会自动换成它，两个都失败才退回一块透明的占位图，不会出现裂图。不想配备用就直接删掉这一行。切换发生时浏览器控制台会打一条 <code>[头像]</code> 日志。</p>
+                <p><code>data-fallback-src</code> 是备用链接：主链接加载失败时头像会自动换成它，两个都失败才退回一块透明的占位图，不会出现裂图。不想配备用就直接删掉这一行。换链是静默的，不会在控制台留日志——头像走单独通道，不参与图片加载那套日志和额度策略。</p>
                 <p>图片建议用正方形，边长 200 到 500 像素就够，太大只会让网页变慢。</p>
 
                 <!-- 6.2 图标 -->
@@ -1264,7 +1264,7 @@ pinned: false
                     <li><code>embeddedPage</code>：填相对路径如 <code>project_subpage/projects/xxx/index.html</code>（front matter 里是纯文本，不写引号），这篇文章会把那个网页嵌进来显示；内嵌页的坑见 6.8</li>
                     <li><code>externalPage</code>：填路径，点文章直接跳过去。跟上面那个二选一</li>
                 </ul>
-                <p>文章正文和通过博客打开的同源内嵌页面里的图片，都会自动使用模糊占位和加载完成后的清晰化动画。普通图片写 <code>&lt;img src="..." alt="..." width="..." height="..." loading="lazy"&gt;</code> 即可；建议填写图片实际宽高，减少加载时的页面跳动。需要高速链接时，同时写 <code>data-fast-src</code>（高速直链）和 <code>data-slow-src</code>（慢速直链/大图预览）：默认优先走高速，但<strong>每张图每天只用 1 次高速</strong>，用过之后当天都走慢速；没配高速、或高速加载失败会立刻回退慢速（失败不占当天额度）。到底走了哪条链接，可以在浏览器控制台看到 <code>[图片加载·高速直链]</code> / <code>[图片加载·慢速直链]</code> 的彩色日志；头像和背景音乐用的 CDN 不参与这套策略。想要贴合图片的占位效果，可再加 <code>data-tone="#8c806b"</code> 和小尺寸图片的 <code>data-lqip="data:image/jpeg;base64,..."</code>。</p>
+                <p>文章正文和通过博客打开的同源内嵌页面里的图片，都会自动使用模糊占位和加载完成后的清晰化动画。普通图片写 <code>&lt;img src="..." alt="..." width="..." height="..." loading="lazy"&gt;</code> 即可；建议填写图片实际宽高，减少加载时的页面跳动。需要高速链接时，同时写 <code>data-fast-src</code>（高速直链）和 <code>data-slow-src</code>（慢速直链/大图预览）：默认优先走高速，但<strong>每张图每天只用 1 次高速</strong>，用过之后当天都走慢速；没配高速、或高速加载失败会立刻回退慢速（失败不占当天额度）。到底走了哪条链接，可以在浏览器控制台看到 <code>[图片加载·高速直链]</code> / <code>[图片加载·慢速直链]</code> 的浅灰日志（走慢速时会写明「原因：」）；头像和背景音乐用的 CDN 不参与这套策略，也不打日志。想要贴合图片的占位效果，可再加 <code>data-tone="#8c806b"</code> 和小尺寸图片的 <code>data-lqip="data:image/jpeg;base64,..."</code>。</p>
 
                 <p>加新文章不必从头写：复制一个现成的 <code>.md</code> 文件改名，把 <code>id</code> 改成一个没被占用的数字，再换标题、日期、摘要和正文即可。文件名随意，但 <code>id</code> 不能重复。</p>
                 <div class="guide-warning">
@@ -1534,34 +1534,29 @@ pinned: false
                 <div class="guide-warning">
                     <div class="guide-warning-title">
                         <i class="ri-error-warning-line"></i>
-                        别在 script.js 里改关于页
+                        别在 script.js 里找个人资料
                     </div>
-                    <p><code>js/script.js</code> 里保留了一份名为 <code>siteConfig</code> 的旧配置，但当前页面没有读取它，在那里改个人资料不会有任何变化。详见 6.14 节。</p>
+                    <p>名字、简介、关于文案都不在 <code>js/script.js</code> 里（那里曾经有一个叫 <code>siteConfig</code> 的配置对象，已经删掉了）。放在那里改了不会有任何变化，详见 6.14 节。</p>
                 </div>
 
                 <!-- 6.14 坑 -->
                 <h3 class="guide-subtitle">
                     <i class="ri-alert-line"></i>
-                    6.14 有个地方改了没用
+                    6.14 个人资料散在好几处
                 </h3>
-                <p>在 <code>js/script.js</code> 里搜索 <code>siteConfig</code>，会看到一段尚未接入页面的旧配置：</p>
-                <pre><code>const siteConfig = {
-    authorName: '...',
-    subtitle: '...',
-    bio: '...',
-    location: '...',
-    occupation: '...',
-    blogStartYear: '...',
-    email: '...',
-    aboutText: `...`,
-};</code></pre>
+                <p>同一句介绍在页面上出现好几次，改的时候要一处一处改。这些都在 <code>index.html</code> 里，按顺序搜一遍：</p>
+                <pre><code>1. &lt;meta name="description"&gt;        浏览器标签、分享卡片的描述
+2. .site-subtitle                  页头名字下面那行
+3. .hero-bio / .hero-description   首页大标题下面的介绍
+4. #view-about                     关于页（整块文案）
+5. &lt;footer&gt;                        页脚</code></pre>
 
                 <div class="guide-warning">
                     <div class="guide-warning-title">
                         <i class="ri-error-warning-line"></i>
-                        改这里不会有任何变化
+                        改一处不会自动同步
                     </div>
-                    <p>这份配置目前<strong>没有被页面读取</strong>，改它不会改变网站显示。名字、简介等首页信息请在 <code>index.html</code> 修改（看 6.5 节）；关于页面也在 <code>index.html</code> 中（看 6.13 节）。</p>
+                    <p>这几处各写各的，没有一个共同的配置来源。改了页头、忘了首页 hero，网站上就会出现两种说法。关于页的完整文案见 6.13 节。</p>
                 </div>
 
                 <!-- 6.15 配色 -->

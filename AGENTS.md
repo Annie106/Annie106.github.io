@@ -73,13 +73,14 @@
 - **正文和元信息在 `posts/*.md`**（每篇一个文件，`---` 里是元信息）。`js/posts-data.js` 是 `tools/build-posts-data.js` 生成的，**不要手改**；改完文章跑一次生成，`npm run build` 已经包含这一步。
 - 正文是 Markdown，渲染器是 `js/markdown.js`，**浏览器和构建脚本共用这一份**（构建时静态页也用它渲染）；动手改语法支持时两边会同时变，这是有意的。
 - `js/tweaks-data.js`：可增删条目，**不要改字段名**（`script.js` 依赖）。
-- `feed.xml` 是生成物，不手改；冲突就重跑 `node tools/build-feed.js` 覆盖。加文章只动 `posts-data.js`。输出必须幂等（`lastBuildDate` 取最新文章日期，别改回 `new Date()`）。
+- `feed.xml` 是生成物，不手改；冲突就重跑 `node tools/build-feed.js` 覆盖。加文章只动 `posts/*.md`。输出必须幂等（`lastBuildDate` 取最新文章日期，别改回 `new Date()`）。
+- `isPublic: false` 是「不展示」不是「保密」：`build-posts-data.js` 不下发 `content`、`build-feed.js` 不进 feed、`build-posts.js` 不出静态页，前端 `isArticlePublic()` 再挡列表 / 搜索 / 翻页。仓库是公开的，`posts/*.md` 原文照样能读到。
 - 文章页由 `build-posts.js` 从 `dist/index.html` 改出来：`index.html` 改了不用跟，但 `MARK_*` 锚点常量改了必须同步（对不上会构建失败）。模板读入先统一成 LF。
 
 ## 各模块一句话
 
 - **首页列表**：切筛选 / 翻页走 `swapPostsList()`，别直接 `innerHTML`；卡片高度保持自然（不固定、不等比化）。
-- **图片**：`data-fast-src` / `data-slow-src` 双直链，每张图每天 1 次高速额度。头像走内联 `onerror`，**别接进** `image-loading.js`。
+- **图片**：`data-fast-src` / `data-slow-src` 双直链，每张图每天 1 次高速额度。头像走**单独通道**（内联 `onerror`）：**别接进** `image-loading.js`，也不打任何控制台日志。
 - **背景音乐**：进站绝不出声，只有播放按钮（和 `BackgroundMusic.play()`）能起播。**别再挂「首次交互即播放」的 document 监听**——访客随便点一下列表、按个方向键就响起来，用户明确否掉过一次。`preload = 'none'`，第一次真要播才设 `src`（`ensureAudioSrc()`），别在 init 里赋 src。
 - **评论**：giscus，term 是「文章 N：标题」。文章页和 `?view=comments` 两处配置要一起改。配色用 `css/giscus-annie-light.css` / `-dark.css`（官方原样，只换输入框聚焦框 —— 新版那条框是 `box-shadow: 0 0 0 2px` 画的，**border-color 和 box-shadow 都要写**）。⚠️ **绝不能把 CSS 的 URL 交给 giscus**：它站在公网 origin，取 localhost 的 CSS 会被 Chrome 的本地网络访问检查拒掉，主题变量一缺编辑器就塌成一片空白。`syncGiscusTheme()` 是同源 fetch 后转 `data:text/css;base64` 塞进去；切主题由 `theme.js` 发 `annie:themechange` 事件，别在 theme.js 里自己算地址。
 - **外链确认**：`<a data-confirm-leave="GitHub">` 的弹窗在 `js/leave-confirm.js`，全站一份（`index.html` + 各独立页各自引一行）。**别搬回 `script.js`**：不引 script.js 的页面（guide.html 等）拿不到它，属性静默失效。弹窗建在最顶层同源文档里，内嵌页面（guide.html）也不会跑位。

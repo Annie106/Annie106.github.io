@@ -127,7 +127,7 @@ archive/                    留档的旧文件，不进产物（构建白名单�
 
 | 想改什么 | 改哪里 |
 | --- | --- |
-| 姓名、简介、头像、联系方式、关于页 | `index.html` 与 `js/script.js` 的 `siteConfig` |
+| 姓名、简介、头像、联系方式、关于页 | `index.html`（页头、hero、`#view-about`、页脚各一处，没有统一配置） |
 | 写新文章 | 双击根目录 `open-md.bat`，或 `node tools/new-post.js "标题" --tags 随笔` |
 | 改完要重新构建 | 双击 `重新构建.bat`（约 2 秒）；想边改边看就选里面的「持续监听」 |
 | 文章 | `posts/*.md`（正文和元信息都在这里，改完跑 `npm run build`） |

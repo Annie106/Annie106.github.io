@@ -135,7 +135,13 @@ function render(posts) {
         }
         if (post.cover) lines.push('    cover: ' + quote(post.cover) + ',');
         if (post.embeddedPage) lines.push('    embeddedPage: ' + quote(post.embeddedPage) + ',');
-        if (post.content) {
+        /* 不公开的文章**连正文都不下发**。
+           只写 isPublic: false 标记是不够的：这个文件会原样发给浏览器，谁打开
+           DevTools 都能读到「不公开」的内容。站内的 isArticlePublic() 拦的只是
+           「渲染不渲染」，拦不住「数据在不在」。摘录照旧保留 —— 列表、搜索、
+           feed 都靠它，而且它本来就是给外面看的。
+           对应的另一处出口是 tools/build-feed.js（RSS 里也不能有这篇）。 */
+        if (post.content && post.isPublic !== false) {
             /* 正文**不能缩进**：Markdown 里 4 个空格开头就是代码块，
                为了文件好看去缩排会让所有标题和列表失效。所以正文一律顶格写，
                只有首尾的反引号单独占一行。 */
@@ -155,7 +161,10 @@ function render(posts) {
                    排序、时间线、归档分组也按它算。
      cover         文章封面，只给 RSS 的缩略图用，页面上不显示。
      pinned        置顶（只影响展示，不改变「哪篇更早写」）
-     isPublic: false  关闭这篇的正文
+     isPublic: false  不公开：正文不下发（这个文件里没有 content）、不进 feed、
+                   不生成 /posts/<id>/ 静态页、站内列表和搜索也看不到。
+                   注意它只是「不展示」，不是「保密」—— posts/*.md 和 git 历史里
+                   原文都在，真敏感的内容别写进仓库。
      embeddedPage  正文是独立 HTML 页面（这时没有 content）
    ======================================================== */
 
