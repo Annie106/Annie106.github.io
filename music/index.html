@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Annie · 音乐库</title>
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+
+    <!-- 在样式表之前定主题，避免深色模式下先闪一下白底 -->
+    <script>
+        (function () {
+            try {
+                if (new URLSearchParams(window.location.search).get('embed') === '1') {
+                    document.documentElement.classList.add('is-modal');
+                }
+                var theme = localStorage.getItem('annie-theme');
+                if (theme !== 'light' && theme !== 'dark') {
+                    theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                }
+                document.documentElement.setAttribute('data-theme', theme);
+            } catch (e) {}
+        })();
+    </script>
+
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="music.css">
+</head>
+<body>
+    <!-- ==================== 头部导航 ====================
+         和首页同一个头，只是把 SPA 的 href="#" 换成真实地址。
+         音乐页是首页下的模块页，沿用站内「子页面映射到首页」的做法。 -->
+    <header class="site-header">
+        <a class="site-branding" href="../index.html" aria-label="Annie · 返回首页">
+            <img
+                class="avatar"
+                src="https://1837491863.cdn.123clouddisk.com/1837491863/46000074#"
+                data-fallback-src="https://picgocloud.com/m/844ab16d-c3d5-4add-8e1c-c54b4259c57b.jpg"
+                alt="Annie 的头像"
+                width="38"
+                height="38"
+                decoding="async"
+                onerror="if(this.dataset.fallbackSrc){this.src=this.dataset.fallbackSrc;delete this.dataset.fallbackSrc;}else{this.onerror=null;this.src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';}"
+            />
+            <span class="site-title-group">
+                <span class="site-title">Annie</span>
+                <span class="site-subtitle">思考 · 记录 · 创造</span>
+            </span>
+        </a>
+        <nav class="site-nav" aria-label="主导航">
+            <ul class="nav-links">
+                <li><a href="../index.html" class="active" aria-current="page">首页</a></li>
+                <li><a href="../index.html?view=blog">文章</a></li>
+                <li><a href="../index.html?view=archive">归档</a></li>
+                <li><a href="../index.html?view=movie">电影</a></li>
+                <li><a href="../index.html?view=about">关于</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <div class="main-container">
+        <section class="music-page" aria-labelledby="musicPageTitle">
+            <header class="tweaks-hero">
+                <p class="tweaks-eyebrow">// MUSIC</p>
+                <h1 class="tweaks-title" id="musicPageTitle">音乐库</h1>
+                <p class="tweaks-lead">把常听的歌放在一页里，慢慢听。列表和首页卡片共用同一份曲目配置。</p>
+            </header>
+
+            <!-- 播放器本体：独立页面和弹窗共用这一份 HTML。
+                 ?embed=1 时 CSS 会隐藏站点头部/标题/页脚，只留播放器给弹窗。
+                 曲目数据在 ../js/music-tracks.js，加歌只改那一个文件。 -->
+            <div id="musicLibrary">
+                <div class="mlib-panel" role="region" aria-label="音乐播放器">
+                    <section class="mlib-now">
+                        <p class="mlib-kicker">NOW PLAYING</p>
+                        <h2 class="mlib-heading">正在播放</h2>
+
+                        <div class="mlib-art" data-mlib-art>
+                            <div class="mlib-art-cover" aria-hidden="true"></div>
+                            <div class="mlib-art-disc" aria-hidden="true">
+                                <span class="mlib-note">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M9 18V5l12-2v13"></path>
+                                        <circle cx="6" cy="18" r="3"></circle>
+                                        <circle cx="18" cy="16" r="3"></circle>
+                                    </svg>
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="mlib-meta">
+                            <h3 class="mlib-track-title" data-mlib-title aria-live="polite">暂无曲目</h3>
+                            <p class="mlib-track-artist" data-mlib-artist></p>
+                        </div>
+
+                        <div class="mlib-progress">
+                            <input class="mlib-range mlib-range-progress" type="range" min="0" max="1000" step="1" value="0"
+                                   aria-label="播放进度" data-mlib-progress>
+                            <div class="mlib-times">
+                                <span data-mlib-current>00:00</span>
+                                <span data-mlib-duration>00:00</span>
+                            </div>
+                        </div>
+
+                        <div class="mlib-controls">
+                            <button class="mlib-ctrl mlib-mode" type="button" data-mlib-shuffle
+                                    aria-label="随机播放" aria-pressed="false" title="随机播放">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M16 3h5v5"></path>
+                                    <path d="M4 20 21 3"></path>
+                                    <path d="M21 16v5h-5"></path>
+                                    <path d="M15 15l6 6"></path>
+                                    <path d="M4 4l5 5"></path>
+                                </svg>
+                            </button>
+                            <button class="mlib-ctrl" type="button" data-mlib-prev aria-label="上一首" title="上一首">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M19 6.5v11L10 12z" fill="currentColor" stroke="none"></path>
+                                    <path d="M6 5v14"></path>
+                                </svg>
+                            </button>
+                            <button class="mlib-play" type="button" data-mlib-play aria-label="播放" title="播放 / 暂停">
+                                <span class="mlib-play-icon">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M8 5.5v13l11-6.5z" fill="currentColor" stroke="none"></path>
+                                    </svg>
+                                </span>
+                                <span class="mlib-pause-icon">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <rect x="7" y="5" width="3.6" height="14" rx="1.2" fill="currentColor" stroke="none"></rect>
+                                        <rect x="13.4" y="5" width="3.6" height="14" rx="1.2" fill="currentColor" stroke="none"></rect>
+                                    </svg>
+                                </span>
+                            </button>
+                            <button class="mlib-ctrl" type="button" data-mlib-next aria-label="下一首" title="下一首">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M5 6.5v11L14 12z" fill="currentColor" stroke="none"></path>
+                                    <path d="M18 5v14"></path>
+                                </svg>
+                            </button>
+                            <button class="mlib-ctrl mlib-mode mlib-repeat" type="button" data-mlib-repeat data-mode="all"
+                                    aria-label="播放模式：列表循环" title="列表循环">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="m17 2 4 4-4 4"></path>
+                                    <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+                                    <path d="m7 22-4-4 4-4"></path>
+                                    <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+                                </svg>
+                                <b class="mlib-repeat-one" aria-hidden="true">1</b>
+                            </button>
+                        </div>
+
+                        <div class="mlib-volume">
+                            <button class="mlib-volume-btn" type="button" data-mlib-mute aria-label="静音" title="静音">
+                                <span class="mlib-volume-on">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M11 5 6 9H2v6h4l5 4z"></path>
+                                        <path d="M15.5 8.5a5 5 0 0 1 0 7"></path>
+                                        <path d="M19 5a10 10 0 0 1 0 14"></path>
+                                    </svg>
+                                </span>
+                                <span class="mlib-volume-off">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M11 5 6 9H2v6h4l5 4z"></path>
+                                        <path d="M22 9l-6 6"></path>
+                                        <path d="M16 9l6 6"></path>
+                                    </svg>
+                                </span>
+                            </button>
+                            <input class="mlib-range mlib-range-volume" type="range" min="0" max="100" step="1" value="30"
+                                   aria-label="音量" data-mlib-volume>
+                            <span class="mlib-volume-label" data-mlib-volume-label>30%</span>
+                        </div>
+                    </section>
+
+                    <section class="mlib-list-wrap">
+                        <header class="mlib-list-head">
+                            <h3>播放列表</h3>
+                            <span data-mlib-count></span>
+                        </header>
+                        <ol class="mlib-list" data-mlib-list></ol>
+                    </section>
+                </div>
+            </div>
+        </section>
+
+        <footer class="site-footer">
+            <p>© 2026 <a href="../index.html?view=about">Annie</a> · 由 <a href="../index.html?view=about">RH 工作室</a> 维护 · 保留所有权利</p>
+        </footer>
+    </div>
+
+    <script src="../js/touch-hover.js"></script>
+    <!-- 独立访问时 music.js 会动态加载 ../js/music-tracks.js 和
+         ../js/background-music.js；?embed=1 时装在弹窗 iframe 里，
+         直接用父页面的引擎，不能在这里静态引第二份。 -->
+    <script src="music.js"></script>
+</body>
+</html>

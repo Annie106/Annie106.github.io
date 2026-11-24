@@ -6456,11 +6456,14 @@
                     history.replaceState(history.state, '', clean.pathname + clean.search);
                 }
 
-                // 关于 / 归档 / 折腾 / 反馈 / 提交成功 / 评论 也可以通过 ?view=xxx 直接打开，
-                // 不受本地界面记忆影响。
+                // 关于 / 归档 / 折腾 / 文章 / 电影 / 反馈 / 提交成功 / 评论 也可以通过
+                // ?view=xxx 直接打开，不受本地界面记忆影响。
+                // 文章/电影原本只靠导航 JS 切，独立页（如 /music/）的头部需要真实
+                // 链接，所以这里一并接进来；切过去之后地址栏仍按 syncUrlWithView 的
+                // 规则收回站点根，和站内导航的行为一致。
                 const urlView = new URL(window.location.href).searchParams.get(VIEW_PARAM);
                 if (urlView === 'about' || urlView === 'archive' || urlView === 'tweaks'
-                    || urlView === 'tags'
+                    || urlView === 'tags' || urlView === 'blog' || urlView === 'movie'
                     || urlView === 'feedback' || urlView === 'thanks' || urlView === 'comments') {
                     // 反馈 / 评论的文章信息跟着地址栏走，直接打开也能带上
                     if (urlView === 'feedback') applyFeedbackContext(readFeedbackContextFromUrl());

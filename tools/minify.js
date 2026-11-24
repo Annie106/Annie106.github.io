@@ -51,6 +51,9 @@ const TARGETS = [
     { dir: 'js', ext: '.js', loader: 'js' },
     { dir: 'css', ext: '.css', loader: 'css' },
     { dir: 'fonts', ext: '.css', loader: 'css' },
+    // 音乐库是独立目录，也一起压（页面 HTML 不压）
+    { dir: 'music', ext: '.js', loader: 'js' },
+    { dir: 'music', ext: '.css', loader: 'css' },
 ];
 
 /* 压缩后必须仍然存在的字符串 —— 每一条都对应一个「被重命名就会静默坏掉」的地方。
@@ -62,6 +65,11 @@ const ASSERTIONS = {
     'js/image-loading.js': ['window.AnnieImageLoading'],
     'js/leave-confirm.js': ['window.LeaveConfirm'],
     'js/background-music.js': ['window.BackgroundMusic'],
+    'js/music-tracks.js': ['window.MUSIC_TRACKS'],
+    'music/music.js': ['window.BackgroundMusic'],
+    'music/music.css': ['#musicLibrary'],
+    'music/modal.js': ['window.MusicModal'],
+    'music/modal.css': ['music-modal', 'musicSheetIn'],
     'js/script.js': ['function openArticle', 'function switchView'],
     'css/style.css': ['.article-content', '@import'],
 };

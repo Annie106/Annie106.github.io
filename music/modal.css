@@ -1,0 +1,306 @@
+/* ==================== 音乐库弹窗 ====================
+ *
+ * 外壳在 index.html，播放器仍是 music/index.html（iframe + ?embed=1）。
+ * 动画节奏照 404.html 的「获取联系」：
+ *   桌面：0.24s 遮罩淡入 + 0.34s 上浮 16px / scale .982
+ *   关闭：0.2s 下坠 10px / scale .99，220ms 后 hidden
+ *   手机：0.46s 从底部整块浮起，收起 0.22s
+ * 配色全部走 style.css 的黑色/灰色变量，不再有琥珀色。
+ * ================================================== */
+
+.music-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.music-modal[hidden] {
+    display: none;
+}
+
+.music-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(24, 24, 22, 0.44);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+    animation: musicFade 0.24s ease both;
+}
+
+html[data-theme="dark"] .music-modal-backdrop {
+    background: rgba(0, 0, 0, 0.62);
+}
+
+.music-modal-panel {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: min(880px, 100%);
+    max-height: min(780px, 100%);
+    overflow: hidden;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 18px;
+    box-shadow: 0 32px 80px rgba(0, 0, 0, 0.26);
+    outline: none;
+    animation: musicRise 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+html[data-theme="dark"] .music-modal-panel {
+    box-shadow: 0 32px 80px rgba(0, 0, 0, 0.55);
+}
+
+.music-modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex: none;
+    padding: 13px 14px 13px 22px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.music-modal-head h2 {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+}
+
+.music-modal-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.18s ease;
+}
+
+.music-modal-close svg {
+    width: 15px;
+    height: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .music-modal-close:hover {
+        background: rgba(0, 0, 0, 0.06);
+        color: var(--color-text-primary);
+    }
+
+    html[data-theme="dark"] .music-modal-close:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+}
+
+.music-modal-close:active {
+    transform: scale(0.94);
+}
+
+.music-modal-close:focus-visible {
+    outline: 2px solid var(--color-text-primary);
+    outline-offset: 2px;
+}
+
+.music-modal-body {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    /* 播放器页面会把真实高度报上来；只有内容高过面板上限时才由这层滚动，
+       避免「弹窗外层滚一点、iframe 里再滚一点」的双滚动条 */
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: var(--color-bg);
+}
+
+.music-modal-frame {
+    display: block;
+    width: 100%;
+    height: 600px;
+    border: 0;
+    background: transparent;
+    opacity: 0;
+    transition: opacity 0.2s ease, height 0.2s ease;
+}
+
+.music-modal-frame.is-ready {
+    opacity: 1;
+}
+
+/* ---------- 加载骨架 ---------- */
+.music-modal-loading {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 28px 30px;
+    background: var(--color-bg);
+    overflow: hidden;
+}
+
+.music-modal-loading[hidden] {
+    display: none;
+}
+
+.music-modal-loading::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.7) 50%, transparent 100%);
+    transform: translateX(-100%);
+    animation: musicSkeletonSweep 1.4s ease-in-out infinite;
+    pointer-events: none;
+}
+
+html[data-theme="dark"] .music-modal-loading::after {
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.07) 50%, transparent 100%);
+}
+
+.music-modal-sk-cover {
+    width: min(210px, 62%);
+    aspect-ratio: 1;
+    margin: 10px auto 4px;
+    border-radius: 18px;
+    background: var(--color-surface);
+}
+
+.music-modal-sk-line {
+    width: min(360px, 70%);
+    height: 12px;
+    margin: 0 auto;
+    border-radius: 999px;
+    background: var(--color-surface);
+}
+
+.music-modal-sk-line.is-short {
+    width: min(220px, 48%);
+}
+
+/* ---------- 关闭 ---------- */
+.music-modal.is-closing .music-modal-backdrop {
+    animation: musicFadeOut 0.2s ease both;
+}
+
+.music-modal.is-closing .music-modal-panel {
+    animation: musicFall 0.2s ease both;
+}
+
+@keyframes musicFade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes musicFadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+@keyframes musicRise {
+    from { opacity: 0; transform: translateY(16px) scale(0.982); }
+    to { opacity: 1; transform: none; }
+}
+
+@keyframes musicFall {
+    from { opacity: 1; transform: none; }
+    to { opacity: 0; transform: translateY(10px) scale(0.99); }
+}
+
+/* 手机：从底部整块浮起（和「获取联系」一致） */
+@keyframes musicSheetIn {
+    from { transform: translateY(100%); }
+    to { transform: none; }
+}
+
+@keyframes musicSheetOut {
+    from { transform: none; }
+    to { transform: translateY(100%); }
+}
+
+@keyframes musicSkeletonSweep {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(100%); }
+}
+
+/* 弹窗打开时锁住背景滚动，并补掉滚动条消失带来的宽度差 */
+html.music-modal-open,
+html.music-modal-open body {
+    overflow: hidden;
+    overscroll-behavior: none;
+}
+
+html.music-modal-open body {
+    padding-right: calc(var(--body-pad-x, 24px) + var(--music-scrollbar-gap, 0px));
+}
+
+@media (max-width: 640px) {
+    .music-modal {
+        padding: 0;
+        align-items: flex-end;
+        justify-content: flex-start;
+    }
+
+    .music-modal-panel {
+        flex: none;
+        width: 100%;
+        max-height: 88vh;
+        max-height: 88dvh;
+        border-radius: 20px 20px 0 0;
+        border-bottom: 0;
+        box-shadow: 0 -12px 44px rgba(0, 0, 0, 0.22);
+        animation-name: musicSheetIn;
+        animation-duration: 0.46s;
+        animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    .music-modal.is-closing .music-modal-panel {
+        animation-name: musicSheetOut;
+        animation-duration: 0.22s;
+        animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
+    }
+
+    .music-modal-head {
+        padding: 13px 12px 13px 16px;
+    }
+
+    .music-modal-body {
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    .music-modal-loading {
+        padding: 22px 20px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .music-modal-backdrop,
+    .music-modal-panel,
+    .music-modal.is-closing .music-modal-backdrop,
+    .music-modal.is-closing .music-modal-panel {
+        animation: none;
+    }
+
+    .music-modal-loading::after {
+        animation: none;
+    }
+
+    .music-modal-frame {
+        transition: none;
+    }
+}

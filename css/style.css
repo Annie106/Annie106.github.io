@@ -4268,15 +4268,24 @@
         }
 
         /* ==================== 音乐播放器卡片 ==================== */
+        /* 配色：暖琥珀（2026-11-24 按参考图定）。卡片底色纯白、没有彩色描边、
+           不铺任何光晕，颜色只出现在图标块（淡黄底 + 橙音符）、音量条、进度条
+           这几个小面积上，播放键是深色圆钮 —— 与参考图逐项对齐。
+           强调色挂成局部变量（自定义属性会往后代继承），
+           深色模式只覆盖这几个变量，别在子元素里再写一遍色值。 */
         .music-player-card {
+            --music-accent: #f0a12b;
+            --music-accent-soft: #fdf3df;
+            --music-track-bg: #e8e8e8;
             position: relative;
             width: 100%;
             margin-top: 0;
             margin-left: 0;
-            background: rgba(255, 255, 255, 0.96);
-            border: 1px solid rgba(17, 17, 17, 0.08);
+            background: #ffffff;
+            /* 参考图卡片没有彩色描边，只留一条几乎看不见的中性细线 */
+            border: 1px solid rgba(17, 17, 17, 0.05);
             border-radius: 18px;
-            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+            box-shadow: 0 6px 20px rgba(15, 23, 42, 0.07);
             padding: 18px 18px 14px;
             z-index: 10;
             backdrop-filter: blur(16px);
@@ -4284,9 +4293,9 @@
             transition: transform 0.2s ease, box-shadow 0.2s ease, width 0.2s ease, padding 0.2s ease;
         }
 
+        /* 播放状态不再给卡片描边 / 外发光，只把投影稍微加重一档 */
         .music-player-card.playing {
-            box-shadow: 0 14px 32px rgba(245, 158, 11, 0.12);
-            border-color: rgba(245, 158, 11, 0.18);
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.09);
         }
 
         .music-player-card.collapsed {
@@ -4322,8 +4331,8 @@
             align-items: center;
             justify-content: center;
             border-radius: 12px;
-            background: rgba(250, 204, 21, 0.14);
-            color: #f59e0b;
+            background: var(--music-accent-soft);
+            color: var(--music-accent);
         }
 
         .music-player-icon svg {
@@ -4414,13 +4423,52 @@
             stroke: none;
         }
 
+        /* 这个位置原来是「收藏」按钮（没有实际功能），现在改成音乐库页面入口：
+           尺寸、位置、间距都不动，只把图标换成播放列表。
+           收藏语义是红心，入口用中性灰更合适。 */
+        .music-icon-btn.music-library-btn {
+            color: #9ca3af;
+            text-decoration: none;
+        }
+
+        .music-icon-btn.music-library-btn:focus-visible {
+            outline: 2px solid var(--color-text-primary);
+            outline-offset: 2px;
+        }
+
+        @media (hover: hover) {
+            html:not(.is-touch-input) .music-icon-btn.music-library-btn:hover {
+                color: var(--music-accent);
+            }
+        }
+
+        [data-theme="dark"] .music-icon-btn.music-library-btn {
+            color: #9aa1ad;
+        }
+
+        @media (hover: hover) {
+            html:not(.is-touch-input)[data-theme="dark"] .music-icon-btn.music-library-btn:hover {
+                color: var(--music-accent);
+            }
+        }
+
         .music-card-toggle {
             width: 34px;
             height: 34px;
             border-radius: 50%;
-            background: #111827;
+            /* 不用纯黑：偏暖的深棕黑压在浅色卡片上不会显得硬邦邦 */
+            background: #211c15;
             color: #fff;
-            box-shadow: 0 8px 18px rgba(17, 24, 39, 0.16);
+            box-shadow: 0 8px 18px rgba(33, 28, 21, 0.20);
+        }
+
+        /* 播放键是深色圆钮，通用悬停规则里的 color: #374151 会让图标
+           跟底色糊在一起，这里固定白色。 */
+        @media (hover: hover) {
+            html:not(.is-touch-input) .music-card-toggle:hover {
+                color: #fff;
+                background: #2e271d;
+            }
         }
 
         .music-card-toggle i,
@@ -4466,7 +4514,7 @@
             min-width: 0;
             height: 5px;
             border-radius: 999px;
-            background: #e5e7eb;
+            background: var(--music-track-bg);
             overflow: hidden;
         }
 
@@ -4474,7 +4522,7 @@
             position: absolute;
             inset: 0 auto 0 0;
             width: 0;
-            background: linear-gradient(90deg, #facc15, #f59e0b);
+            background: var(--music-accent);
             border-radius: inherit;
             transition: width 0.15s linear;
         }
@@ -4511,7 +4559,7 @@
             width: 100%;
             height: 4px;
             border-radius: 999px;
-            background: linear-gradient(90deg, #fbbf24 0%, #fbbf24 var(--volume-percent, 30%), #e5e7eb var(--volume-percent, 30%), #e5e7eb 100%);
+            background: linear-gradient(90deg, var(--music-accent) 0%, var(--music-accent) var(--volume-percent, 30%), var(--music-track-bg) var(--volume-percent, 30%), var(--music-track-bg) 100%);
             outline: none;
             cursor: pointer;
         }
@@ -4522,18 +4570,18 @@
             width: 14px;
             height: 14px;
             border-radius: 50%;
-            background: #111827;
+            background: #211c15;
             border: 2px solid #fff;
-            box-shadow: 0 2px 6px rgba(17, 24, 39, 0.16);
+            box-shadow: 0 2px 6px rgba(33, 28, 21, 0.24);
         }
 
         .music-volume-slider::-moz-range-thumb {
             width: 14px;
             height: 14px;
             border-radius: 50%;
-            background: #111827;
+            background: #211c15;
             border: 2px solid #fff;
-            box-shadow: 0 2px 6px rgba(17, 24, 39, 0.16);
+            box-shadow: 0 2px 6px rgba(33, 28, 21, 0.24);
         }
 
         .music-player-percent {
@@ -4549,7 +4597,9 @@
                所以让它从导航底边往下让开 */
             top: calc(var(--header-h) + 12px);
             right: 20px;
-            z-index: 1000;
+            /* 要压在搜索浮层（1150）和音乐弹窗（1300）上面：
+               音频失败时用户在弹窗里，提示不能被遮罩吃掉 */
+            z-index: 1500;
             display: flex;
             align-items: center;
             width: min(100% - 40px, 420px);
@@ -5650,15 +5700,18 @@
            全部走 --menu-* / --card-control-* 那组变量（见 :root 与 [data-theme="dark"]），
            这里再写一份会盖掉变量，深浅两边迟早对不上 */
 
-        /* 音乐播放器卡片 */
+        /* 音乐播放器卡片：深色只换这一组局部变量和底色，
+           子元素的底色 / 描边 / 阴影全部继承过去 */
         [data-theme="dark"] .music-player-card {
-            background: rgba(23, 26, 32, 0.9);
-            border-color: rgba(255, 255, 255, 0.1);
-            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+            --music-accent: #f5b455;
+            --music-accent-soft: rgba(245, 180, 85, 0.14);
+            --music-track-bg: rgba(255, 255, 255, 0.10);
+            background: #171a20;
+            border-color: rgba(255, 255, 255, 0.06);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
         }
         [data-theme="dark"] .music-player-card.playing {
-            border-color: rgba(245, 158, 11, 0.3);
-            box-shadow: 0 14px 32px rgba(245, 158, 11, 0.16);
+            box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
         }
         [data-theme="dark"] .music-player-text h3 { color: #e7e9ee; }
         [data-theme="dark"] .music-player-text p { color: #9aa1ad; }
@@ -5666,23 +5719,26 @@
         [data-theme="dark"] .music-card-toggle,
         [data-theme="dark"] .music-card-collapse { color: #9aa1ad; }
         /* 同样只在鼠标悬停时变色，避免触屏点一下后图标颜色被粘住
-           （深色模式下播放按钮是浅底，粘上浅色图标会直接看不见） */
+           （深色模式下播放按钮是亮橙底，粘上浅色图标会直接看不见） */
         @media (hover: hover) {
             html:not(.is-touch-input)[data-theme="dark"] .music-icon-btn:hover,
-            html:not(.is-touch-input)[data-theme="dark"] .music-card-toggle:hover,
             html:not(.is-touch-input)[data-theme="dark"] .music-card-collapse:hover { color: #e7e9ee; }
+            html:not(.is-touch-input)[data-theme="dark"] .music-card-toggle:hover {
+                color: #1b1409;
+                background: #f7c072;
+            }
         }
+        /* 深色下黑圆钮会沉进背景，改成亮橙底 + 深色图标（提亮一档，不反色） */
         [data-theme="dark"] .music-card-toggle {
-            background: var(--color-text-primary);
-            color: #111111;
-            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.4);
+            background: var(--music-accent);
+            color: #1b1409;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
         }
         [data-theme="dark"] .music-card-collapse {
             background: rgba(255, 255, 255, 0.08);
             color: #9aa1ad;
         }
         [data-theme="dark"] .music-track-time { color: #9aa1ad; }
-        [data-theme="dark"] .music-track-progress { background: #2a2e37; }
         [data-theme="dark"] .music-volume-trigger {
             background: rgba(255, 255, 255, 0.08);
             color: #9aa1ad;
@@ -5693,15 +5749,12 @@
                 color: #e7e9ee;
             }
         }
-        [data-theme="dark"] .music-volume-slider {
-            background: linear-gradient(90deg, #fbbf24 0%, #fbbf24 var(--volume-percent, 30%), #2a2e37 var(--volume-percent, 30%), #2a2e37 100%);
-        }
         [data-theme="dark"] .music-volume-slider::-webkit-slider-thumb {
-            background: var(--color-text-primary);
+            background: var(--music-accent);
             border-color: var(--color-bg);
         }
         [data-theme="dark"] .music-volume-slider::-moz-range-thumb {
-            background: var(--color-text-primary);
+            background: var(--music-accent);
             border-color: var(--color-bg);
         }
         [data-theme="dark"] .music-player-percent { color: #9aa1ad; }

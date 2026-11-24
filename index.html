@@ -573,11 +573,20 @@
                                 <p id="musicCardArtist">第五人格</p>
                             </div>
                             <div class="music-player-actions">
-                                <button class="music-icon-btn" type="button" aria-label="收藏">
-                                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path>
+                                <!-- 原来的「收藏」按钮没有实际功能，这里改成音乐库页面入口：
+                                     位置、尺寸不变，点它跳到 /music/ 独立页面。 -->
+                                <!-- JS 会拦成弹窗；没跑 JS 时按 href 去独立页面。 -->
+                                <a class="music-icon-btn music-library-btn" href="music/index.html"
+                                   id="musicCardLibrary" aria-haspopup="dialog"
+                                   aria-controls="musicModal" aria-expanded="false"
+                                   aria-label="打开音乐库" title="打开音乐库">
+                                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                        <rect x="3" y="4.75" width="10.5" height="2" rx="1"></rect>
+                                        <rect x="3" y="10.75" width="10.5" height="2" rx="1"></rect>
+                                        <rect x="3" y="16.75" width="6.5" height="2" rx="1"></rect>
+                                        <path d="M16.5 8.8 22 12l-5.5 3.2z"></path>
                                     </svg>
-                                </button>
+                                </a>
                                 <button class="music-card-toggle" id="musicCardToggle" type="button" aria-label="播放或暂停音乐">
                                     <i class="ri-play-line"></i>
                                 </button>
@@ -1028,7 +1037,7 @@
             </section>
 
             <!-- 版本号：从页脚挪到这里，收在关于页右下角 -->
-            <p class="about-version">版本 0.4.26.083</p>
+            <p class="about-version">版本 0.4.27.021</p>
         </div>
 
         <!-- ==================== 文章详情视图 ==================== -->
@@ -1306,6 +1315,34 @@
         </footer>
     </div>
 
+    <!-- ==================== 音乐库弹窗 ====================
+         播放器本体仍是 music/index.html，只是套在 iframe 里、带 ?embed=1。
+         这样首页卡片、弹窗、独立页面共用同一份播放器 HTML。
+         打开/关闭动画参考 404.html 的「获取联系」：桌面 0.34s 上浮，
+         手机上从底部浮起 0.46s。CSS/JS 都是点开才加载。 -->
+    <div class="music-modal" id="musicModal" hidden>
+        <div class="music-modal-backdrop" data-music-close></div>
+        <div class="music-modal-panel" role="dialog" aria-modal="true"
+             aria-labelledby="musicModalTitle" tabindex="-1">
+            <div class="music-modal-head">
+                <h2 id="musicModalTitle">音乐库</h2>
+                <button class="music-modal-close" id="musicModalClose" type="button"
+                        aria-label="关闭音乐库" data-music-close>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+                </button>
+            </div>
+            <div class="music-modal-body" id="musicModalBody">
+                <!-- 加载占位：iframe ready 后整体淡入，避免先闪一块空白 -->
+                <div class="music-modal-loading" id="musicModalLoading" aria-hidden="true">
+                    <span class="music-modal-sk-cover"></span>
+                    <span class="music-modal-sk-line"></span>
+                    <span class="music-modal-sk-line is-short"></span>
+                    <span class="music-modal-sk-line"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ==================== 全站搜索面板 ====================
          桌面端是从顶部展开的居中面板，手机端是占满可视区的全屏面板。
          面板高度跟随 visualViewport（而不是 100vh），键盘弹出时输入框
@@ -1485,11 +1522,18 @@
     <!-- 电影板块的停服公告在 movie.html 内部实现（阴影 + 卡片同一文档，
          滚动时不会错位），父页面不再挂浮层 -->
 
-    <!-- ⚠️ 这两个必须排在 script.js **前面**。地址栏会在 init() 里被改写成
+    <!-- ⚠️ 这几个必须排在 script.js **前面**。地址栏会在 init() 里被改写成
          /posts/<id>/，而相对路径的 <script src="js/…"> 是在解析到它的那一刻
          才解析路径的 —— 排在后面就会变成 /posts/<id>/js/… 然后 404。
          它们都不依赖 script.js（各自只往 window 上挂一个对象）。 -->
     <script src="js/copyToClipboard.js"></script>
+    <!-- 曲目配置（只放数据，1KB）。完整音乐库的 JS/CSS 不在这里，
+         由 background-music.js 在第一次点「音乐库」时按需注入。 -->
+    <script src="js/music-tracks.js"></script>
+    <!-- 音频元数据预加载：首屏 load 之后才动，只取时长不拉整首，
+         所以放在这里不占关键路径。必须排在 background-music.js 前面，
+         引擎初始化时要把曲目登记给它。 -->
+    <script src="js/music-preload.js"></script>
     <script src="js/background-music.js"></script>
     <!-- 外链确认弹窗（<a data-confirm-leave="GitHub">）。和 guide.html 这类
          独立页共用同一份，逻辑不在 script.js 里。独立页要自己引这一行。 -->
