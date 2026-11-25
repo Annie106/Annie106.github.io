@@ -2520,6 +2520,12 @@
             --sk-card-bg: rgba(255, 255, 255, 0.035);
             --sk-card-border: rgba(255, 255, 255, 0.09);
         }
+        /* 直接打开非首页视图（?view=music 等）时，首页骨架屏从头就不该出现。
+           head 里的内联脚本会在 body 解析前给 html 打 .no-home-skeleton，
+           这里压掉骨架屏（连同 ::after 的扫光动画），避免整页跳转时扫光一闪。 */
+        html.no-home-skeleton .home-skeleton {
+            display: none;
+        }
         /* 一条斜向高光从左扫到右，2.1s 一轮。
            整块骨架共用同一条光带（而不是每张卡片各扫一次），
            六张卡片看起来是被同一次光扫过，节奏统一，也只跑一个动画。
@@ -4267,350 +4273,1182 @@
             outline-offset: 2px;
         }
 
-        /* ==================== 音乐播放器卡片 ==================== */
-        /* 配色：暖琥珀（2026-11-24 按参考图定）。卡片底色纯白、没有彩色描边、
-           不铺任何光晕，颜色只出现在图标块（淡黄底 + 橙音符）、音量条、进度条
-           这几个小面积上，播放键是深色圆钮 —— 与参考图逐项对齐。
-           强调色挂成局部变量（自定义属性会往后代继承），
-           深色模式只覆盖这几个变量，别在子元素里再写一遍色值。 */
-        .music-player-card {
-            --music-accent: #f0a12b;
-            --music-accent-soft: #fdf3df;
-            --music-track-bg: #e8e8e8;
+        /* 卡片里的歌单是绝对定位浮层，整列抬一层，免得被下面的文章卡片盖住 */
+        .hero-player {
             position: relative;
-            width: 100%;
-            margin-top: 0;
-            margin-left: 0;
-            background: #ffffff;
-            /* 参考图卡片没有彩色描边，只留一条几乎看不见的中性细线 */
-            border: 1px solid rgba(17, 17, 17, 0.05);
+            z-index: 4;
+        }
+
+        /* ==================== 音乐卡片 ====================
+           首页右侧那一块。封面 / 标题 / 上一首·播放·下一首 / 进度 / 播放列表都在这里。
+           播放引擎（music/core.js）要等第一次点播放才加载，所以这堆样式要能
+           独立撑起「没点之前」的样子：封面来自 tracks.js，歌单也是。
+
+           配色走卡片自己的局部变量（--me-*），深色只覆盖变量、不重写规则。
+           没有封面时用 repeating-radial-gradient 画黑胶，不引任何图片。 */
+        .music-entry {
+            --me-surface: #ffffff;
+            --me-border: rgba(17, 17, 17, 0.07);
+            --me-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 18px 40px -22px rgba(15, 23, 42, 0.22);
+            --me-title: #1a1a1a;
+            --me-muted: #6b6b6b;
+            --me-faint: #9a9a9a;
+            --me-chip: #f4f4f4;
+            --me-track: #ececec;
+            --me-fill: #1a1a1a;
+            --me-fill-ink: #ffffff;
+            --me-label: #b45f74;
+            --me-disc-1: #2b2b30;
+            --me-disc-2: #191a1d;
+
+            position: relative;
+            padding: 13px 16px 12px;
+            border: 1px solid var(--me-border);
             border-radius: 18px;
-            box-shadow: 0 6px 20px rgba(15, 23, 42, 0.07);
-            padding: 18px 18px 14px;
-            z-index: 10;
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            transition: transform 0.2s ease, box-shadow 0.2s ease, width 0.2s ease, padding 0.2s ease;
+            background: var(--me-surface);
+            box-shadow: var(--me-shadow);
+            /* ⚠️ 不能写 overflow:hidden：播放列表是绝对定位、浮在卡片下面的，
+               一裁就整块没了。暖光改成贴着卡片四边画，不需要裁。 */
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
         }
 
-        /* 播放状态不再给卡片描边 / 外发光，只把投影稍微加重一档 */
-        .music-player-card.playing {
-            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.09);
+        /* 卡片整体的暖光：右上角一点极淡的粉，纯白卡片才不至于像一块表格 */
+        .music-entry::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            background: radial-gradient(circle at 100% 0, rgba(180, 95, 116, 0.16), rgba(180, 95, 116, 0) 52%);
+            pointer-events: none;
         }
 
-        .music-player-card.collapsed {
-            width: min(220px, calc(100vw - 32px));
-            padding: 12px 14px;
+        @media (hover: hover) {
+            html:not(.is-touch-input) .music-entry:hover {
+                border-color: rgba(17, 17, 17, 0.12);
+                box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 22px 46px -22px rgba(15, 23, 42, 0.3);
+            }
         }
 
-        .music-player-card.collapsed .music-player-progress-wrap,
-        .music-player-card.collapsed .music-track-progress-wrap {
-            display: none;
-        }
-
-        .music-player-card.collapsed .music-player-main {
-            gap: 8px;
-        }
-
-        .music-player-card.collapsed .music-player-text {
-            display: none;
-        }
-
-        .music-player-main {
+        .music-entry-top {
+            position: relative;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 11px;
+        }
+
+        .music-entry-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            color: var(--me-faint);
+        }
+
+        .music-entry-label i {
+            font-size: 0.95rem;
+            line-height: 1;
+        }
+
+        /* 「播放列表」开关：一枚小胶囊，展开时反色 */
+        .music-entry-list-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 10px 5px 8px;
+            border: 0;
+            border-radius: 999px;
+            background: var(--me-chip);
+            color: var(--me-muted);
+            font: inherit;
+            font-size: 0.72rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.18s ease, color 0.18s ease;
+        }
+
+        .music-entry-list-toggle i {
+            font-size: 0.95rem;
+        }
+
+        html:not(.is-touch-input) .music-entry-list-toggle:hover {
+            color: var(--me-title);
+            background: var(--me-border);
+        }
+
+        /* 展开时是反色胶囊。注意这两条必须压在 hover 上面，并且选择器要更具体：
+           否则一悬停 color 会被上一段改成深色，黑底黑字 —— 文字就像消失了。 */
+        .music-entry.is-list-open .music-entry-list-toggle,
+        html:not(.is-touch-input) .music-entry.is-list-open .music-entry-list-toggle:hover {
+            background: var(--me-fill);
+            color: var(--me-fill-ink);
+        }
+
+        .music-entry-list-toggle:focus-visible {
+            outline: 2px solid var(--me-fill);
+            outline-offset: 2px;
+        }
+
+        .music-entry-main {
+            position: relative;
+            display: flex;
+            align-items: center;
             gap: 12px;
         }
 
-        .music-player-icon {
-            width: 42px;
-            height: 42px;
-            min-width: 42px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 12px;
-            background: var(--music-accent-soft);
-            color: var(--music-accent);
+        /* 封面 / 唱片：同一块位置，有 cover 就显示图，没有就画唱片 */
+        .music-entry-art {
+            position: relative;
+            flex: 0 0 auto;
+            width: 62px;
+            height: 62px;
+            border-radius: 50%;
+            overflow: hidden;
+            box-shadow: 0 8px 18px -9px rgba(0, 0, 0, 0.55);
         }
 
-        .music-player-icon svg {
-            width: 24px;
-            height: 24px;
-            stroke: currentColor;
-            fill: none;
-            stroke-width: 2;
-            stroke-linecap: round;
-            stroke-linejoin: round;
+        .music-entry-cover {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            /* 播放时慢慢转：这是「音乐图标在转」的来源 */
+            animation: music-entry-spin 16s linear infinite;
+            animation-play-state: paused;
         }
 
-        .music-player-text {
-            flex: 1;
+        .music-entry[data-playing="true"] .music-entry-cover {
+            animation-play-state: running;
+        }
+
+        /* ⚠️ 没有封面的曲目必须真的把 <img> 藏起来：
+           img 自带 display:block，[hidden] 的 display:none 压不过它，
+           结果就是「切到第二首，标题变了封面还是上一首」 */
+        .music-entry-art[data-cover="false"] .music-entry-cover {
+            display: none;
+        }
+
+        .music-entry-art[data-cover="true"] .music-entry-disc {
+            display: none;
+        }
+
+        .music-entry-disc {
+            position: relative;
+            display: block;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background:
+                radial-gradient(circle at 50% 50%, var(--art-accent, var(--me-label)) 0 21%, rgba(0, 0, 0, 0.38) 22%, rgba(0, 0, 0, 0) 23%),
+                repeating-radial-gradient(circle at 50% 50%, var(--me-disc-1) 0 1.5px, var(--me-disc-2) 1.5px 4px);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+            animation: music-entry-spin 9s linear infinite;
+            animation-play-state: paused;
+        }
+
+        /* 中心那个小孔 */
+        .music-entry-disc::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 6px;
+            height: 6px;
+            margin: -3px 0 0 -3px;
+            border-radius: 50%;
+            background: var(--me-surface);
+            box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28);
+        }
+
+        .music-entry[data-playing="true"] .music-entry-disc {
+            animation-play-state: running;
+        }
+
+        .music-entry-info {
+            flex: 1 1 auto;
             min-width: 0;
+            /* 点标题/封面跳曲库：这块是整卡的「点一下去看」区域 */
+            cursor: pointer;
         }
 
-        .music-player-text h3 {
+        .music-entry-title {
             margin: 0;
-            font-size: 1.02rem;
+            font-size: 1rem;
             font-weight: 600;
-            color: #374151;
+            letter-spacing: -0.01em;
+            line-height: 1.35;
+            color: var(--me-title);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
 
-        .music-player-text p {
-            margin: 2px 0 0;
-            color: #6b7280;
-            font-size: 0.78rem;
+        .music-entry-meta {
+            margin: 3px 0 0;
+            font-size: 0.76rem;
             line-height: 1.4;
+            color: var(--me-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
-        .music-player-actions {
+        /* 出错那句话比歌手名长，允许折到两行；再长就省略 */
+        .music-entry[data-error="true"] .music-entry-meta {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            white-space: normal;
+            color: #b22b2b;
+        }
+
+        /* 上一首 / 下一首默认隐身，鼠标进卡片（或键盘 focus）才浮出来。
+           宽度一直占着，不然一悬停文字会被挤得跳一下。 */
+        .music-entry-controls {
+            position: relative;
+            flex: 0 0 auto;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 2px;
         }
 
-        .music-icon-btn,
-        .music-card-toggle,
-        .music-card-collapse {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 30px;
-            height: 30px;
-            border: none;
-            background: transparent;
-            color: #9ca3af;
+        .music-entry-skip {
+            display: grid;
+            place-items: center;
+            width: 26px;
+            height: 26px;
             padding: 0;
+            border: 0;
+            border-radius: 50%;
+            background: transparent;
+            color: var(--me-muted);
             cursor: pointer;
-            transition: transform 0.2s ease, color 0.2s ease, background 0.2s ease;
+            opacity: 0;
+            transform: scale(0.82);
+            pointer-events: none;
+            transition: opacity 0.18s ease, transform 0.18s ease, background 0.18s ease, color 0.18s ease;
         }
 
-        /* 悬停效果只在真正用鼠标时生效。
-           触屏点一下会让 :hover 一直粘在按钮上，按钮看起来像没松开（常亮），
-           所以这里用 html:not(.is-touch-input) 把它排除掉。 */
-        @media (hover: hover) {
-            html:not(.is-touch-input) .music-icon-btn:hover,
-            html:not(.is-touch-input) .music-card-toggle:hover,
-            html:not(.is-touch-input) .music-card-collapse:hover {
-                transform: scale(1.04);
-                color: #374151;
+        .music-entry-skip svg {
+            width: 13px;
+            height: 13px;
+            fill: currentColor;
+        }
+
+        .music-entry:hover .music-entry-skip,
+        .music-entry:focus-within .music-entry-skip {
+            opacity: 1;
+            transform: none;
+            pointer-events: auto;
+        }
+
+        html:not(.is-touch-input) .music-entry-skip:hover {
+            background: var(--me-chip);
+            color: var(--me-title);
+        }
+
+        /* 触屏没有 hover，上一首/下一首就常驻，不然整块看着不可点 */
+        @media (hover: none) {
+            .music-entry-skip {
+                opacity: 0.9;
+                transform: none;
+                pointer-events: auto;
             }
         }
-        /* 按下时的反馈：松手即恢复。
-           带 html:not(.is-touch-input) 的这条是为了在鼠标场景下
-           优先级压过上面的 :hover（两者特异性相同时后写的生效）。 */
-        .music-icon-btn:active,
-        .music-card-toggle:active,
-        .music-card-collapse:active,
-        html:not(.is-touch-input) .music-icon-btn:active,
-        html:not(.is-touch-input) .music-card-toggle:active,
-        html:not(.is-touch-input) .music-card-collapse:active {
-            transform: scale(0.94);
-        }
 
-        .music-icon-btn {
-            color: #ef4444;
-        }
-
-        .music-icon-btn svg {
-            width: 18px;
-            height: 18px;
-            fill: currentColor;
-            stroke: none;
-        }
-
-        /* 这个位置原来是「收藏」按钮（没有实际功能），现在改成音乐库页面入口：
-           尺寸、位置、间距都不动，只把图标换成播放列表。
-           收藏语义是红心，入口用中性灰更合适。 */
-        .music-icon-btn.music-library-btn {
-            color: #9ca3af;
-            text-decoration: none;
-        }
-
-        .music-icon-btn.music-library-btn:focus-visible {
-            outline: 2px solid var(--color-text-primary);
+        .music-entry-skip:focus-visible {
+            opacity: 1;
+            transform: none;
+            outline: 2px solid var(--me-fill);
             outline-offset: 2px;
         }
 
-        @media (hover: hover) {
-            html:not(.is-touch-input) .music-icon-btn.music-library-btn:hover {
-                color: var(--music-accent);
-            }
-        }
-
-        [data-theme="dark"] .music-icon-btn.music-library-btn {
-            color: #9aa1ad;
-        }
-
-        @media (hover: hover) {
-            html:not(.is-touch-input)[data-theme="dark"] .music-icon-btn.music-library-btn:hover {
-                color: var(--music-accent);
-            }
-        }
-
-        .music-card-toggle {
-            width: 34px;
-            height: 34px;
-            border-radius: 50%;
-            /* 不用纯黑：偏暖的深棕黑压在浅色卡片上不会显得硬邦邦 */
-            background: #211c15;
-            color: #fff;
-            box-shadow: 0 8px 18px rgba(33, 28, 21, 0.20);
-        }
-
-        /* 播放键是深色圆钮，通用悬停规则里的 color: #374151 会让图标
-           跟底色糊在一起，这里固定白色。 */
-        @media (hover: hover) {
-            html:not(.is-touch-input) .music-card-toggle:hover {
-                color: #fff;
-                background: #2e271d;
-            }
-        }
-
-        .music-card-toggle i,
-        .music-card-collapse i {
-            font-size: 1rem;
-            line-height: 1;
-        }
-
-        .music-card-collapse {
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            background: rgba(17, 17, 17, 0.04);
-            color: #6b7280;
-        }
-
-        .music-player-progress-wrap {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-top: 16px;
-        }
-
-        .music-track-progress-wrap {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-top: 16px;
-        }
-
-        .music-track-time {
-            min-width: 34px;
-            color: #9ca3af;
-            font-size: 0.68rem;
-            line-height: 1;
-            text-align: center;
-            font-variant-numeric: tabular-nums;
-        }
-
-        .music-track-progress {
+        .music-entry-play {
             position: relative;
-            flex: 1;
-            min-width: 0;
-            height: 5px;
-            border-radius: 999px;
-            background: var(--music-track-bg);
-            overflow: hidden;
-        }
-
-        .music-track-progress-bar {
-            position: absolute;
-            inset: 0 auto 0 0;
-            width: 0;
-            background: var(--music-accent);
-            border-radius: inherit;
-            transition: width 0.15s linear;
-        }
-
-        .music-volume-trigger {
-            width: 28px;
-            height: 28px;
-            border: none;
-            border-radius: 50%;
-            background: rgba(17, 17, 17, 0.04);
-            color: #6b7280;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
+            flex: 0 0 auto;
+            display: grid;
+            place-items: center;
+            width: 44px;
+            height: 44px;
             padding: 0;
-            transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+            border: 0;
+            border-radius: 50%;
+            background: var(--me-fill);
+            color: var(--me-fill-ink);
+            cursor: pointer;
+            box-shadow: 0 10px 22px -10px rgba(0, 0, 0, 0.55);
+            transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+        }
+
+        .music-entry-play svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+        }
+
+        .music-entry-icon-pause,
+        .music-entry[data-playing="true"] .music-entry-icon-play {
+            display: none;
+        }
+
+        .music-entry[data-playing="true"] .music-entry-icon-pause {
+            display: block;
+        }
+
+        /* 加载 / 缓冲的那圈转轴，画在按钮外面（inset 为负），圆钮里再套圈太挤 */
+        .music-entry-spinner {
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            border-top-color: var(--me-fill);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            animation: music-entry-spin 0.9s linear infinite;
+            pointer-events: none;
+        }
+
+        .music-entry-play[data-loading="true"] .music-entry-spinner {
+            opacity: 0.75;
+        }
+
+        .music-entry-play[data-loading="true"] svg {
+            opacity: 0.35;
         }
 
         @media (hover: hover) {
-            html:not(.is-touch-input) .music-volume-trigger:hover {
-                transform: scale(1.04);
-                background: rgba(17, 17, 17, 0.08);
-                color: #374151;
+            html:not(.is-touch-input) .music-entry-play:hover {
+                transform: scale(1.05);
+                box-shadow: 0 12px 26px -10px rgba(0, 0, 0, 0.6);
             }
         }
-        .music-volume-trigger:active {
+
+        .music-entry-play:active {
             transform: scale(0.94);
         }
 
-        .music-volume-slider {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 100%;
-            height: 4px;
-            border-radius: 999px;
-            background: linear-gradient(90deg, var(--music-accent) 0%, var(--music-accent) var(--volume-percent, 30%), var(--music-track-bg) var(--volume-percent, 30%), var(--music-track-bg) 100%);
-            outline: none;
-            cursor: pointer;
+        .music-entry-play:focus-visible {
+            outline: 2px solid var(--me-fill);
+            outline-offset: 3px;
         }
 
-        .music-volume-slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            background: #211c15;
-            border: 2px solid #fff;
-            box-shadow: 0 2px 6px rgba(33, 28, 21, 0.24);
+        .music-entry-progress {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 9px;
+            margin-top: 11px;
+            padding-top: 10px;
+            border-top: 1px solid var(--me-border);
         }
 
-        .music-volume-slider::-moz-range-thumb {
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            background: #211c15;
-            border: 2px solid #fff;
-            box-shadow: 0 2px 6px rgba(33, 28, 21, 0.24);
+        /* 每一行：图标 + 进度条 + 数值，行高压到 18px，两行也不显得空 */
+        .music-entry-bar-row {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            height: 18px;
         }
 
-        .music-player-percent {
-            font-size: 0.72rem;
-            color: #6b7280;
-            min-width: 36px;
+        /* 两行的进度条要上下对齐（起点、终点同一条竖线）：
+           所以左边占位统一 34px（时间 "00:00" 的宽度），右边占位统一 34px。
+           第一行的两个时间、第二行的喇叭 + 百分比，都塞进这两个等宽槽里。 */
+        .music-entry-bar-row > .music-entry-time,
+        .music-entry-bar-row > .music-entry-vol-btn,
+        .music-entry-bar-row > .music-entry-vol-value {
+            flex: 0 0 34px;
+            width: 34px;
+        }
+
+        .music-entry-time--cur {
+            text-align: left;
+        }
+
+        .music-entry-time--dur,
+        .music-entry-vol-value {
             text-align: right;
         }
 
-        .audio-error-toast {
-            position: fixed;
-            /* 导航吸顶后，top: 20px 会正好压在导航右侧那几个链接上，
-               所以让它从导航底边往下让开 */
-            top: calc(var(--header-h) + 12px);
-            right: 20px;
-            /* 要压在搜索浮层（1150）和音乐弹窗（1300）上面：
-               音频失败时用户在弹窗里，提示不能被遮罩吃掉 */
-            z-index: 1500;
+        .music-entry-vol-ico {
+            flex: 0 0 34px;
+            width: 34px;
+            font-size: 12px;
+            line-height: 1;
+            color: var(--me-muted);
+        }
+
+        /* 静音按钮：喇叭，和进度条轨道中心对齐（行高 18px、垂直居中） */
+        .music-entry-vol-btn {
+            display: grid;
+            place-items: center;
+            flex: 0 0 auto;
+            width: 15px;
+            height: 18px;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            color: var(--me-muted);
+            cursor: pointer;
+            transition: color 0.18s ease;
+        }
+
+        .music-entry-vol-btn svg {
+            width: 15px;
+            height: 15px;
+        }
+
+        html:not(.is-touch-input) .music-entry-vol-btn:hover {
+            color: var(--me-title);
+        }
+
+        .music-entry-bar {
+            position: relative;
+            flex: 1 1 auto;
             display: flex;
             align-items: center;
-            width: min(100% - 40px, 420px);
-            min-height: 58px;
-            padding: 12px 54px 12px 16px;
-            border: 1px solid #f85149;
-            border-radius: 8px;
-            background: linear-gradient(rgba(248, 81, 73, 0.1), rgba(248, 81, 73, 0.1));
+            height: 18px;
+            cursor: pointer;
+            /* 拖动进度时别让页面跟着滚 */
+            touch-action: none;
+        }
+
+        /* 轨道：5px 实色，浅色下一眼能看出这是一条进度条，不再是若隐若现的细线 */
+        .music-entry-bar::before {
+            content: '';
+            width: 100%;
+            height: 5px;
+            border-radius: 999px;
+            background: var(--me-track);
+        }
+
+        .music-entry-bar-fill {
+            position: absolute;
+            left: 0;
+            top: 50%;
+            width: 0;
+            height: 5px;
+            margin-top: -2.5px;
+            border-radius: 999px;
+            background: var(--me-fill);
+            pointer-events: none;
+        }
+
+        /* 滑块：小小的圆点，尺寸只比轨道（5px）大一点点。
+           ⚠️ 对齐的关键：left 用 --progress 定位后，必须让滑块中心**锁在轨道两端之间**。
+           直接用 left:0% + margin-left:-半宽，0% 时滑块会有一半探出轨道左端、
+           压到左边的时间文字上（红圈里那种「没对齐」就是这个）。
+           用 clamp 把中心夹在 [半宽, 100%-半宽]，0%/100% 时滑块刚好贴着轨道两端，
+           且圆心永远落在轨道的中心线上。 */
+        .music-entry-bar::after {
+            content: '';
+            position: absolute;
+            left: clamp(5px, var(--progress, 0%), calc(100% - 5px));
+            top: 50%;
+            width: 10px;
+            height: 10px;
+            margin: -5px 0 0 -5px;
+            border-radius: 50%;
+            background: var(--me-fill);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+            transition: transform 0.12s ease;
+        }
+
+        .music-entry-bar.is-dragging::after {
+            transform: scale(1.2);
+        }
+
+        .music-entry-bar:focus-visible {
+            outline: 2px solid var(--me-fill);
+            outline-offset: 4px;
+            border-radius: 999px;
+        }
+
+        .music-entry-time {
+            flex: 0 0 auto;
+            font-size: 0.68rem;
+            color: var(--me-faint);
+            font-variant-numeric: tabular-nums;
+            line-height: 1;
+        }
+
+        /* 两端时间各自对齐：当前在左、总时长在右，中间是进度条 */
+        .music-entry-time--cur {
+            text-align: left;
+        }
+
+        .music-entry-time--dur {
+            text-align: right;
+        }
+
+        /* 音量进度条：和播放进度同一套配色（同色系，视觉统一） */
+        .music-entry-bar--vol .music-entry-bar-fill {
+            background: var(--me-fill);
+        }
+
+        /* 音量滑块和播放滑块同尺寸、同一套 clamp 对齐规则，不再单独写定位 */
+
+        .music-entry-vol-value {
+            flex: 0 0 auto;
+            min-width: 30px;
+            text-align: right;
+            font-size: 0.68rem;
+            color: var(--me-faint);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* 静音：喇叭图标切换（音量归零时那个叉），音量条滑块也收到最左 */
+        .music-vol-off {
+            display: none;
+        }
+
+        .music-entry[data-muted="true"] .music-vol-on {
+            display: none;
+        }
+
+        .music-entry[data-muted="true"] .music-vol-off {
+            display: block;
+        }
+
+        .music-entry[data-muted="true"] .music-entry-vol-ico {
+            color: var(--me-faint);
+        }
+
+        .music-entry-vol-btn:focus-visible {
+            outline: 2px solid var(--me-fill);
+            outline-offset: 2px;
+            border-radius: 4px;
+        }
+
+        /* 播放列表：**浮层**，绝对定位到卡片下面。
+           不能参与文档流 —— 一撑高卡片，整个 hero 和下面的文章列表都会跳一下。 */
+        .music-entry-list {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            right: 0;
+            z-index: 30;
+            max-height: 0;
+            padding: 0 10px;
+            overflow: hidden;
+            border: 1px solid transparent;
+            border-radius: 16px;
+            background: var(--me-surface);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-6px);
+            transition:
+                opacity 0.18s ease,
+                transform 0.24s cubic-bezier(0.22, 0.61, 0.36, 1),
+                max-height 0.26s ease,
+                padding 0.2s ease,
+                border-color 0.2s ease,
+                visibility 0.18s;
+        }
+
+        .music-entry.is-list-open .music-entry-list {
+            max-height: 300px;
+            padding: 8px 10px 8px;
+            border-color: var(--me-border);
+            box-shadow:
+                0 1px 2px rgba(15, 23, 42, 0.05),
+                0 20px 44px -20px rgba(15, 23, 42, 0.35);
+            opacity: 1;
+            visibility: visible;
+            transform: none;
+        }
+
+        /* 下方空间不够时（靠近页脚）改成向上弹：把锚点翻到卡片顶部，
+           入场位移也反过来，不然后会先往下冒一下再跳上去 */
+        .music-entry.is-list-upward .music-entry-list {
+            top: auto;
+            bottom: calc(100% + 8px);
+            transform: translateY(6px);
+        }
+
+        .music-entry.is-list-upward.is-list-open .music-entry-list {
+            transform: none;
+        }
+
+        /* 歌曲多的时候列表区自己滚，最多露出 4 首的高度；
+           超过就上下滑动，浮层总高度不跟着涨 */
+        .music-entry-list .music-tracklist {
+            max-height: 192px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--me-track) transparent;
+        }
+
+        .music-entry-more {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-top: 6px;
+            padding: 9px 12px;
+            border-radius: 10px;
+            background: var(--me-chip);
+            color: var(--me-title);
+            font-size: 0.78rem;
+            font-weight: 500;
+            text-decoration: none;
+            transition: background 0.18s ease;
+        }
+
+        .music-entry-more span {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .music-entry-more i {
+            font-size: 0.92rem;
+            color: var(--me-muted);
+        }
+
+        html:not(.is-touch-input) .music-entry-more:hover {
+            background: var(--me-border);
+        }
+
+        .music-entry-more:focus-visible {
+            outline: 2px solid var(--me-fill);
+            outline-offset: 2px;
+        }
+
+        /* ==================== 播放列表（卡片 / 迷你条 / 音乐页共用） ====================
+           三种容器各自有自己的配色变量，这里只用全站的中性色，
+           保证深色下不用再写一份。 */
+        .music-tracklist {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+
+        .mt-row-hit {
+            display: grid;
+            grid-template-columns: 20px 34px minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            padding: 6px 8px;
+            border: 0;
+            border-radius: 9px;
+            background: transparent;
+            color: inherit;
+            font: inherit;
+            text-align: left;
+            cursor: pointer;
+            transition: background 0.16s ease;
+        }
+
+        .mt-row-hit:hover {
+            background: var(--card-control-bg);
+        }
+
+        .mt-row-hit:focus-visible {
+            outline: 2px solid var(--color-text-primary);
+            outline-offset: -2px;
+        }
+
+        .mt-slot {
+            position: relative;
+            display: grid;
+            place-items: center;
+            width: 20px;
+            height: 20px;
+        }
+
+        .mt-num {
+            font-size: 0.68rem;
+            color: var(--color-text-tertiary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .mt-eq {
+            display: none;
+            align-items: center;
+            gap: 2px;
+            height: 13px;
+        }
+
+        .mt-eq i {
+            width: 2px;
+            height: 12px;
+            border-radius: 1px;
+            background: var(--color-text-primary);
+            transform: scaleY(0.3);
+            transform-origin: center;
+            animation: mt-eq 0.85s ease-in-out infinite alternate;
+        }
+
+        .mt-eq i:nth-child(2) {
+            animation-delay: 0.16s;
+        }
+
+        .mt-eq i:nth-child(3) {
+            animation-delay: 0.32s;
+        }
+
+        /* hover 时序号位置换成播放三角（浅灰圆底的小按钮，参考图那样） */
+        .mt-play {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--card-control-bg);
+            color: var(--color-text-primary);
+        }
+
+        .mt-play svg {
+            width: 12px;
+            height: 12px;
+            fill: currentColor;
+        }
+
+        html:not(.is-touch-input) .mt-row-hit:hover .mt-num {
+            display: none;
+        }
+
+        html:not(.is-touch-input) .mt-row-hit:hover .mt-play {
+            display: grid;
+            place-items: center;
+        }
+
+        .mt-row.is-playing .mt-num {
+            display: none;
+        }
+
+        .mt-row.is-playing .mt-eq {
+            display: flex;
+        }
+
+        /* 正在播放的行：音柱优先，hover 也别换成播放三角 */
+        html:not(.is-touch-input) .mt-row.is-playing .mt-row-hit:hover .mt-play {
+            display: none;
+        }
+
+        html:not(.is-touch-input) .mt-row.is-playing .mt-row-hit:hover .mt-eq {
+            display: flex;
+        }
+
+        .mt-art {
+            --row-accent: #b45f74;
+            display: block;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background:
+                radial-gradient(circle at 50% 50%, var(--row-accent) 0 23%, rgba(0, 0, 0, 0.38) 24%, rgba(0, 0, 0, 0) 25%),
+                repeating-radial-gradient(circle at 50% 50%, #2b2b30 0 1px, #191a1d 1px 3px);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+        }
+
+        .mt-art.has-cover {
+            background-size: cover;
+            background-position: center;
+        }
+
+        .mt-text {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+
+        .mt-title {
+            color: var(--color-text-primary);
+            font-size: 0.84rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .mt-sub {
+            color: var(--color-text-tertiary);
+            font-size: 0.7rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .mt-time {
+            color: var(--color-text-tertiary);
+            font-size: 0.68rem;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .mt-row.is-current .mt-title {
+            color: var(--color-text-primary);
+            font-weight: 600;
+        }
+
+        /* 音乐页那份行更大一点，留白也跟着放开 */
+        .mt-row--lg .mt-row-hit {
+            grid-template-columns: 26px 44px minmax(0, 1fr) auto;
+            gap: 14px;
+            padding: 9px 12px;
+            border-radius: 12px;
+        }
+
+        .mt-row--lg .mt-slot {
+            width: 26px;
+            height: 24px;
+        }
+
+        .mt-row--lg .mt-num {
+            font-size: 0.74rem;
+        }
+
+        .mt-row--lg .mt-art {
+            width: 44px;
+            height: 44px;
+        }
+
+        .mt-row--lg .mt-title {
+            font-size: 0.94rem;
+        }
+
+        .mt-row--lg .mt-sub {
+            font-size: 0.76rem;
+        }
+
+        .mt-row--lg .mt-time {
+            font-size: 0.74rem;
+        }
+
+        /* ==================== 站内音乐页 ?view=music ==================== */
+        /* 和「最近折腾」同一套版式：抬头贴左边，列表收到 760px 居中 */
+        #view-music {
+            /* 顶栏和「返回」之间别留一大块空白，收紧到最小 */
+            padding-top: 4px;
+            /* 右下角播放条是 fixed，底部留出位置，别让它压住最后一行 */
+            padding-bottom: 96px;
+        }
+
+        .music-view-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .music-view-back {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0;
+            border: 0;
+            background: none;
+            color: var(--color-text-secondary);
+            font: inherit;
+            font-size: 0.88rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: color 0.18s ease;
+        }
+
+        .music-view-back i {
+            font-size: 1rem;
+        }
+
+        html:not(.is-touch-input) .music-view-back:hover {
+            color: var(--color-text-primary);
+        }
+
+        /* 和文章页右上角「分享」同一套胶囊，站内的次要按钮都长这样 */
+        .music-view-submit {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 15px;
+            border: 1px solid var(--color-border);
+            border-radius: 999px;
+            background: transparent;
+            color: var(--color-text-secondary);
+            font-size: 0.84rem;
+            font-weight: 500;
+            text-decoration: none;
+            transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+        }
+
+        .music-view-submit i {
+            font-size: 0.95rem;
+        }
+
+        html:not(.is-touch-input) .music-view-submit:hover {
+            color: var(--color-text-primary);
+            border-color: var(--color-text-tertiary);
+            background: var(--color-surface);
+        }
+
+        .music-view-back:focus-visible,
+        .music-view-submit:focus-visible {
+            outline: 2px solid var(--color-text-primary);
+            outline-offset: 3px;
+            border-radius: 999px;
+        }
+
+        .music-view-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            /* 铺满容器宽度：宽屏下别只在中间留 760px、两边空一大片 */
+            width: 100%;
+            margin: 24px 0 10px;
+        }
+
+        .music-view-play {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            padding: 11px 20px 11px 16px;
+            border: 0;
+            border-radius: 999px;
+            background: var(--color-text-primary);
+            color: var(--color-bg);
+            font: inherit;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 12px 26px -14px rgba(0, 0, 0, 0.55);
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        /* 播放 / 暂停：两个独立图标交叉淡入淡出（同一个伪元素改 border 没法做过渡） */
+        .music-view-play-icon {
+            position: relative;
+            width: 13px;
+            height: 14px;
+            flex: 0 0 auto;
+        }
+
+        .music-view-play-icon i {
+            position: absolute;
+            inset: 0;
+            display: block;
+            transition: opacity 0.2s ease, transform 0.24s cubic-bezier(0.22, 0.61, 0.36, 1);
+        }
+
+        /* 三角 */
+        .music-view-play-icon .icon-play {
+            opacity: 1;
+            transform: scale(1) rotate(0deg);
+        }
+
+        .music-view-play-icon .icon-play::before {
+            content: '';
+            position: absolute;
+            left: 2px;
+            top: 1px;
+            border-left: 10px solid currentColor;
+            border-top: 6px solid transparent;
+            border-bottom: 6px solid transparent;
+        }
+
+        /* 双竖条 */
+        .music-view-play-icon .icon-pause {
+            opacity: 0;
+            transform: scale(0.6) rotate(-25deg);
+        }
+
+        .music-view-play-icon .icon-pause::before {
+            content: '';
+            position: absolute;
+            left: 1px;
+            top: 1px;
+            width: 4px;
+            height: 12px;
+            border-radius: 1px;
+            background: currentColor;
+            box-shadow: 7px 0 0 currentColor;
+        }
+
+        /* 切到播放态：三角淡出、竖条淡入，带一点缩放旋转的过渡 */
+        .music-view-play[data-playing="true"] .icon-play {
+            opacity: 0;
+            transform: scale(0.6) rotate(25deg);
+        }
+
+        .music-view-play[data-playing="true"] .icon-pause {
+            opacity: 1;
+            transform: scale(1) rotate(0deg);
+        }
+
+        /* 文字切换的轻微淡入：data-playing 变化时给 label 重放一次动画 */
+        .music-view-play-label {
+            display: inline-block;
+        }
+
+        .music-view-play-label.is-switching {
+            animation: music-view-label-in 0.26s cubic-bezier(0.22, 0.61, 0.36, 1);
+        }
+
+        @keyframes music-view-label-in {
+            from {
+                opacity: 0;
+                transform: translateY(4px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (hover: hover) {
+            html:not(.is-touch-input) .music-view-play:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 16px 30px -14px rgba(0, 0, 0, 0.6);
+            }
+        }
+
+        .music-view-play:active {
+            transform: scale(0.98);
+        }
+
+        .music-view-mode {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 15px;
+            border: 1px solid var(--color-border);
+            border-radius: 999px;
+            background: transparent;
+            color: var(--color-text-secondary);
+            font: inherit;
+            font-size: 0.84rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+        }
+
+        .music-view-mode svg {
+            display: none;
+            width: 16px;
+            height: 16px;
+        }
+
+        .music-view-mode[data-mode="list"] .icon-mode-list,
+        .music-view-mode[data-mode="shuffle"] .icon-mode-shuffle,
+        .music-view-mode[data-mode="one"] .icon-mode-one {
+            display: block;
+        }
+
+        html:not(.is-touch-input) .music-view-mode:hover {
+            color: var(--color-text-primary);
+            border-color: var(--color-text-tertiary);
+            background: var(--color-surface);
+        }
+
+        .music-view-play:focus-visible,
+        .music-view-mode:focus-visible {
+            outline: 2px solid var(--color-text-primary);
+            outline-offset: 3px;
+        }
+
+        .music-view-count {
+            margin-left: auto;
+            color: var(--color-text-tertiary);
+            font-size: 0.76rem;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .music-view-error {
+            margin: 10px 0 0;
+            padding: 10px 14px;
+            border: 1px solid rgba(178, 43, 43, 0.22);
+            border-radius: 10px;
+            background: rgba(178, 43, 43, 0.06);
             color: #b22b2b;
-            box-shadow: 0 8px 24px rgba(178, 43, 43, 0.12);
-            animation: audio-error-enter 0.25s ease-out;
+            font-size: 0.84rem;
+            line-height: 1.6;
+        }
+
+        .music-tracklist--view {
+            width: 100%;
+            margin: 6px 0 0;
+            gap: 2px;
+        }
+
+        .music-view-note {
+            width: 100%;
+            margin: 30px 0 0;
+            color: var(--color-text-tertiary);
+            font-size: 0.74rem;
+            line-height: 1.85;
+        }
+
+        .music-view-note code {
+            padding: 1px 5px;
+            border-radius: 4px;
+            background: var(--color-surface);
+            font-size: 0.95em;
+        }
+
+        @keyframes music-entry-spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes mt-eq {
+            from {
+                transform: scaleY(0.3);
+            }
+            to {
+                transform: scaleY(1);
+            }
+        }
+
+        /* ---------------- 音乐卡片 · 深色 ---------------- */
+        [data-theme="dark"] .music-entry {
+            --me-surface: #17181c;
+            --me-border: rgba(255, 255, 255, 0.08);
+            --me-shadow: 0 1px 2px rgba(0, 0, 0, 0.32), 0 20px 44px -24px rgba(0, 0, 0, 0.8);
+            --me-title: #e9ebf0;
+            --me-muted: #9aa1ad;
+            --me-faint: #7d838f;
+            --me-chip: rgba(255, 255, 255, 0.06);
+            --me-track: #2a2d34;
+            --me-fill: #e9ebf0;
+            --me-fill-ink: #14161a;
+            --me-label: #c5748a;
+            --me-disc-1: #3a3b41;
+            --me-disc-2: #24252a;
+        }
+
+        /* 深色下暖光要收着一点，不然像一块脏印子 */
+        [data-theme="dark"] .music-entry::before {
+            background: radial-gradient(circle, rgba(197, 116, 138, 0.12), rgba(197, 116, 138, 0) 68%);
+        }
+
+        @media (hover: hover) {
+            html:not(.is-touch-input)[data-theme="dark"] .music-entry:hover {
+                border-color: rgba(255, 255, 255, 0.14);
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.36), 0 24px 50px -24px rgba(0, 0, 0, 0.85);
+            }
+        }
+
+        [data-theme="dark"] .music-entry[data-error="true"] .music-entry-meta,
+        [data-theme="dark"] .music-view-error {
+            color: #ff8f88;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .music-entry-disc,
+            .mt-eq i {
+                animation: none;
+            }
+            .music-entry-list {
+                transition: none;
+            }
         }
 
         /* 顶部轻提示：反馈提交成功、链接已复制等共用同一套外观。
@@ -5057,62 +5895,6 @@
             }
         }
 
-        .audio-error-message {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin: 0;
-            font-size: 0.92rem;
-            font-weight: 600;
-            line-height: 1.4;
-        }
-
-        .audio-error-message > i {
-            flex: 0 0 auto;
-            font-size: 1.7rem;
-        }
-
-        .audio-error-close {
-            position: absolute;
-            top: 50%;
-            right: 16px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 28px;
-            height: 28px;
-            padding: 0;
-            border: 1px solid #f85149;
-            border-radius: 6px;
-            background: transparent;
-            color: #f85149;
-            cursor: pointer;
-            opacity: 0.45;
-            transform: translateY(-50%);
-            transition: opacity 0.2s ease, background 0.2s ease;
-        }
-
-        .audio-error-close:hover {
-            background: rgba(248, 81, 73, 0.08);
-            opacity: 1;
-        }
-
-        .audio-error-close i {
-            font-size: 1rem;
-            line-height: 1;
-        }
-
-        @keyframes audio-error-enter {
-            from {
-                opacity: 0;
-                transform: translateY(-8px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
         /* ==================== 页脚 ==================== */
         .site-footer {
             text-align: center;
@@ -5230,27 +6012,6 @@
             }
             .home-pager-step {
                 padding: 0 9px;
-            }
-            .music-player-card {
-                padding: 12px 14px 10px;
-            }
-            .music-player-card.collapsed {
-                width: 100%;
-            }
-            .music-player-progress-wrap {
-                gap: 10px;
-                margin-top: 12px;
-            }
-            .music-player-text h3 {
-                font-size: 0.9rem;
-            }
-            .music-player-text p {
-                font-size: 0.72rem;
-            }
-            .audio-error-toast {
-                top: calc(var(--header-h) + 8px);
-                right: 12px;
-                width: calc(100% - 24px);
             }
         }
 
@@ -5699,74 +6460,6 @@
         /* 二级菜单的深色配色不再单独写死：底色、描边、投影、悬停底
            全部走 --menu-* / --card-control-* 那组变量（见 :root 与 [data-theme="dark"]），
            这里再写一份会盖掉变量，深浅两边迟早对不上 */
-
-        /* 音乐播放器卡片：深色只换这一组局部变量和底色，
-           子元素的底色 / 描边 / 阴影全部继承过去 */
-        [data-theme="dark"] .music-player-card {
-            --music-accent: #f5b455;
-            --music-accent-soft: rgba(245, 180, 85, 0.14);
-            --music-track-bg: rgba(255, 255, 255, 0.10);
-            background: #171a20;
-            border-color: rgba(255, 255, 255, 0.06);
-            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
-        }
-        [data-theme="dark"] .music-player-card.playing {
-            box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
-        }
-        [data-theme="dark"] .music-player-text h3 { color: #e7e9ee; }
-        [data-theme="dark"] .music-player-text p { color: #9aa1ad; }
-        [data-theme="dark"] .music-icon-btn,
-        [data-theme="dark"] .music-card-toggle,
-        [data-theme="dark"] .music-card-collapse { color: #9aa1ad; }
-        /* 同样只在鼠标悬停时变色，避免触屏点一下后图标颜色被粘住
-           （深色模式下播放按钮是亮橙底，粘上浅色图标会直接看不见） */
-        @media (hover: hover) {
-            html:not(.is-touch-input)[data-theme="dark"] .music-icon-btn:hover,
-            html:not(.is-touch-input)[data-theme="dark"] .music-card-collapse:hover { color: #e7e9ee; }
-            html:not(.is-touch-input)[data-theme="dark"] .music-card-toggle:hover {
-                color: #1b1409;
-                background: #f7c072;
-            }
-        }
-        /* 深色下黑圆钮会沉进背景，改成亮橙底 + 深色图标（提亮一档，不反色） */
-        [data-theme="dark"] .music-card-toggle {
-            background: var(--music-accent);
-            color: #1b1409;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
-        }
-        [data-theme="dark"] .music-card-collapse {
-            background: rgba(255, 255, 255, 0.08);
-            color: #9aa1ad;
-        }
-        [data-theme="dark"] .music-track-time { color: #9aa1ad; }
-        [data-theme="dark"] .music-volume-trigger {
-            background: rgba(255, 255, 255, 0.08);
-            color: #9aa1ad;
-        }
-        @media (hover: hover) {
-            html:not(.is-touch-input)[data-theme="dark"] .music-volume-trigger:hover {
-                background: rgba(255, 255, 255, 0.12);
-                color: #e7e9ee;
-            }
-        }
-        [data-theme="dark"] .music-volume-slider::-webkit-slider-thumb {
-            background: var(--music-accent);
-            border-color: var(--color-bg);
-        }
-        [data-theme="dark"] .music-volume-slider::-moz-range-thumb {
-            background: var(--music-accent);
-            border-color: var(--color-bg);
-        }
-        [data-theme="dark"] .music-player-percent { color: #9aa1ad; }
-
-        /* 错误提示 */
-        [data-theme="dark"] .audio-error-toast {
-            background: linear-gradient(rgba(248, 81, 73, 0.16), rgba(248, 81, 73, 0.16));
-            color: #ff8f88;
-        }
-        [data-theme="dark"] .audio-error-close:hover {
-            background: rgba(248, 81, 73, 0.12);
-        }
 
         /* 主题切换按钮在深色模式下：和同一行的社交图标走同一套悬停语言
            （提亮一档 + 图标变白 + 极淡描边），不再是反色的白圆 */

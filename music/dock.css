@@ -1,0 +1,391 @@
+/* ==================== 音乐模块 · 迷你播放条 ====================
+ *
+ * 只在「卡片看不见了、但音乐还在放（或停在中途）」时出现：
+ * 桌面右下角一张小卡片，手机贴底。
+ *
+ * 这一份是**懒加载**的样式：跟着 core.js 一起，第一次点播放才下载，
+ * 所以可以放心用 backdrop-filter 之类稍微贵一点的属性。
+ *
+ * 播放列表（.mt-row 那套）的样式在 css/style.css 里 —— 卡片首屏就要用到，
+ * 不能放在这里，否则点开歌单前会有一瞬间的裸列表。
+ * ======================================================== */
+
+.music-dock {
+    --md-bg: rgba(255, 255, 255, 0.94);
+    --md-border: rgba(17, 17, 17, 0.08);
+    --md-title: #1a1a1a;
+    --md-muted: #7a7a7a;
+    --md-track: rgba(17, 17, 17, 0.1);
+    --md-fill: #1a1a1a;
+    --md-btn: #6b6b6b;
+    --md-btn-hover-bg: rgba(17, 17, 17, 0.06);
+    --md-primary-bg: #1a1a1a;
+    --md-primary-ink: #ffffff;
+    --md-disc-1: #2b2b30;
+    --md-disc-2: #191a1d;
+    --md-label: #b45f74;
+
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    z-index: 880;
+
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 360px;
+    padding: 10px 10px 10px 12px;
+
+    border: 1px solid var(--md-border);
+    border-radius: 16px;
+    background: var(--md-bg);
+    box-shadow:
+        0 1px 2px rgba(15, 23, 42, 0.05),
+        0 18px 40px -18px rgba(15, 23, 42, 0.35);
+    backdrop-filter: blur(18px) saturate(1.5);
+    -webkit-backdrop-filter: blur(18px) saturate(1.5);
+    /* ⚠️ 这里绝对不能写 overflow:hidden：播放列表是绝对定位到卡片外面的，
+       一裁就整块没了。顶边那条进度改成往里缩 14px，不需要再裁圆角。 */
+
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(12px);
+    transition:
+        opacity 0.24s ease,
+        transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1),
+        visibility 0.24s;
+}
+
+.music-dock.is-visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+/* 顶边那条进度：视觉上只有 2px，命中区撑到 12px，
+   否则鼠标根本点不中，触屏更拖不动。
+   贴着最上沿画，圆角交给 .music-dock 的 overflow 裁。 */
+.music-dock-progress {
+    position: absolute;
+    /* 缩进一个圆角的宽度，线头才不会跑到卡片外面去 */
+    left: 14px;
+    right: 14px;
+    top: 0;
+    display: flex;
+    align-items: flex-start;
+    height: 12px;
+    cursor: pointer;
+}
+
+.music-dock-progress::before {
+    content: '';
+    width: 100%;
+    height: 2px;
+    background: var(--md-track);
+}
+
+.music-dock-progress-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 2px;
+    background: var(--md-fill);
+    pointer-events: none;
+}
+
+/* 外描边会被 overflow 裁掉，所以往里收 */
+.music-dock-progress:focus-visible {
+    outline: 2px solid var(--md-fill);
+    outline-offset: -4px;
+}
+
+.music-dock-open {
+    flex: 0 0 auto;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+}
+
+.music-dock-art {
+    display: block;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    overflow: hidden;
+    box-shadow: 0 4px 10px -5px rgba(0, 0, 0, 0.55);
+}
+
+.music-dock-cover {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    animation: music-dock-spin 14s linear infinite;
+    animation-play-state: paused;
+}
+
+.music-dock.is-playing .music-dock-cover {
+    animation-play-state: running;
+}
+
+.music-dock-art[data-cover="true"] .music-dock-disc {
+    display: none;
+}
+
+/* 没有封面的曲目要真的把 <img> 藏掉：img 的 display:block 会压过 [hidden]，
+   不写这条就会出现「切歌了，封面还是上一首」 */
+.music-dock-art[data-cover="false"] .music-dock-cover {
+    display: none;
+}
+
+.music-dock-disc {
+    position: relative;
+    display: block;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background:
+        radial-gradient(circle at 50% 50%, var(--bar-accent, var(--md-label)) 0 22%, rgba(0, 0, 0, 0.4) 23%, transparent 24%),
+        repeating-radial-gradient(circle at 50% 50%, var(--md-disc-1) 0 1px, var(--md-disc-2) 1px 2.6px);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+    animation: music-dock-spin 9s linear infinite;
+    animation-play-state: paused;
+}
+
+.music-dock.is-playing .music-dock-disc {
+    animation-play-state: running;
+}
+
+.music-dock-info {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.music-dock-title {
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--md-title);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.music-dock-artist {
+    margin: 1px 0 0;
+    font-size: 0.7rem;
+    line-height: 1.35;
+    color: var(--md-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 出错那句话比歌手名长，允许折两行 */
+.music-dock.has-error .music-dock-artist {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    white-space: normal;
+    color: #b22b2b;
+}
+
+.music-dock-actions {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    flex: 0 0 auto;
+}
+
+.music-dock-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--md-btn);
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.music-dock-btn svg {
+    width: 15px;
+    height: 15px;
+    fill: currentColor;
+}
+
+.music-dock-btn.is-primary {
+    width: 34px;
+    height: 34px;
+    background: var(--md-primary-bg);
+    color: var(--md-primary-ink);
+    box-shadow: 0 8px 18px -8px rgba(0, 0, 0, 0.6);
+}
+
+.music-dock-btn.is-primary svg {
+    width: 14px;
+    height: 14px;
+}
+
+.music-dock-btn.is-quiet svg {
+    width: 13px;
+    height: 13px;
+}
+
+/* 悬停只在真鼠标下生效：触屏点一下会让 :hover 粘住，按钮看起来像没松开。
+   ⚠️ 通用 hover 必须排除 .is-primary：那个按钮是黑底白图标，
+   一旦被通用规则把 color 改成 --md-title（深色），就会变成黑底黑三角、图标「消失」。 */
+@media (hover: hover) {
+    html:not(.is-touch-input) .music-dock-btn:not(.is-primary):hover {
+        background: var(--md-btn-hover-bg);
+        color: var(--md-title);
+    }
+    html:not(.is-touch-input) .music-dock-btn.is-primary:hover {
+        background: var(--md-primary-bg);
+        color: var(--md-primary-ink);
+        filter: brightness(1.18);
+    }
+}
+
+.music-dock-btn:active {
+    transform: scale(0.93);
+}
+
+.music-dock-btn:focus-visible,
+.music-dock-open:focus-visible {
+    outline: 2px solid var(--md-fill);
+    outline-offset: 2px;
+}
+
+/* ---------------- 播放列表面板 ---------------- */
+.music-dock-panel {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: calc(100% + 8px);
+    max-height: 264px;
+    overflow: auto;
+    padding: 10px 10px 8px;
+    border: 1px solid var(--md-border);
+    border-radius: 14px;
+    background: var(--md-bg);
+    box-shadow:
+        0 1px 2px rgba(15, 23, 42, 0.05),
+        0 18px 40px -18px rgba(15, 23, 42, 0.35);
+    backdrop-filter: blur(18px) saturate(1.5);
+    -webkit-backdrop-filter: blur(18px) saturate(1.5);
+
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(8px) scale(0.98);
+    transform-origin: bottom center;
+    transition: opacity 0.2s ease, transform 0.24s cubic-bezier(0.22, 0.61, 0.36, 1), visibility 0.2s;
+}
+
+.music-dock.is-list-open .music-dock-panel {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: none;
+}
+
+.music-dock-panel-title {
+    margin: 0 0 6px;
+    padding: 0 8px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: var(--md-muted);
+}
+
+/* 面板里的列表跟着迷你条配色走（列表基础样式在 style.css） */
+.music-dock-panel .mt-title {
+    color: var(--md-title);
+}
+
+.music-dock-panel .mt-sub,
+.music-dock-panel .mt-time,
+.music-dock-panel .mt-num {
+    color: var(--md-muted);
+}
+
+.music-dock-panel .mt-row-hit:hover {
+    background: var(--md-btn-hover-bg);
+}
+
+@keyframes music-dock-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ---------------- 深色 ---------------- */
+[data-theme="dark"] .music-dock {
+    --md-bg: rgba(23, 24, 28, 0.95);
+    --md-border: rgba(255, 255, 255, 0.1);
+    --md-title: #e9ebf0;
+    --md-muted: #9aa1ad;
+    --md-track: rgba(255, 255, 255, 0.14);
+    --md-fill: #e9ebf0;
+    --md-btn: #9aa1ad;
+    --md-btn-hover-bg: rgba(255, 255, 255, 0.08);
+    --md-primary-bg: #e9ebf0;
+    --md-primary-ink: #14161a;
+    --md-disc-1: #3a3b41;
+    --md-disc-2: #24252a;
+    --md-label: #c5748a;
+    box-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.4),
+        0 20px 44px -20px rgba(0, 0, 0, 0.8);
+}
+
+[data-theme="dark"] .music-dock.has-error .music-dock-artist {
+    color: #ff8f88;
+}
+
+/* ---------------- 移动端 ---------------- */
+@media (max-width: 600px) {
+    .music-dock {
+        left: 12px;
+        right: 12px;
+        bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+        width: auto;
+        padding: 9px 8px 9px 10px;
+        gap: 7px;
+        border-radius: 14px;
+    }
+    .music-dock-artist {
+        font-size: 0.68rem;
+    }
+    .music-dock-btn {
+        width: 30px;
+        height: 30px;
+    }
+    .music-dock-panel {
+        left: 4px;
+        right: 4px;
+        max-height: 46vh;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .music-dock {
+        transition: opacity 0.2s linear, visibility 0.2s;
+        transform: none;
+    }
+    .music-dock-disc {
+        animation: none;
+    }
+    .music-dock-panel {
+        transition: none;
+        transform: none;
+    }
+}

@@ -72,7 +72,7 @@ const PUBLISH_DIRS = [
     'js',
     'fonts',
     'images',
-    'music',
+    'music',        /* 音乐模块资源：tracks/ui/core/dock（音乐视图内嵌在首页 ?view=music） */
     'project_subpage',
 ];
 
@@ -87,12 +87,6 @@ const MUST_HAVE = [
     'js/posts-data.js',
     'fonts/remixicon.woff2',
     'feed.xml',
-    // 音乐库：首页卡片第一次点开时通过 iframe 加载，缺一个就整块打不开
-    'music/index.html',
-    'music/music.css',
-    'music/music.js',
-    'music/modal.css',
-    'music/modal.js',
 ];
 
 /* 反向检查扫描源码时要跳过的目录。

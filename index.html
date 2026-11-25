@@ -90,6 +90,15 @@
                    中间这一小段手机地址栏会先用白色，深色页看着像闪了一下。 */
                 var meta = document.getElementById('themeColorMeta');
                 if (meta) meta.setAttribute('content', theme === 'dark' ? '#0f1115' : '#ffffff');
+                /* 直接打开非首页视图（如 ?view=music）时，首页骨架屏不该出现：
+                   它是给「首页等文章数据」用的，整页跳到音乐/归档/关于等视图时
+                   一闪而过的扫光正是它。这里在最早期（body 还没解析）给 html 打
+                   标记，CSS 据此把骨架屏压掉，扫光动画连一帧都不会播。 */
+                var m = window.location.search.match(/[?&]view=([^&]+)/);
+                var view = m ? decodeURIComponent(m[1]) : '';
+                if (view && view !== 'home') {
+                    document.documentElement.classList.add('no-home-skeleton');
+                }
             } catch (e) {}
         })();
     </script>
@@ -559,57 +568,93 @@
                     </div>
                 </div>
                 <div class="hero-player">
-                    <div class="music-player-card" id="musicPlayerCard" aria-live="polite">
-                        <div class="music-player-main">
-                            <div class="music-player-icon" aria-hidden="true">
-                                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M9 18V5l12-2v13"></path>
-                                    <circle cx="6" cy="18" r="3"></circle>
-                                    <circle cx="18" cy="16" r="3"></circle>
-                                </svg>
-                            </div>
-                            <div class="music-player-text">
-                                <h3 id="musicCardTitle">2020中秋节-活动BGM</h3>
-                                <p id="musicCardArtist">第五人格</p>
-                            </div>
-                            <div class="music-player-actions">
-                                <!-- 原来的「收藏」按钮没有实际功能，这里改成音乐库页面入口：
-                                     位置、尺寸不变，点它跳到 /music/ 独立页面。 -->
-                                <!-- JS 会拦成弹窗；没跑 JS 时按 href 去独立页面。 -->
-                                <a class="music-icon-btn music-library-btn" href="music/index.html"
-                                   id="musicCardLibrary" aria-haspopup="dialog"
-                                   aria-controls="musicModal" aria-expanded="false"
-                                   aria-label="打开音乐库" title="打开音乐库">
-                                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                        <rect x="3" y="4.75" width="10.5" height="2" rx="1"></rect>
-                                        <rect x="3" y="10.75" width="10.5" height="2" rx="1"></rect>
-                                        <rect x="3" y="16.75" width="6.5" height="2" rx="1"></rect>
-                                        <path d="M16.5 8.8 22 12l-5.5 3.2z"></path>
-                                    </svg>
-                                </a>
-                                <button class="music-card-toggle" id="musicCardToggle" type="button" aria-label="播放或暂停音乐">
-                                    <i class="ri-play-line"></i>
-                                </button>
-                                <button class="music-card-collapse" id="musicCardCollapse" type="button" aria-label="收起播放器">
-                                    <i class="ri-arrow-down-s-line"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="music-track-progress-wrap">
-                            <span class="music-track-time" id="musicCurrentTime">00:00</span>
-                            <div class="music-track-progress" aria-label="播放进度">
-                                <span class="music-track-progress-bar" id="musicProgressBar"></span>
-                            </div>
-                            <span class="music-track-time" id="musicDuration">00:00</span>
-                        </div>
-
-                        <div class="music-player-progress-wrap">
-                            <button class="music-volume-trigger" id="musicVolumeToggle" type="button" aria-label="静音/开启声音">
-                                <i class="ri-volume-up-line"></i>
+                    <!-- 音乐卡片。首帧的标题 / 歌手 / 时长写死在这里（和 music/tracks.js 第一首一致），
+                         这样脚本还没跑完时卡片也不是一片空白；music/ui.js 起来后会按真实数据覆盖。
+                         点播放才去加载 core.js（播放引擎）和 dock.css，首屏不拉音频。 -->
+                    <div class="music-entry" id="musicEntry" data-music-card data-music-module="music/">
+                        <div class="music-entry-top">
+                            <span class="music-entry-label">
+                                <i class="ri-music-2-line" aria-hidden="true"></i>
+                                音乐播放
+                            </span>
+                            <!-- 歌单在卡片里展开，不跳走：随时能换一首 -->
+                            <button class="music-entry-list-toggle" id="musicListToggle" type="button"
+                                    aria-expanded="false" aria-controls="musicEntryList">
+                                <i class="ri-list-check" aria-hidden="true"></i>
+                                <span>播放列表</span>
                             </button>
-                            <input id="musicVolumeSlider" class="music-volume-slider" type="range" min="0" max="100" value="30" aria-label="音量调节">
-                            <span class="music-player-percent" id="musicPlayerPercent">30%</span>
+                        </div>
+                        <div class="music-entry-main">
+                            <span class="music-entry-art" id="musicEntryArt" data-cover="false" aria-hidden="true">
+                                <img class="music-entry-cover" id="musicEntryCover" alt="" hidden>
+                                <span class="music-entry-disc"></span>
+                            </span>
+                            <div class="music-entry-info">
+                                <h3 class="music-entry-title" id="musicEntryTitle">婚</h3>
+                                <p class="music-entry-meta" id="musicEntryMeta">沐可儿</p>
+                            </div>
+                            <!-- 上一首 / 下一首默认藏起来，鼠标移到卡片上才浮出来（触屏常驻） -->
+                            <div class="music-entry-controls">
+                                <button class="music-entry-skip" type="button" data-music="prev" aria-label="上一首">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 5.5h1.8v13H7zM18.5 5.6v12.8L9.6 12z"/></svg>
+                                </button>
+                                <button class="music-entry-play" id="musicEntryToggle" type="button"
+                                        aria-label="播放" aria-pressed="false"
+                                        data-playing="false" data-loading="false">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                        <path class="music-entry-icon-play" d="M8.2 5.4v13.2L19 12z"></path>
+                                        <g class="music-entry-icon-pause">
+                                            <path d="M8 5.5h2.9v13H8z"></path>
+                                            <path d="M13.1 5.5H16v13h-2.9z"></path>
+                                        </g>
+                                    </svg>
+                                    <span class="music-entry-spinner" aria-hidden="true"></span>
+                                </button>
+                                <button class="music-entry-skip" type="button" data-music="next" aria-label="下一首">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15.2 5.5H17v13h-1.8zM5.5 5.6v12.8L14.4 12z"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="music-entry-progress" id="musicEntryProgress">
+                            <!-- 第一行：播放进度。时间分两端（当前在左、总时长在右），中间是进度条 -->
+                            <div class="music-entry-bar-row">
+                                <span class="music-entry-time music-entry-time--cur" id="musicEntryCurTime">00:00</span>
+                                <span class="music-entry-bar" id="musicEntryBar" role="slider" tabindex="0"
+                                      aria-label="播放进度" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
+                                    <span class="music-entry-bar-fill" id="musicEntryFill"></span>
+                                </span>
+                                <span class="music-entry-time music-entry-time--dur" id="musicEntryDuration">03:04</span>
+                            </div>
+                            <!-- 第二行：音量。点喇叭静音，拖进度条调音量 -->
+                            <div class="music-entry-bar-row music-entry-bar-row--vol">
+                                <button class="music-entry-vol-btn" id="musicEntryMute" type="button"
+                                        aria-label="静音 / 取消静音">
+                                    <svg class="music-vol-on" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                        <path d="M5 9.5h3l3.6-3.1v11.2L8 14.5H5z" fill="currentColor"></path>
+                                        <path d="M15 9.2a3.7 3.7 0 010 5.6M17.4 6.9a7 7 0 010 10.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path>
+                                    </svg>
+                                    <svg class="music-vol-off" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                        <path d="M5 9.5h3l3.6-3.1v11.2L8 14.5H5z" fill="currentColor"></path>
+                                        <path d="M15.4 9.6l4.2 4.8M19.6 9.6l-4.2 4.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path>
+                                    </svg>
+                                </button>
+                                <!-- 静态兜底 30%（和无历史记录时的默认值一致）。
+                                     ui.js 起来后会立刻用 localStorage 里的真实音量覆盖这里。 -->
+                                <span class="music-entry-bar music-entry-bar--vol" id="musicEntryVolBar" role="slider" tabindex="0"
+                                      aria-label="音量" aria-valuemin="0" aria-valuemax="100" aria-valuenow="30"
+                                      style="--progress:30%">
+                                    <span class="music-entry-bar-fill" id="musicEntryVolFill" style="width:30%"></span>
+                                </span>
+                                <span class="music-entry-vol-value" id="musicEntryVolValue">30%</span>
+                            </div>
+                        </div>
+                        <!-- 播放列表：默认收起（CSS max-height:0 + inert），点「播放列表」展开 -->
+                        <div class="music-entry-list" id="musicEntryList">
+                            <ul class="music-tracklist music-tracklist--card" id="musicCardList"></ul>
+                            <a class="music-entry-more" href="?view=music" data-music-open-view>
+                                <span><i class="ri-equalizer-2-line" aria-hidden="true"></i> 打开完整曲库</span>
+                                <i class="ri-arrow-right-line" aria-hidden="true"></i>
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -955,6 +1000,64 @@
             <div class="tweaks-feed" id="tweaksFeed"></div>
         </div>
 
+        <!-- ==================== 音乐 ==================== -->
+        <!-- 不占导航栏，地址是 ?view=music。曲目、封面、直链全在 music/tracks.js，
+             列表和播放状态由 music/ui.js 渲染 —— 和首页卡片、右下角播放条共用同一份状态。 -->
+        <div id="view-music" class="view" style="display:none;">
+            <div class="music-view-nav">
+                <button class="music-view-back" id="musicViewBack" type="button">
+                    <i class="ri-arrow-left-line" aria-hidden="true"></i>
+                    返回
+                </button>
+                <a class="music-view-submit" href="project_subpage/blog/building.html">
+                    <i class="ri-send-plane-line" aria-hidden="true"></i>
+                    投稿
+                </a>
+            </div>
+            <header class="tweaks-hero">
+                <p class="tweaks-eyebrow">// MUSIC</p>
+                <h1 class="tweaks-title">听点声音</h1>
+                <p class="tweaks-lead" id="musicViewLead">点开就放，播放器在第一次点播放时才加载。</p>
+            </header>
+
+            <div class="music-view-bar">
+                <button class="music-view-play" id="musicViewPlay" type="button" data-playing="false">
+                    <span class="music-view-play-icon" aria-hidden="true">
+                        <i class="icon-play"></i>
+                        <i class="icon-pause"></i>
+                    </span>
+                    <span class="music-view-play-label" id="musicViewPlayText">播放全部</span>
+                </button>
+                <!-- 点一下换一种模式：顺序 → 随机 → 单曲循环，文案跟着变 -->
+                <button class="music-view-mode" id="musicViewMode" type="button"
+                        data-mode="list" aria-label="播放模式：顺序播放">
+                    <svg class="icon-mode-list" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M4 7h11M4 12h11M4 17h7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path>
+                        <path d="M17.4 15.2l2.1 1.8-2.1 1.8M19.5 17H15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                    <svg class="icon-mode-shuffle" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M4 7h3.2l9.6 10H20M4 17h3.2l2.6-2.7M13.4 9.6L16.8 7H20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                        <path d="M17.6 4.6L20 7l-2.4 2.4M17.6 14.6L20 17l-2.4 2.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                    <svg class="icon-mode-one" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M4 7h11M4 12h11M4 17h7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path>
+                        <path d="M17.4 14.4l1.6-1.1v5.9M16.4 19.2h4.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                    <span id="musicViewModeText">顺序播放</span>
+                </button>
+                <span class="music-view-count" id="musicViewCount">2 首</span>
+            </div>
+
+            <p class="music-view-error" id="musicViewError" hidden>当前 IP 今日播放额度已用完，请明天再来</p>
+
+            <ul class="music-tracklist music-tracklist--view" id="musicViewList"></ul>
+
+            <p class="music-view-note">
+                每日播放流量存在一定限制，
+                具体限流由音频所在的服务器执行。
+            </p>
+        </div>
+
         <!-- ==================== 标签总览 ==================== -->
         <!-- 不占导航栏。每个标签是一条指向 /tags/<标签>/ 的真链接：
              点进去是构建时生成的独立页，地址可以直接发给别人。 -->
@@ -1037,7 +1140,7 @@
             </section>
 
             <!-- 版本号：从页脚挪到这里，收在关于页右下角 -->
-            <p class="about-version">版本 0.4.27.021</p>
+            <p class="about-version">版本 0.4.27.042</p>
         </div>
 
         <!-- ==================== 文章详情视图 ==================== -->
@@ -1315,34 +1418,6 @@
         </footer>
     </div>
 
-    <!-- ==================== 音乐库弹窗 ====================
-         播放器本体仍是 music/index.html，只是套在 iframe 里、带 ?embed=1。
-         这样首页卡片、弹窗、独立页面共用同一份播放器 HTML。
-         打开/关闭动画参考 404.html 的「获取联系」：桌面 0.34s 上浮，
-         手机上从底部浮起 0.46s。CSS/JS 都是点开才加载。 -->
-    <div class="music-modal" id="musicModal" hidden>
-        <div class="music-modal-backdrop" data-music-close></div>
-        <div class="music-modal-panel" role="dialog" aria-modal="true"
-             aria-labelledby="musicModalTitle" tabindex="-1">
-            <div class="music-modal-head">
-                <h2 id="musicModalTitle">音乐库</h2>
-                <button class="music-modal-close" id="musicModalClose" type="button"
-                        aria-label="关闭音乐库" data-music-close>
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
-                </button>
-            </div>
-            <div class="music-modal-body" id="musicModalBody">
-                <!-- 加载占位：iframe ready 后整体淡入，避免先闪一块空白 -->
-                <div class="music-modal-loading" id="musicModalLoading" aria-hidden="true">
-                    <span class="music-modal-sk-cover"></span>
-                    <span class="music-modal-sk-line"></span>
-                    <span class="music-modal-sk-line is-short"></span>
-                    <span class="music-modal-sk-line"></span>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- ==================== 全站搜索面板 ====================
          桌面端是从顶部展开的居中面板，手机端是占满可视区的全屏面板。
          面板高度跟随 visualViewport（而不是 100vh），键盘弹出时输入框
@@ -1522,19 +1597,15 @@
     <!-- 电影板块的停服公告在 movie.html 内部实现（阴影 + 卡片同一文档，
          滚动时不会错位），父页面不再挂浮层 -->
 
-    <!-- ⚠️ 这几个必须排在 script.js **前面**。地址栏会在 init() 里被改写成
+    <!-- ⚠️ 这两个必须排在 script.js **前面**。地址栏会在 init() 里被改写成
          /posts/<id>/，而相对路径的 <script src="js/…"> 是在解析到它的那一刻
          才解析路径的 —— 排在后面就会变成 /posts/<id>/js/… 然后 404。
          它们都不依赖 script.js（各自只往 window 上挂一个对象）。 -->
     <script src="js/copyToClipboard.js"></script>
-    <!-- 曲目配置（只放数据，1KB）。完整音乐库的 JS/CSS 不在这里，
-         由 background-music.js 在第一次点「音乐库」时按需注入。 -->
-    <script src="js/music-tracks.js"></script>
-    <!-- 音频元数据预加载：首屏 load 之后才动，只取时长不拉整首，
-         所以放在这里不占关键路径。必须排在 background-music.js 前面，
-         引擎初始化时要把曲目登记给它。 -->
-    <script src="js/music-preload.js"></script>
-    <script src="js/background-music.js"></script>
+    <!-- 音乐模块：tracks.js 只是数据（约 2KB），ui.js 负责卡片 / 迷你播放条 / 音乐页的界面。
+         真正重的播放引擎 core.js 和它的 dock.css 仍然要等第一次点播放才加载。 -->
+    <script src="music/tracks.js"></script>
+    <script src="music/ui.js"></script>
     <!-- 外链确认弹窗（<a data-confirm-leave="GitHub">）。和 guide.html 这类
          独立页共用同一份，逻辑不在 script.js 里。独立页要自己引这一行。 -->
     <script src="js/leave-confirm.js"></script>

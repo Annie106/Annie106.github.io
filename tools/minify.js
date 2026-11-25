@@ -49,11 +49,12 @@ const DIST = path.join(ROOT, 'dist');
    图片和字体不碰。 */
 const TARGETS = [
     { dir: 'js', ext: '.js', loader: 'js' },
-    { dir: 'css', ext: '.css', loader: 'css' },
-    { dir: 'fonts', ext: '.css', loader: 'css' },
-    // 音乐库是独立目录，也一起压（页面 HTML 不压）
+    /* 音乐模块是懒加载的，但产物里同样值得压一遍：
+       core.js 的注释比代码还长，不压等于白传 */
     { dir: 'music', ext: '.js', loader: 'js' },
     { dir: 'music', ext: '.css', loader: 'css' },
+    { dir: 'css', ext: '.css', loader: 'css' },
+    { dir: 'fonts', ext: '.css', loader: 'css' },
 ];
 
 /* 压缩后必须仍然存在的字符串 —— 每一条都对应一个「被重命名就会静默坏掉」的地方。
@@ -64,12 +65,9 @@ const ASSERTIONS = {
     'js/tweaks-data.js': ['window.BLOG_TWEAKS'],
     'js/image-loading.js': ['window.AnnieImageLoading'],
     'js/leave-confirm.js': ['window.LeaveConfirm'],
-    'js/background-music.js': ['window.BackgroundMusic'],
-    'js/music-tracks.js': ['window.MUSIC_TRACKS'],
-    'music/music.js': ['window.BackgroundMusic'],
-    'music/music.css': ['#musicLibrary'],
-    'music/modal.js': ['window.MusicModal'],
-    'music/modal.css': ['music-modal', 'musicSheetIn'],
+    'music/core.js': ['AnnieMusic'],
+    'music/ui.js': ['AnnieMusicUI'],
+    'music/tracks.js': ['window.ANNIE_MUSIC_TRACKS'],
     'js/script.js': ['function openArticle', 'function switchView'],
     'css/style.css': ['.article-content', '@import'],
 };

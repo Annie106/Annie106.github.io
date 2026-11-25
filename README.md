@@ -89,14 +89,7 @@ js/script.js                筛选、搜索、路由、页面状态
 js/tweaks-data.js           博客更新记录（首页「本周折腾」+ 独立页共用）
 js/theme.js                 深色模式
 js/touch-hover.js           触屏悬停修正
-js/background-music.js      首页音乐卡片 + 播放引擎（唯一 <audio>）
-js/music-tracks.js          音乐库曲目配置（加歌只改这里）
-music/                      音乐库：首页弹窗 + 独立页面共用同一份播放器 HTML
-music/index.html            播放器页面（?embed=1 时只留播放器，去掉头部/标题/页脚）
-music/music.css             播放器卡片样式（黑白灰）
-music/music.js              页面交互；弹窗模式走 postMessage，独立访问时加载引擎
-music/modal.js              首页弹窗外壳：开关、遮罩、iframe 高度、指令桥
-music/modal.css             首页弹窗动画与黑色/灰色面板样式
+music/                      音乐模块：曲目 / 界面 / 播放引擎（引擎点播放才加载）
 js/copyToClipboard.js       联系方式复制
 js/leave-confirm.js         外链「即将离开」确认弹窗（独立页各引一行）
 js/scroll-reveal.js         独立页 / 内嵌页的滚动出现（首页那套在 script.js）
@@ -143,7 +136,7 @@ archive/                    留档的旧文件，不进产物（构建白名单�
 | 滚动出现 | 独立页引 `js/scroll-reveal.js`，选择器写在 `data-reveal-targets` |
 | 文章不可用提示 / 原因页 | `project_subpage/blog/article_unavailable.html` / `article_unavailable_reasons.html` |
 | 文章卡片菜单 | `js/script.js` 的 `articleMenus`（按文章 id） |
-| 背景音乐 | `js/music-tracks.js`（标题、作者、音频直链）；播放逻辑在 `js/background-music.js` |
+| 音乐 | `music/tracks.js`（加歌、换直链、换封面只改这里；页面是 `?view=music`） |
 | 视频列表 | `movie.html` 的 `VIDEO_LIST` |
 | 样式 | `css/style.css` |
 | 图标 | 直接写 `<i class="ri-xxx"></i>`，字体已在本地 |
@@ -188,7 +181,7 @@ node tools/check-icons.js
 python -m http.server 8000
 ```
 
-访问 <http://localhost:8000>，或直接打开 `index.html`。背景音乐需用户交互后才能播放。
+访问 <http://localhost:8000>，或直接打开 `index.html`。音乐要点播放才开始加载，进站不会自动出声。
 
 > 评论区的黑 / 白聚焦框本地也能看到：主题 CSS 由页面自己读进来、转成 `data:` URL 传给 giscus，不走跨域请求（https 的 giscus.app 取 localhost 的 CSS 会被 Chrome 拦掉）。
 

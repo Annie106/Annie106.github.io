@@ -50,6 +50,7 @@
             const viewArchive = $('#view-archive');
             const viewTweaks = $('#view-tweaks');
             const viewTags = $('#view-tags');
+            const viewMusic = $('#view-music');
             const tagLandingList = $('#tagLandingList');
             const viewMovie = $('#view-movie');
             const viewAbout = $('#view-about');
@@ -283,7 +284,7 @@
             // 点击文章跳到独立 HTML 页面后，返回本站时恢复离开时所在的界面：
             // 视图（首页 / 文章列表 / 文章详情 / 电影 / 关于）、当前标签、滚动位置。
             const VIEW_STATE_KEY = 'annie-view-state';
-            const VALID_VIEWS = ['home', 'blog', 'archive', 'tweaks', 'tags', 'movie', 'about', 'article', 'feedback', 'thanks', 'comments'];
+            const VALID_VIEWS = ['home', 'blog', 'archive', 'tweaks', 'tags', 'music', 'movie', 'about', 'article', 'feedback', 'thanks', 'comments'];
 
             function saveViewState() {
                 if (!VALID_VIEWS.includes(currentView)) return;
@@ -562,7 +563,7 @@
                 url.pathname = siteBasePath();
                 url.searchParams.delete(ARTICLE_PARAM);
                 if (currentView === 'about' || currentView === 'archive' || currentView === 'tweaks'
-                    || currentView === 'tags'
+                    || currentView === 'tags' || currentView === 'music'
                     || currentView === 'feedback' || currentView === 'thanks'
                     || currentView === 'comments') {
                     url.searchParams.set(VIEW_PARAM, currentView);
@@ -5006,7 +5007,16 @@
                 '#articleContent > *',
                 '#articleAdjacent > *',
                 '#articleRelated > *',
-                '#view-article .article-comments'
+                '#view-article .article-comments',
+                /* —— 音乐视图：抬头 + 操作栏 + 每一条曲目 ——
+                   曲目列表是 music/ui.js 动态画的 <li class="mt-row">，切换视图时
+                   已经存在，可以挂滚动渐显；别挂 .music-tracklist 整块（一个
+                   大列表一屏全出现，等于没动画）。 */
+                '#view-music .music-view-nav',
+                '#view-music .tweaks-hero',
+                '#view-music .music-view-bar',
+                '#view-music .music-tracklist--view .mt-row',
+                '#view-music .music-view-note'
             ].join(',');
 
             /* 同一批进视口的元素按屏幕位置从上到下依次错开。上限 3 档（270ms）：
@@ -5348,6 +5358,17 @@
                 }
             }
 
+            /* 音乐模块在 music/ 里，不引 script.js，想打开站内页面就发这个事件。
+               只放行 VALID_VIEWS 里的名字，拼错时宁可什么都不做。 */
+            document.addEventListener('annie:open-view', function (event) {
+                const target = event.detail && event.detail.view;
+                if (!target || !VALID_VIEWS.includes(target)) return;
+                if (currentView === target) return;
+                /* 和点导航一样走 navigateToView：会压一条历史记录，
+                   所以从音乐页按返回能回到刚才那一页，而不是直接退出站点。 */
+                navigateToView(target);
+            });
+
             function switchView(viewName) {
                 const previousView = currentView;
                 // 上一次切视图排下的滚动恢复任务立刻作废，
@@ -5372,7 +5393,7 @@
                 currentView = viewName;
                 // 离开感谢页就把倒计时停掉，别再偷偷把用户送回首页
                 if (viewName !== 'thanks') stopThanksCountdown();
-                [viewHome, viewBlog, viewArchive, viewTweaks, viewTags, viewMovie, viewAbout,
+                [viewHome, viewBlog, viewArchive, viewTweaks, viewTags, viewMusic, viewMovie, viewAbout,
                     viewArticle, viewFeedback, viewThanks, viewComments].forEach(v => {
                     v.style.display = 'none';
                     v.classList.remove('active-view');
@@ -5415,6 +5436,11 @@
                     viewTags.style.display = 'block';
                     viewTags.classList.add('active-view');
                     renderTagLanding();
+                } else if (viewName === 'music') {
+                    /* 列表本身是 music/ui.js 画的（它在首屏就跑了），这里只负责显示。
+                       音乐不占导航栏，所以 navMap 里映射成 null，不会有高亮。 */
+                    viewMusic.style.display = 'block';
+                    viewMusic.classList.add('active-view');
                 } else if (viewName === 'movie') {
                     viewMovie.style.display = 'block';
                     viewMovie.classList.add('active-view');
@@ -5460,7 +5486,7 @@
                 /* 反馈 / 感谢不属于导航里的任何一栏，映射成 null：
                    否则站在反馈页上会看到「首页」是选中态，比没有高亮更误导。
                    指示块那边找不到 .active 会自己收起，不用额外处理。 */
-                const navMap = { home: 'home', blog: 'blog', archive: 'archive', tweaks: 'home', tags: null, movie: 'movie', about: 'about', article: 'blog', feedback: null, thanks: null, comments: null };
+                const navMap = { home: 'home', blog: 'blog', archive: 'archive', tweaks: 'home', tags: null, music: null, movie: 'movie', about: 'about', article: 'blog', feedback: null, thanks: null, comments: null };
                 const activeNav = (viewName in navMap) ? navMap[viewName] : 'home';
                 const navLink = activeNav
                     ? document.querySelector(`.nav-links a[data-nav="${activeNav}"]`)
@@ -6456,14 +6482,12 @@
                     history.replaceState(history.state, '', clean.pathname + clean.search);
                 }
 
-                // 关于 / 归档 / 折腾 / 文章 / 电影 / 反馈 / 提交成功 / 评论 也可以通过
-                // ?view=xxx 直接打开，不受本地界面记忆影响。
-                // 文章/电影原本只靠导航 JS 切，独立页（如 /music/）的头部需要真实
-                // 链接，所以这里一并接进来；切过去之后地址栏仍按 syncUrlWithView 的
-                // 规则收回站点根，和站内导航的行为一致。
+                // 关于 / 归档 / 折腾 / 反馈 / 提交成功 / 评论 也可以通过 ?view=xxx 直接打开，
+                // 不受本地界面记忆影响。
                 const urlView = new URL(window.location.href).searchParams.get(VIEW_PARAM);
+                /* 音乐页已经内嵌为站内视图 ?view=music，和关于/归档/折腾一样直接打开。 */
                 if (urlView === 'about' || urlView === 'archive' || urlView === 'tweaks'
-                    || urlView === 'tags' || urlView === 'blog' || urlView === 'movie'
+                    || urlView === 'tags' || urlView === 'music'
                     || urlView === 'feedback' || urlView === 'thanks' || urlView === 'comments') {
                     // 反馈 / 评论的文章信息跟着地址栏走，直接打开也能带上
                     if (urlView === 'feedback') applyFeedbackContext(readFeedbackContextFromUrl());

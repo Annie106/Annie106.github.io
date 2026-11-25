@@ -2,8 +2,8 @@
  * Remix Icon v4.3.0 · 本地子集（生成物，不要手改）
  * 来源：https://github.com/Remix-Design/RemixIcon · Apache License 2.0
  *
- * 从 tools/remixicon-src.css 里只挑出站内用到的 96 个图标，
- * 字体同样由 tools/remixicon-src.woff2 裁出（96 个字形）。
+ * 从 tools/remixicon-src.css 里只挑出站内用到的 95 个图标，
+ * 字体同样由 tools/remixicon-src.woff2 裁出（95 个字形）。
  * 加 / 换图标后跑一次：python tools/subset-icons.py（或 tools/update-icons.bat），
  * 忘跑的话 tools/check-icons.js 会报「图标名不存在」。
  *
@@ -49,7 +49,6 @@
 .ri-arrow-right-line:before { content: "\ea6c"; }
 .ri-arrow-right-s-line:before { content: "\ea6e"; }
 .ri-arrow-right-up-line:before { content: "\ea70"; }
-.ri-arrow-up-s-line:before { content: "\ea78"; }
 .ri-article-line:before { content: "\ea7e"; }
 .ri-bookmark-3-line:before { content: "\eae3"; }
 .ri-briefcase-line:before { content: "\eaf5"; }

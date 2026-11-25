@@ -24,7 +24,7 @@
     //     它有自己的内联 onerror 兜底，也不打日志）
     //   · 音乐播放器区域（音频是 <audio>，本来就不会进这里；封面图同样放过）
     //   · 任何显式标了 data-image-loading="off" / data-fast-quota="off" 的区域
-    var EXCLUDED_SELECTOR = '.avatar, .music-player-card, ' +
+    var EXCLUDED_SELECTOR = '.avatar, .music-entry, .music-dock, ' +
         '[data-image-loading="off"], [data-fast-quota="off"]';
     var FAST_DAILY_KEY = 'annie-image-fast-daily';
 
