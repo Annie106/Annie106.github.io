@@ -648,8 +648,16 @@
                                 <span class="music-entry-vol-value" id="musicEntryVolValue">30%</span>
                             </div>
                         </div>
-                        <!-- 播放列表：默认收起（CSS max-height:0 + inert），点「播放列表」展开 -->
+                        <!-- 播放列表：默认收起（CSS max-height:0 + inert），点「播放列表」展开。
+                             窄屏（≤640px）时整块变成从底部升起的浮层（照 404 的「获取联系」），
+                             所以这里带一个只在浮层模式下出现的头部；桌面端 display:none。 -->
                         <div class="music-entry-list" id="musicEntryList">
+                            <div class="music-sheet-head">
+                                <p class="music-sheet-title">播放列表</p>
+                                <button class="music-sheet-close" id="musicSheetClose" type="button" aria-label="关闭播放列表">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.4 6.4l11.2 11.2M17.6 6.4L6.4 17.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
+                                </button>
+                            </div>
                             <ul class="music-tracklist music-tracklist--card" id="musicCardList"></ul>
                             <a class="music-entry-more" href="?view=music" data-music-open-view>
                                 <span><i class="ri-equalizer-2-line" aria-hidden="true"></i> 打开完整曲库</span>
@@ -1140,7 +1148,7 @@
             </section>
 
             <!-- 版本号：从页脚挪到这里，收在关于页右下角 -->
-            <p class="about-version">版本 0.4.27.042</p>
+            <p class="about-version">版本 0.4.27.057</p>
         </div>
 
         <!-- ==================== 文章详情视图 ==================== -->

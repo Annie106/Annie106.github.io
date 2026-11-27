@@ -17,6 +17,25 @@
  *   cover    可选，封面图。写了就替代黑胶唱片（圆形裁切），不写就画唱片。
  *   duration 可选，秒。填了不用等播放就能显示时长；不填显示 --:--。
  *   accent   可选，唱片中心标的颜色（只有没配封面时才看得见）。
+ *   lyric    可选，歌词。播放页右侧那块就是它。三种写法都认：
+ *            1) 数组：lyric: [{ time: 12.5, text: '第一句' }, { time: 18.2, text: '第二句' }]
+ *               time 单位是**秒**（可以带小数），从左到右必须递增。
+ *            2) LRC 原文（直接粘现成的）：
+ *               lyric: '[00:12.50]第一句\n[00:18.20]第二句'
+ *               [ti:] / [ar:] / [al:] / [by:] 这些标签会被自动忽略；
+ *               一行里带多个时间戳（[00:10.00][00:30.00]副歌）会展开成两行。
+ *            3) 纯文本：一行一句，只滚动不跟随播放进度。
+ *            不写 / 空字符串 / 空数组 → 播放页显示「该歌曲未配置歌词」。
+ *            有时间的歌词会跟着播放高亮 + 自动居中，点一句跳过去。
+ *   lyricFile 可选，**直接指向一个 .lrc 文件**（有现成歌词文件时推荐这个）：
+ *            lyricFile: 'music/lyrics/marriage.lrc'
+ *            - 相对路径按站点根解析；第一次放到这一首才去读，同一次访问只读一遍。
+ *            - 编码不用管：先按 UTF-8 解，解出乱码会自动再按 GBK 试一次。
+ *            - 读取期间歌词区显示「歌词加载中…」，读不到显示「歌词加载失败」。
+ *            - 和 lyric 同时写时以 lyric 为准。
+ *            - ⚠️ 是 fetch 读同源文件，所以**本地要起服务器**（双击 HTML 打不开）；
+ *              线上是 GitHub Pages，正常。
+ *            - 文件名建议用英文 / 拼音：中文名也能用，但复制链接时会被转义成一长串。
  *
  * ⚠️ 首页卡片的首帧文案（第一首的标题 / 歌手）同时写死在 index.html 里，
  *    这样 tracks.js 还没执行时卡片也不是一片空白。改第一首记得两处一起改。
@@ -34,6 +53,7 @@ window.ANNIE_MUSIC_TRACKS = [
         src: 'https://1837491863.cdn.123clouddisk.com/1837491863/52072187',
         cover: 'images/music_img/IMG_marriage_0.jpg',
         duration: 184,
+        lyricFile: 'music/lyrics/marriage.lrc', 
         accent: '#b45f74'
     },
     {
@@ -44,6 +64,16 @@ window.ANNIE_MUSIC_TRACKS = [
         src: 'https://1837491863.cdn.123clouddisk.com/1837491863/51963332#',
         cover: 'images/music_img/IMG_hug_you_0.jpg',
         duration: 222,
+        accent: '#b45f74'
+    },
+    {
+        id: 'wind blows',
+        title: '风吹雨落',
+        artist: '刀酱',
+        album: '风吹雨落',
+        src: 'https://1837491863.cdn.123clouddisk.com/1837491863/52025030',
+        cover: 'images/music_img/IMG_wind blows_0.jpg',
+        duration: 159,
         accent: '#b45f74'
     },
     {

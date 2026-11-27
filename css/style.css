@@ -4431,12 +4431,19 @@
             display: none;
         }
 
+        /* 封面加载完成：黑胶淡出。保留在 DOM 里（只是透明），
+           下一首换成没封面时不需要重新插入节点。 */
         .music-entry-art[data-cover="true"] .music-entry-disc {
-            display: none;
+            opacity: 0;
+            pointer-events: none;
         }
 
+        /* 黑胶盖在封面图**上面**：封面解码完成之前它挡着那块空白的圆，
+           加载完再淡出、露出下面的真实封面（切换逻辑见 music/ui.js 的 setCoverArt）。
+           所以这里必须是 absolute + inset:0，不能和 <img> 一起走普通流。 */
         .music-entry-disc {
-            position: relative;
+            position: absolute;
+            inset: 0;
             display: block;
             width: 100%;
             height: 100%;
@@ -4447,6 +4454,8 @@
             box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
             animation: music-entry-spin 9s linear infinite;
             animation-play-state: paused;
+            /* 封面就绪时这一层淡出，而不是 display:none —— display 没法过渡 */
+            transition: opacity 260ms ease;
         }
 
         /* 中心那个小孔 */
@@ -5036,21 +5045,36 @@
             display: flex;
         }
 
+        /* 黑胶打底：封面图（.mt-cover）没解码完之前，这一层就是占位，
+           所以它必须留着自己的 background，不能被封面的 url 覆盖掉 */
         .mt-art {
             --row-accent: #b45f74;
+            position: relative;
             display: block;
             width: 34px;
             height: 34px;
             border-radius: 50%;
+            overflow: hidden;
             background:
                 radial-gradient(circle at 50% 50%, var(--row-accent) 0 23%, rgba(0, 0, 0, 0.38) 24%, rgba(0, 0, 0, 0) 25%),
                 repeating-radial-gradient(circle at 50% 50%, #2b2b30 0 1px, #191a1d 1px 3px);
             box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
         }
 
-        .mt-art.has-cover {
-            background-size: cover;
-            background-position: center;
+        /* 封面图盖在黑胶上，解码完成才淡入（逻辑见 music/ui.js 的 buildRows） */
+        .mt-cover {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+            opacity: 0;
+            transition: opacity 220ms ease;
+        }
+
+        .mt-cover.is-ready {
+            opacity: 1;
         }
 
         .mt-text {
@@ -5445,6 +5469,11 @@
             .music-entry-disc,
             .mt-eq i {
                 animation: none;
+            }
+            /* 减弱动效时封面直接切换，不要那 260ms 的黑胶淡出 */
+            .music-entry-disc,
+            .mt-cover {
+                transition: none;
             }
             .music-entry-list {
                 transition: none;
@@ -8466,5 +8495,243 @@
             .tag-landing-item,
             .tag-landing-item i {
                 transition: none;
+            }
+        }
+
+        /* ==================== 音乐卡片 · 歌单浮层（窄屏） ====================
+           ≤640px 时点「播放列表」不再在卡片下方挂一个小浮层，而是把整块
+           搬成贴底升起的浮层 —— 版式和动效照 404.html 的「获取联系」：
+           背板 0.24s 淡入，面板 0.46s 从下沿升起来（cubic-bezier(.32,.72,0,1)），
+           收起 0.22s 落回去，上圆角、投影朝上。
+           开关逻辑在 music/ui.js 的 openCardSheet / closeCardSheet：
+           浮层期间这块元素会被搬到 body（卡片在 .hero-player 里带 z-index，
+           position: fixed 待在里头会被那个层叠上下文压住，背板也盖不住整页）。 */
+        .music-sheet-head {
+            display: none;
+        }
+
+        .music-sheet-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 1490;
+            background: rgba(24, 24, 22, 0.44);
+            -webkit-backdrop-filter: blur(3px);
+            backdrop-filter: blur(3px);
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .music-sheet-backdrop.is-open {
+            opacity: 1;
+            visibility: visible;
+            animation: musicFadeIn 0.24s ease both;
+        }
+
+        .music-sheet-backdrop.is-closing {
+            animation: musicFadeOut 0.2s ease both;
+        }
+
+        @keyframes musicFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes musicFadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+
+        .music-sheet-backdrop[hidden] {
+            display: none;
+        }
+
+        .music-entry-list.is-sheet {
+            position: fixed;
+            top: auto;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 1500;
+            display: flex;
+            flex-direction: column;
+            /* 内容再多也不出屏幕：上限 88dvh（不认 dvh 的老浏览器退回 vh），
+               超出的部分交给列表自己滚 */
+            max-height: 88vh;
+            max-height: 88dvh;
+            padding: 0;
+            border: 1px solid var(--color-border);
+            border-bottom: 0;
+            border-radius: 20px 20px 0 0;
+            background: var(--color-bg);
+            box-shadow: 0 -12px 44px rgba(0, 0, 0, 0.22);
+            opacity: 1;
+            visibility: hidden;
+            transform: translateY(100%);
+        }
+
+        /* 进出场用 @keyframes，不用 transition：
+           这块是「先插进 DOM、再加类」的，同帧两次样式变更会被合并，
+           transition 会被整条跳过（404.html 的「获取联系」也是这么写的） */
+        .music-entry-list.is-sheet.is-open {
+            transform: none;
+            visibility: visible;
+            animation: musicSheetIn 0.46s cubic-bezier(0.32, 0.72, 0, 1) both;
+        }
+
+        /* 收起给 0.22s：ui.js 220ms 后把整块搬回卡片里 */
+        .music-entry-list.is-sheet.is-closing {
+            animation: musicSheetOut 0.22s cubic-bezier(0.4, 0, 1, 1) both;
+        }
+
+        @keyframes musicSheetIn {
+            from { transform: translateY(100%); }
+            to { transform: none; }
+        }
+
+        @keyframes musicSheetOut {
+            from { transform: none; }
+            to { transform: translateY(100%); }
+        }
+
+        /* 打开时焦点给浮层自己（tabindex=-1），程序化聚焦不该在外面顶一圈框 */
+        .music-entry-list.is-sheet:focus {
+            outline: none;
+        }
+
+        .music-entry-list.is-sheet .music-sheet-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex: none;
+            padding: 13px 12px 13px 20px;
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .music-sheet-title {
+            margin: 0;
+            color: var(--color-text-primary);
+            font-size: 15px;
+            font-weight: 500;
+            letter-spacing: 0.01em;
+        }
+
+        .music-sheet-close {
+            display: grid;
+            place-items: center;
+            flex: none;
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            border: 1px solid transparent;
+            border-radius: 50%;
+            background: transparent;
+            color: var(--color-text-secondary);
+            cursor: pointer;
+            transition: background 0.2s ease, color 0.2s ease;
+        }
+
+        .music-sheet-close svg {
+            width: 15px;
+            height: 15px;
+            fill: currentColor;
+        }
+
+        html:not(.is-touch-input) .music-sheet-close:hover {
+            background: var(--card-control-bg);
+            color: var(--color-text-primary);
+        }
+
+        .music-sheet-close:focus-visible {
+            outline: 2px solid var(--color-text-primary);
+            outline-offset: 2px;
+        }
+
+        /* 当前这首：和播放浮层里的歌单同一套（movie 选片条：左侧强调色 + 浅灰底） */
+        .music-entry-list.is-sheet .mt-row {
+            border-left: 3px solid transparent;
+            transition: background-color 0.16s ease, border-color 0.2s ease;
+        }
+
+        .music-entry-list.is-sheet .mt-row-hit {
+            padding-left: 7px;
+            border-radius: 0;
+        }
+
+        /* 竖条走全站强调色（浅色近黑、深色自动翻成白），不用 --card-accent：
+           玫瑰紫是卡片主标签专用的那一点彩色，放到整条 3px 竖条上太重，
+           和这里「黑字 + 浅灰底」的选片条不是一套语言 */
+        .music-entry-list.is-sheet .mt-row.is-current {
+            background: #f5f5f5;
+            border-left-color: var(--color-accent);
+        }
+
+        [data-theme="dark"] .music-entry-list.is-sheet .mt-row.is-current {
+            background: rgba(255, 255, 255, 0.07);
+        }
+
+        html:not(.is-touch-input) .music-entry-list.is-sheet .mt-row-hit:hover {
+            background: rgba(17, 17, 17, 0.035);
+        }
+
+        html:not(.is-touch-input)[data-theme="dark"] .music-entry-list.is-sheet .mt-row-hit:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        /* 列表区把剩下的高度全吃掉、自己滚：头部和底部那条「打开完整曲库」
+           始终钉在浮层的两端，歌再多也不会把它们顶出屏幕 */
+        .music-entry-list.is-sheet .music-tracklist {
+            flex: 1 1 auto;
+            min-height: 0;
+            max-height: none;
+            padding: 8px 10px;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            /* 行高不是整除数时最后一行会被切一半，底部淡出把「还有更多」说清楚 */
+            -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 92%, transparent 100%);
+            mask-image: linear-gradient(180deg, #000 0%, #000 92%, transparent 100%);
+        }
+
+        /* 走到 body 上以后 --me-* 就不在作用域里了，这里换成全站变量 */
+        .music-entry-list.is-sheet .music-entry-more {
+            flex: none;
+            margin: 4px 12px calc(12px + env(safe-area-inset-bottom));
+            background: var(--color-tag-bg);
+            color: var(--color-text-primary);
+        }
+
+        .music-entry-list.is-sheet .music-entry-more i {
+            color: var(--color-text-tertiary);
+        }
+
+        html:not(.is-touch-input) .music-entry-list.is-sheet .music-entry-more:hover {
+            background: var(--color-border-light);
+        }
+
+        /* 浮层期间卡片上那颗「播放列表」保持按下态 */
+        .music-entry.is-sheet-open .music-entry-list-toggle,
+        html:not(.is-touch-input) .music-entry.is-sheet-open .music-entry-list-toggle:hover {
+            background: var(--me-fill);
+            color: var(--me-fill-ink);
+        }
+
+        /* 浮层打开时锁住背后滚动（ui.js 写 --mm-gap 补滚动条宽度） */
+        html.music-sheet-open,
+        html.music-sheet-open body {
+            overflow: hidden;
+            overscroll-behavior: none;
+        }
+
+        html.music-sheet-open body {
+            padding-right: calc(var(--body-pad-x, 24px) + var(--mm-gap, 0px));
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            /* 减弱动效时直接落终态（.is-open 本身就带着 transform: none） */
+            .music-sheet-backdrop.is-open,
+            .music-sheet-backdrop.is-closing,
+            .music-entry-list.is-sheet.is-open,
+            .music-entry-list.is-sheet.is-closing {
+                animation: none;
             }
         }

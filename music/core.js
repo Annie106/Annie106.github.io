@@ -17,11 +17,15 @@
  *   3. **状态唯一的来源是 audio 元素**：UI 只读 subscribe 推过来的快照，
  *      不自己记 isPlaying —— 否则浏览器暂停（比如来电、系统媒体键）
  *      之后按钮会停在「暂停」图标上，点了没反应。
- *   4. 播放失败不抛异常、不静默：state.error 变成 'blocked' / 'source'，
+ *   4. 播放失败不抛异常、不静默：state.error 变成 'blocked' / 'quota' / 'play'，
  *      UI 直接在卡片上写一句人话。
+ *   5. **失败必须退避**：连续放不出来时下一次请求要等够时间（规则见下面
+ *      「失败重试门禁」那一段）。等待期内任何入口（播放键、换歌、上一首/
+ *      下一首、播放全部、系统媒体键）都不会碰 audio.src / audio.play()。
  *
  * reason 取值（UI 按它决定要不要重排）：
  *   'init' 'track' 'play' 'pause' 'time' 'duration' 'loading' 'error' 'volume' 'mode'
+ *   'retry'（等待期每秒刷新倒计时、到期解除）—— UI 不需要特殊处理，和 'error' 一样重画即可
  * ======================================================== */
 (function (global) {
     'use strict';
@@ -55,6 +59,46 @@
         muted: prefs.muted === true,
         mode: MODES.indexOf(prefs.mode) >= 0 ? prefs.mode : 'list'
     };
+
+    /* ---------------- 失败重试门禁 ----------------
+     *
+     * 一次「失败」= 浏览器明确告诉我们放不出来：<audio> 的 error 事件，
+     * 或者 play() 返回的 promise 被 reject（AbortError 是我们自己切歌打断的，不算）。
+     *
+     * 失败次数 → 下一次请求要等多久（n = 刚刚失败的是第几次请求）：
+     *
+     *   n = 1  →  第 2 次请求   等 0 秒（立刻可以再点一次，给一次瞬断的机会）
+     *   n = 2  →  第 3 次请求   等 10 秒
+     *   n = 3  →  第 4 次请求   等 20 秒
+     *   n = 4  →  第 5 次请求   等 20 秒（和上一档一样，不是 30）
+     *   n = 5  →  第 6 次请求   等 30 秒
+     *   n = 6  →  第 7 次请求   等 40 秒
+     *   n = 7  →  第 8 次请求   等 50 秒
+     *   n = 8  →  阶梯本该涨到 60 秒 —— **不再等待，今天到此为止**
+     *
+     * 即 delay(n) = 0（n≤1）/ 10 秒（n=2）/ max(20, (n-2)×10) 秒（n≥3），
+     * 而这个值一旦 >= 60 就直接锁到明天：连续失败 8 次、试了 7 档，
+     * 再点基本是徒劳，还白白打音频服务器。锁定按自然日记（本地时区），
+     * 存在 localStorage 里，刷新 / 关掉再开也还是锁着，跨天自动解开。
+     *
+     * 计时起点是「这一次失败被确认的那一刻」，不是请求发出的那一刻：
+     * 网络很慢、请求发了 8 秒才报错，那 10 秒就从报错那一秒重新数。
+     *
+     * 放行只认时间戳（now >= retryAt），绝不靠定时器计数：后台标签页的
+     * 定时器会被节流到一分钟一次，靠计数就会提前发起请求。下面那个
+     * setInterval 只负责让界面上的秒数跳动，删掉它也不会多发一次请求。
+     */
+    var LOCKOUT_SECONDS = 60;          // 等待阶梯涨到这个数就停止重试
+    var LOCK_KEY = 'annie-music-lockout';
+
+    var failureCount = 0;      // 连续失败次数，真正放出声（playing）后清零
+    var retryAt = 0;           // 时间戳，早于它一律不发请求；0 表示不禁
+    var retryTimer = null;     // 只刷新倒计时文案，不参与放行判定
+    var retryShown = -1;       // 上一次推给 UI 的剩余秒数，避免每 250ms 重画
+    var attemptOpen = false;   // 有一次请求已发出、结果还没回来（用于给重复报告去重）
+    var lastFailureAt = 0;
+    var lastFailureSrc = '';
+    var lockedDate = readLockedDate(); // 已锁死的日期（'YYYY-M-D'），空串表示没锁
 
     /* ---------------- 小工具 ---------------- */
 
@@ -142,6 +186,158 @@
         });
     }
 
+    /* ---------------- 失败重试门禁（逻辑） ---------------- */
+
+    /* 第 count 次失败之后要等多久才能发下一次请求，单位**秒**。
+       规则表在文件上半部分的注释里，改这里就等于改规则，别在别处再算一遍。 */
+    function retryDelaySeconds(count) {
+        if (count <= 1) return 0;
+        if (count === 2) return 10;
+        return Math.max(20, (count - 2) * 10);
+    }
+
+    /* 本地日期，形如 '2026-11-27'。不用 toISOString()：那是 UTC，
+       东八区晚上 8 点之后就会算成「明天」，锁定会提前解开。 */
+    function todayKey() {
+        var date = new Date();
+        return date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate();
+    }
+
+    function readLockedDate() {
+        try { return localStorage.getItem(LOCK_KEY) || ''; } catch (error) { return ''; }
+    }
+
+    /* 今天已经锁过一次：一进页面就该说清楚，不用等用户点了才发现。
+       锁的是「日期字符串」，所以刷新、关页面再开都还在，跨天自动失效。 */
+    function isLockedOut() {
+        if (!lockedDate) return false;
+        if (lockedDate === todayKey()) return true;
+        clearLock();   /* 已经是新的一天，顺手把缓存清掉 */
+        return false;
+    }
+
+    function clearLock() {
+        if (!lockedDate) return;
+        lockedDate = '';
+        /* 换了一天就重新从「立即重试」开始数：否则昨天攒到的 8 次会让
+           今天第一次失败就直接又锁死 */
+        failureCount = 0;
+        try { localStorage.removeItem(LOCK_KEY); } catch (error) { /* 隐私模式 */ }
+    }
+
+    function lockForToday() {
+        lockedDate = todayKey();
+        retryAt = 0;
+        clearRetryTick();
+        try { localStorage.setItem(LOCK_KEY, lockedDate); } catch (error) { /* 存不下就只锁本次会话 */ }
+    }
+
+    /* 剩余等待秒数，向上取整：剩 0.4 秒也算 1 秒，界面上不会出现
+       「已显示 0 秒却不能点」。判定放行时用的是毫秒时间戳，不是这个值。 */
+    function retryWaitSeconds() {
+        if (!retryAt) return 0;
+        var remain = retryAt - Date.now();
+        return remain > 0 ? Math.ceil(remain / 1000) : 0;
+    }
+
+    function canRequest() {
+        if (isLockedOut()) return false;
+        return !retryAt || Date.now() >= retryAt;
+    }
+
+    function clearRetryTick() {
+        if (retryTimer) {
+            clearInterval(retryTimer);
+            retryTimer = null;
+        }
+        retryShown = -1;
+    }
+
+    function scheduleRetryTick() {
+        if (!retryAt || retryTimer) return;
+        retryTimer = setInterval(function () {
+            if (canRequest()) {
+                clearRetryTick();
+                emit('retry');   /* 等待结束，文案回到普通失败态 */
+                return;
+            }
+            var seconds = retryWaitSeconds();
+            if (seconds === retryShown) return;
+            retryShown = seconds;
+            emit('retry');
+        }, 250);
+    }
+
+    function resetFailureChain() {
+        failureCount = 0;
+        retryAt = 0;
+        attemptOpen = false;
+        lastFailureAt = 0;
+        lastFailureSrc = '';
+        clearRetryTick();
+        /* 能放出声说明根本没被锁，跨天残留的标记顺手清掉 */
+        clearLock();
+    }
+
+    /* 等待期内有人想播：一个请求都不发，只把剩余秒数推给 UI。 */
+    function reportCooldown() {
+        if (!state.error) state.error = 'quota';
+        retryShown = -1;
+        emit('retry');
+    }
+
+    /* 所有失败最终都从这里进：state.error、失败次数、等待截止时间三件事
+       必须一次算完，散在各自的事件回调里迟早会对不上。 */
+    function registerFailure(reason) {
+        var now = Date.now();
+        var src = audio ? (audio.getAttribute('src') || audio.currentSrc || '') : '';
+
+        if (attemptOpen) {
+            attemptOpen = false;
+        } else if (src && src === lastFailureSrc && now - lastFailureAt < 1000) {
+            /* 同一次失败的第二次报告（error 事件和 play() 的 reject 说的是
+               同一件事）。不吞掉的话失败次数会翻倍，等待时间也跟着翻倍。 */
+            return;
+        }
+        lastFailureAt = now;
+        lastFailureSrc = src;
+
+        state.playing = false;
+        state.buffering = false;
+
+        /* 浏览器因为「没有用户手势」拦下来的，不是音源的问题：
+           再点一次通常就过了。算进失败链会让「被拦一次就要等 10 秒」
+           变得莫名其妙，所以它不进等待期。 */
+        if (reason === 'blocked') {
+            state.error = 'blocked';
+            syncMediaSessionState();
+            emit('error');
+            return;
+        }
+
+        failureCount += 1;
+        var seconds = retryDelaySeconds(failureCount);
+
+        /* 阶梯涨到 60 秒这一档：不再等待、不再发请求，直接锁到明天。
+           到这里已经是连续第 8 次失败（0/10/20/20/30/40/50 都试过了），
+           继续点既听不到歌，也一直在打音频服务器。 */
+        if (seconds >= LOCKOUT_SECONDS) {
+            lockForToday();
+            state.error = reason;
+            syncMediaSessionState();
+            emit('error');
+            return;
+        }
+
+        /* 计时起点 = 这一次失败被确认的时刻 */
+        retryAt = seconds > 0 ? now + seconds * 1000 : 0;
+
+        state.error = reason;
+        syncMediaSessionState();
+        emit('error');
+        scheduleRetryTick();
+    }
+
     /* ---------------- 音频元素 ---------------- */
 
     function ensureAudio() {
@@ -160,6 +356,8 @@
             state.playing = true;
             state.buffering = false;
             state.error = '';
+            /* 真的放出声了：失败链结束，下一次失败重新从「立即重试」开始数 */
+            resetFailureChain();
             syncMediaSessionState();
             emit('play');
         });
@@ -197,14 +395,11 @@
 
         /* 直链失效（403 / 404 / 防盗链 / 当日流量用完）都走这里。
            浏览器只给一个笼统的 MEDIA_ERR_SRC_NOT_SUPPORTED，
-           页面上统一说成「今日播放额度已用完」，让用户明天再来。 */
+           页面上统一说成「今日播放额度已用完」，让用户明天再来。
+           失败计数 / 等待期在 registerFailure 里统一处理。 */
         audio.addEventListener('error', function () {
             if (!audio || !audio.getAttribute('src')) return;
-            state.playing = false;
-            state.buffering = false;
-            state.error = 'quota';
-            syncMediaSessionState();
-            emit('error');
+            registerFailure('quota');
         });
     }
 
@@ -256,6 +451,14 @@
         var nextIndex = ((index % tracks.length) + tracks.length) % tracks.length;
         var track = tracks[nextIndex];
 
+        /* 等待期内一个字节都不发：连 index / src 都不动，避免出现
+           「界面已经换了歌、audio 还停在上一次失败的地址」这种半截状态。
+           代价是这期间点别的歌没反应 —— 卡片上那句倒计时就是解释。 */
+        if (!canRequest()) {
+            reportCooldown();
+            return;
+        }
+
         state.index = nextIndex;
         state.error = '';
         state.currentTime = 0;
@@ -271,13 +474,17 @@
     }
 
     function startPlayback() {
+        if (!canRequest()) {
+            reportCooldown();
+            return;
+        }
         var element = ensureAudio();
         var promise;
+        attemptOpen = true;
         try {
             promise = element.play();
         } catch (error) {
-            state.error = 'play';
-            emit('error');
+            registerFailure('play');
             return;
         }
         /* 浏览器可能因为「没有用户手势」或音源不可用拒绝播放。
@@ -285,20 +492,22 @@
         if (promise && typeof promise.catch === 'function') {
             promise.catch(function (error) {
                 if (error && error.name === 'AbortError') return;
-                state.playing = false;
                 /* NotAllowedError：没手势 / 被拦；NotSupportedError：
                    直链打不开或不是音频（挡掉域名的实测就是这一条）。 */
-                if (error && error.name === 'NotAllowedError') state.error = 'blocked';
-                else if (error && error.name === 'NotSupportedError') state.error = 'quota';
-                else state.error = 'play';
-                syncMediaSessionState();
-                emit('error');
+                if (error && error.name === 'NotAllowedError') registerFailure('blocked');
+                else if (error && error.name === 'NotSupportedError') registerFailure('quota');
+                else registerFailure('play');
             });
         }
     }
 
     function play(index) {
         if (!tracks.length) return;
+        /* 门禁放在最前面：等待期内连 load 都不进，更不会碰 audio.src */
+        if (!canRequest()) {
+            reportCooldown();
+            return;
+        }
         if (typeof index === 'number' && index !== state.index) {
             load(index, true);
             return;
@@ -376,8 +585,9 @@
 
     function seekRatio(ratio) {
         if (!state.duration) {
-            /* 时长未知时按比例拖没有意义，先触发一次元数据加载 */
-            if (audio && audio.getAttribute('src')) {
+            /* 时长未知时按比例拖没有意义，先触发一次元数据加载。
+               等待期内不发 —— audio.load() 会重新走一遍网络。 */
+            if (audio && audio.getAttribute('src') && canRequest()) {
                 try { audio.load(); } catch (error) {}
             }
             return;
@@ -437,6 +647,9 @@
             audio.volume = state.volume;
             audio.muted = state.muted;
         }
+        /* 今天已经被锁死过（localStorage 里记着）：一进页面就把话说清楚，
+           否则用户会先点一下没反应，才知道今天听不了。 */
+        if (isLockedOut()) state.error = 'quota';
         syncMediaSessionTrack();
         bindMediaSessionActions();
         emit('init');
@@ -444,6 +657,10 @@
     }
 
     function getState() {
+        /* isLockedOut() 在跨天时会顺手清掉失败计数，必须先判一次再读 failures。
+           否则「刚跨过零点」的这一帧会给出 locked=false 却 failures=8 的
+           不自洽快照，界面要再等下一次 emit 才恢复正常。 */
+        var locked = isLockedOut();
         return {
             ready: state.ready,
             index: state.index,
@@ -452,6 +669,10 @@
             playing: state.playing,
             buffering: state.buffering,
             error: state.error,
+            /* 失败链的三个可读量：UI 只用来写倒计时文案 / 置灰播放键 */
+            failures: failureCount,
+            retryIn: retryWaitSeconds(),
+            locked: locked,
             currentTime: state.currentTime,
             duration: state.duration || (currentTrack() ? Number(currentTrack().duration) || 0 : 0),
             volume: state.volume,

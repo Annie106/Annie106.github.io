@@ -1,0 +1,974 @@
+/* ==================== 音乐模块 · 播放页 ====================
+ *
+ * 一个对话框，版式和动效整体照 404.html 的「获取联系」：
+ *   · 桌面：背板 0.24s 淡入，面板 0.34s 从 16px 下方浮起、scale(.982) 收到原大
+ *   · 窄屏（≤640px）：居中偏上的对话框，同样从下方升起（0.46s）
+ *   · 收起：`.is-closing` + @keyframes（0.2s / 窄屏 0.22s），220ms 后 hidden
+ * 面板里是唱片、歌词、进度、走带控件；播放列表在面板里就地展开。
+ *
+ * 配色全部沿用 css/style.css 的变量，唯一的彩色是唱片中心标（--card-accent）。
+ * 这一份是**懒加载**的：第一次打开播放页才下载（和 dock.css 同一套做法）。
+ * ======================================================== */
+
+/* ---------------- 浮层 ---------------- */
+.mp-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+/* display 会盖掉 [hidden] 的默认样式，必须显式收回来 */
+.mp-modal[hidden] {
+    display: none;
+}
+
+.mp-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(24, 24, 22, 0.44);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+    animation: mpBackdropIn 0.24s ease both;
+}
+
+.mp-panel {
+    --mp-fg: var(--color-text-primary);
+    --mp-muted: var(--color-text-secondary);
+    --mp-faint: var(--color-text-tertiary);
+    --mp-line: rgba(17, 17, 17, 0.12);
+    --mp-fill: var(--color-text-primary);
+    --mp-hover-bg: var(--card-control-bg);
+    --mp-accent: var(--card-accent);
+    --mp-disc: 200px;
+
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: min(760px, 100%);
+    /* 高度跟着内容走，上限才是视口；写死会剩一大块空白 */
+    max-height: min(780px, 100%);
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    border-radius: 18px;
+    background: var(--color-bg);
+    color: var(--mp-fg);
+    box-shadow: 0 32px 80px rgba(0, 0, 0, 0.26);
+    outline: none;
+    animation: mpPanelRise 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 关闭是「加一个类」，用 @keyframes 而不是 transition：
+   同一帧里两次样式变更会被合并，transition 会被整条跳过 */
+.mp-modal.is-closing .mp-backdrop {
+    animation: mpBackdropOut 0.2s ease both;
+}
+
+.mp-modal.is-closing .mp-panel {
+    animation: mpPanelFall 0.2s ease both;
+}
+
+@keyframes mpBackdropIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes mpBackdropOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+@keyframes mpPanelRise {
+    from { opacity: 0; transform: translateY(16px) scale(0.982); }
+    to { opacity: 1; transform: none; }
+}
+
+@keyframes mpPanelFall {
+    from { opacity: 1; transform: none; }
+    to { opacity: 0; transform: translateY(10px) scale(0.99); }
+}
+
+/* 窄屏专用：从下沿整块升起来（from 必须是整块在视口之外，
+   只给十几像素的话看不出「从下面上来」） */
+@keyframes mpSheetIn {
+    from { transform: translateY(100%); }
+    to { transform: none; }
+}
+
+@keyframes mpSheetOut {
+    from { transform: none; }
+    to { transform: translateY(100%); }
+}
+
+/* ---------------- 面板头（照 404 的 .contact-panel-head） ---------------- */
+.mp-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex: none;
+    padding: 13px 14px 13px 22px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.mp-panel-title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+}
+
+/* 关闭按钮：圆形、透明底，悬停才亮一档 */
+.mp-panel-close {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--mp-muted);
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.mp-panel-close svg {
+    width: 15px;
+    height: 15px;
+    fill: currentColor;
+}
+
+.mp-panel-close:focus-visible {
+    outline: 2px solid var(--color-text-primary);
+    outline-offset: 2px;
+}
+
+/* 面板内容：唱片 / 歌词 / 歌单都滚在这一块里，
+   底下的走带控件是**钉住的**——歌单开出来再长，播放键也不会被推出屏幕 */
+.mp-panel-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 20px 22px 16px;
+    scrollbar-width: thin;
+}
+
+/* ---------------- 主体：唱片 + 歌词 ---------------- */
+.mp-body {
+    display: grid;
+    grid-template-columns: var(--mp-disc) minmax(0, 1fr);
+    gap: clamp(20px, 3vw, 34px);
+    align-items: start;
+}
+
+.mp-stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.mp-art {
+    position: relative;
+    display: block;
+    width: var(--mp-disc);
+    height: var(--mp-disc);
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+}
+
+/* 黑胶本体：细密纹路 + 一圈内描边 + 一层很浅的投影。
+   封面（.mp-art-img）解码完之前，它就是占位。 */
+.mp-art::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: repeating-radial-gradient(circle at 50% 50%, #26262c 0 1px, #141518 1px 3px);
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+        0 16px 32px -20px rgba(0, 0, 0, 0.55);
+}
+
+.mp-art-img,
+.mp-disc {
+    position: absolute;
+    inset: 18%;
+    width: 64%;
+    height: 64%;
+    border-radius: 50%;
+    animation: mp-spin 28s linear infinite;
+    animation-play-state: paused;
+}
+
+.mp-art-img {
+    object-fit: cover;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+/* 没有封面时露出的「唱片中心标」，全站唯一会出现在这里的一抹彩色 */
+.mp-disc {
+    background:
+        radial-gradient(circle at 50% 50%, var(--mp-accent) 0 21%, rgba(0, 0, 0, 0.55) 22%, rgba(0, 0, 0, 0) 23%),
+        repeating-radial-gradient(circle at 50% 50%, #2b2b30 0 1px, #191a1d 1px 3px);
+    transition: opacity 0.3s ease;
+}
+
+/* ⚠️ img 的 display 会压过 [hidden]，不写这条会出现「切歌了封面还是上一首」 */
+.mp-art[data-cover="false"] .mp-art-img {
+    display: none;
+}
+
+.mp-art[data-cover="true"] .mp-disc {
+    opacity: 0;
+}
+
+.mp-spindle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 8px;
+    height: 8px;
+    margin: -4px 0 0 -4px;
+    border-radius: 50%;
+    background: #0b0c0f;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+/* 播放时唱片才转。用 animation-play-state 而不是加/删动画：
+   暂停再播不会从 0 度重新开始，看着才像真唱片。 */
+.mp-panel[data-playing="true"] .mp-art-img,
+.mp-panel[data-playing="true"] .mp-disc {
+    animation-play-state: running;
+}
+
+/* ---------------- 右侧：标题 + 歌词 ---------------- */
+.mp-info {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.mp-title {
+    margin: 0;
+    font-size: clamp(1.15rem, 1.7vw, 1.4rem);
+    font-weight: 600;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+    overflow-wrap: anywhere;
+}
+
+.mp-meta {
+    margin: 5px 0 0;
+    color: var(--mp-faint);
+    font-size: 0.78rem;
+    overflow-wrap: anywhere;
+}
+
+.mp-error {
+    margin: 8px 0 0;
+    padding: 7px 11px;
+    border: 1px solid rgba(178, 43, 43, 0.2);
+    border-radius: 8px;
+    background: rgba(178, 43, 43, 0.05);
+    color: #b22b2b;
+    font-size: 0.78rem;
+    line-height: 1.6;
+}
+
+.mp-lyric {
+    position: relative;
+    margin-top: 12px;
+    min-height: 132px;
+    max-height: 236px;
+    padding: 2px 2px 18px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    /* 只让底部淡出：顶部也淡的话，滚到最上面第一句就是虚的 */
+    -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 86%, transparent 100%);
+    mask-image: linear-gradient(180deg, #000 0%, #000 86%, transparent 100%);
+}
+
+.mp-lyric-line {
+    margin: 0;
+    padding: 4px 0;
+    font-size: 0.9rem;
+    line-height: 1.65;
+    color: var(--mp-faint);
+    opacity: 0.78;
+    transition: color 0.28s ease, opacity 0.28s ease;
+}
+
+.mp-lyric-line.is-past {
+    opacity: 0.5;
+}
+
+.mp-lyric-line.is-active {
+    color: var(--mp-fg);
+    opacity: 1;
+    font-weight: 600;
+}
+
+.mp-lyric-line.is-seekable {
+    cursor: pointer;
+}
+
+html:not(.is-touch-input) .mp-lyric-line.is-seekable:hover {
+    color: var(--mp-fg);
+    opacity: 1;
+}
+
+.mp-lyric-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 132px;
+    margin: 0;
+    color: var(--mp-faint);
+    font-size: 0.82rem;
+}
+
+/* ---------------- 走带控制 ---------------- */
+.mp-barwrap {
+    position: relative;
+    flex: none;
+    padding: 10px 22px max(16px, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--color-divider);
+    background: var(--color-bg);
+}
+
+/* 内容区还能往下滚时，在控件条上沿飘一层淡出：
+   不然滚到一半的歌单行会被硬生生切在控件条上，看着像画坏了。
+   .is-scrollable 由 ui.js 按「还能不能滚」实时挂 */
+.mp-barwrap::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    height: 26px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0), var(--color-bg));
+    opacity: 0;
+    transition: opacity 0.18s ease;
+    pointer-events: none;
+}
+
+.mp-panel.is-scrollable .mp-barwrap::before {
+    opacity: 1;
+}
+
+.mp-progress {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.mp-time {
+    min-width: 38px;
+    color: var(--mp-faint);
+    font-size: 0.7rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.mp-time--dur {
+    text-align: right;
+}
+
+.mp-bar {
+    position: relative;
+    flex: 1 1 auto;
+    height: 18px;
+    cursor: pointer;
+}
+
+.mp-bar::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 3px;
+    margin-top: -1.5px;
+    border-radius: 999px;
+    background: var(--mp-line);
+}
+
+.mp-bar-fill {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 0;
+    height: 3px;
+    margin-top: -1.5px;
+    border-radius: 999px;
+    background: var(--mp-fill);
+}
+
+/* 滑块平时藏起来，悬停 / 拖动 / 键盘聚焦时才浮出 */
+.mp-bar::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: var(--progress, 0%);
+    width: 10px;
+    height: 10px;
+    margin: -5px 0 0 -5px;
+    border-radius: 50%;
+    background: var(--mp-fill);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+    opacity: 0;
+    transition: opacity 0.16s ease;
+}
+
+.mp-bar:hover::after,
+.mp-bar.is-dragging::after,
+.mp-bar:focus-visible::after {
+    opacity: 1;
+}
+
+.mp-bar:focus-visible {
+    outline: 2px solid var(--mp-fill);
+    outline-offset: 4px;
+    border-radius: 999px;
+}
+
+.mp-transport {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    margin-top: 2px;
+}
+
+.mp-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+}
+
+.mp-btn {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--mp-muted);
+    cursor: pointer;
+    transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease;
+}
+
+.mp-btn svg {
+    width: 17px;
+    height: 17px;
+    fill: currentColor;
+}
+
+.mp-play {
+    width: 48px;
+    height: 48px;
+    margin: 0 6px;
+    background: var(--color-text-primary);
+    color: var(--color-bg);
+}
+
+.mp-play svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* 播放 / 暂停两个图标叠在一起交叉淡入淡出（同一个伪元素改 border 没法过渡） */
+.mp-play-icon {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    opacity: 1;
+    transform: none;
+    transition: opacity 0.2s ease, transform 0.24s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.mp-play-icon--pause {
+    opacity: 0;
+    transform: scale(0.6) rotate(-25deg);
+}
+
+.mp-play[data-playing="true"] .mp-play-icon {
+    opacity: 0;
+    transform: scale(0.6) rotate(25deg);
+}
+
+.mp-play[data-playing="true"] .mp-play-icon--pause {
+    opacity: 1;
+    transform: none;
+}
+
+/* 引擎还在路上 / 今日听不了：给个看得懂的状态，别让按钮看着像坏了 */
+.mp-play[data-loading="true"] .mp-play-icon {
+    opacity: 0;
+}
+
+.mp-play[data-loading="true"]::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 17px;
+    height: 17px;
+    margin: -8.5px 0 0 -8.5px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: mp-spin 0.9s linear infinite;
+}
+
+.mp-play[data-locked="true"] {
+    opacity: 0.45;
+    cursor: default;
+}
+
+/* 播放模式：三个图标都写在 DOM 里，按 data-mode 只显示当前那个 */
+.mp-mode svg {
+    display: none;
+}
+
+.mp-mode[data-mode="list"] svg:nth-of-type(1),
+.mp-mode[data-mode="shuffle"] svg:nth-of-type(2),
+.mp-mode[data-mode="one"] svg:nth-of-type(3) {
+    display: block;
+}
+
+.mp-extras {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+}
+
+.mp-vol-btn {
+    width: 34px;
+    height: 34px;
+}
+
+/* 喇叭图标两个状态：由 data-muted 切 */
+.mp-vol-btn span {
+    display: grid;
+    place-items: center;
+}
+
+.mp-vol-btn .mp-vol-off {
+    display: none;
+}
+
+.mp-panel[data-muted="true"] .mp-vol-btn .mp-vol-on {
+    display: none;
+}
+
+.mp-panel[data-muted="true"] .mp-vol-btn .mp-vol-off {
+    display: grid;
+}
+
+.mp-vol {
+    position: relative;
+    width: 74px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.mp-vol::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 3px;
+    margin-top: -1.5px;
+    border-radius: 999px;
+    background: var(--mp-line);
+}
+
+.mp-vol-fill {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 30%;
+    height: 3px;
+    margin-top: -1.5px;
+    border-radius: 999px;
+    background: var(--mp-fill);
+}
+
+.mp-vol::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: var(--progress, 30%);
+    width: 10px;
+    height: 10px;
+    margin: -5px 0 0 -5px;
+    border-radius: 50%;
+    background: var(--mp-fill);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+    opacity: 0;
+    transition: opacity 0.16s ease;
+}
+
+.mp-vol:hover::after,
+.mp-vol.is-dragging::after,
+.mp-vol:focus-visible::after {
+    opacity: 1;
+}
+
+.mp-vol:focus-visible {
+    outline: 2px solid var(--mp-fill);
+    outline-offset: 4px;
+    border-radius: 999px;
+}
+
+/* 播放列表入口：胶囊，和卡片里其它次要按钮一致 */
+.mp-queue-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: 8px;
+    padding: 6px 11px 6px 9px;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--mp-muted);
+    font: inherit;
+    font-size: 0.74rem;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.mp-queue-btn svg {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+}
+
+.mp-queue-btn[aria-expanded="true"] {
+    color: var(--mp-fg);
+    border-color: var(--color-text-tertiary);
+    background: var(--mp-hover-bg);
+}
+
+/* ---------------- 播放列表（面板内就地展开） ----------------
+   列表项学 movie.html 的选片条：左侧一条强调色、选中项浅灰底、序号加粗，
+   切换只有 0.16s 的底色过渡，不做位移，免得整列跟着抖。 */
+.mp-queue {
+    margin-top: 14px;
+    border-top: 1px solid var(--color-divider);
+    overflow: hidden;
+}
+
+.mp-queue[hidden] {
+    display: none;
+}
+
+.mp-queue-list {
+    max-height: 268px;
+    margin: 0;
+    padding: 6px 0 2px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    /* 行高不是整除数时最后一行会被切一半，底部淡出把「还有更多」说清楚 */
+    -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 90%, transparent 100%);
+    mask-image: linear-gradient(180deg, #000 0%, #000 90%, transparent 100%);
+}
+
+.mp-queue-list .mt-row {
+    border-left: 3px solid transparent;
+    background: transparent;
+    transition: background-color 0.16s ease, border-color 0.2s ease;
+}
+
+.mp-queue-list .mt-row-hit {
+    padding-left: 9px;
+    border-radius: 0;
+    transition: background-color 0.16s ease;
+}
+
+/* 竖条跟卡片浮层那份保持同一色（--color-accent：浅色近黑、深色翻白），
+   不用 --card-accent 的玫瑰紫，理由见 style.css 同一处注释 */
+.mp-queue-list .mt-row.is-current {
+    background: #f5f5f5;
+    border-left-color: var(--color-accent);
+}
+
+.mp-queue-list .mt-row.is-current .mt-title {
+    font-weight: 600;
+}
+
+html:not(.is-touch-input) .mp-queue-list .mt-row-hit:hover {
+    background: rgba(17, 17, 17, 0.035);
+}
+
+/* 点下去那一下的实感，和 movie.html 的 .contact-btn:active 同一个思路 */
+.mp-queue-list .mt-row-hit:active {
+    transform: scale(0.995);
+}
+
+[data-theme="dark"] .mp-queue-list .mt-row.is-current {
+    background: rgba(255, 255, 255, 0.07);
+}
+
+html:not(.is-touch-input)[data-theme="dark"] .mp-queue-list .mt-row-hit:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+/* 浮窗打开时锁住背后滚动（ui.js 会写 --mp-modal-gap 补滚动条宽度） */
+html.mp-modal-open,
+html.mp-modal-open body {
+    overflow: hidden;
+    overscroll-behavior: none;
+}
+
+html.mp-modal-open body {
+    padding-right: calc(var(--body-pad-x, 24px) + var(--mp-modal-gap, 0px));
+}
+
+/* ---------------- 悬停 ---------------- */
+@media (hover: hover) {
+    html:not(.is-touch-input) .mp-btn:not(.mp-play):hover {
+        background: var(--mp-hover-bg);
+        color: var(--mp-fg);
+    }
+    html:not(.is-touch-input) .mp-play:hover {
+        filter: brightness(1.14);
+    }
+    html:not(.is-touch-input) .mp-panel-close:hover {
+        background: var(--mp-hover-bg);
+        color: var(--mp-fg);
+    }
+    html:not(.is-touch-input) .mp-queue-btn:hover {
+        color: var(--mp-fg);
+        border-color: var(--color-text-tertiary);
+        background: var(--mp-hover-bg);
+    }
+}
+
+.mp-btn:active {
+    transform: scale(0.94);
+}
+
+.mp-play:active {
+    transform: scale(0.97);
+}
+
+/* ---------------- 深色 ----------------
+   只覆盖变量。深色下不要用「反色」当悬停：会变成一块发光白点。 */
+[data-theme="dark"] .mp-panel {
+    --mp-line: rgba(255, 255, 255, 0.14);
+    --mp-fill: #e9ebf0;
+    --mp-accent: #d98fa2;
+}
+
+[data-theme="dark"] .mp-panel .mp-error {
+    border-color: rgba(255, 143, 136, 0.28);
+    background: rgba(255, 143, 136, 0.08);
+    color: #ff8f88;
+}
+
+/* ---------------- 窄屏 ----------------
+   ≤720：唱片和文字上下排，音量滑杆收起来（系统音量键更顺手）
+   ≤640：面板变成居中偏上的对话框（原先贴底，首屏看着像压在下沿） */
+@media (max-width: 720px) {
+    .mp-panel {
+        --mp-disc: 132px;
+    }
+
+    .mp-panel-body {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .mp-body {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto minmax(0, 1fr);
+        gap: 14px;
+        flex: 1 1 auto;
+        min-height: 0;
+    }
+
+    .mp-stage {
+        gap: 6px;
+    }
+
+    .mp-info {
+        align-self: stretch;
+        min-height: 0;
+        align-items: center;
+        text-align: center;
+    }
+
+    .mp-error {
+        align-self: stretch;
+        text-align: left;
+    }
+
+    .mp-lyric {
+        flex: 1 1 auto;
+        min-height: 120px;
+        max-height: none;
+    }
+
+    .mp-lyric-empty {
+        height: 100%;
+        min-height: 120px;
+    }
+
+    .mp-title {
+        font-size: 1.05rem;
+    }
+
+    .mp-transport {
+        gap: 8px;
+    }
+
+    .mp-extras .mp-vol {
+        display: none;
+    }
+
+    .mp-queue-btn {
+        margin-left: 2px;
+        padding: 6px 9px;
+    }
+
+    .mp-queue-btn .mp-queue-label {
+        display: none;
+    }
+
+    /* 歌单是面板内容区（display:flex）里的兄弟节点，默认会被一起压矮，
+       行数就被 overflow:hidden 硬切在中间（还没法滚）。让它保持自身高度，
+       放不下时由 .mp-panel-body 这个唯一滚动区去滚。 */
+    .mp-queue {
+        flex: none;
+    }
+}
+
+@media (max-width: 640px) {
+    /* 面板还是「贴着下沿的那一板」，只是内容不再堆在底部：
+       顶部留 13dvh 的边距把整块往下压，面板高度撑满到屏幕底，
+       内容从顶部往下排，走带控件紧跟内容，剩下的高度就是面板自己的空白。
+       这样下方那块是面板的白底，而不是背板后面透出来的页面内容。
+       外观（上圆角、下直角、无底边、投影朝上）保持原样。 */
+    .mp-modal {
+        padding: 13dvh 0 0;
+        align-items: flex-start;
+        justify-content: flex-start;
+    }
+
+    .mp-panel {
+        width: 100%;
+        height: 100%;
+        max-height: 100%;
+        /* 底部留一截面板自己的空白：走带控件不会贴着屏幕边，
+           但也别留太多——控件下面空一大块，看着像没排完 */
+        padding-bottom: 4dvh;
+        border-radius: 20px 20px 0 0;
+        border-bottom: 0;
+        box-shadow: 0 -12px 44px rgba(0, 0, 0, 0.22);
+        animation-name: mpSheetIn;
+        animation-duration: 0.46s;
+        /* 整屏高的位移要「前段稍缓、后段收稳」 */
+        animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    /* 内容区不抢剩下的高度：它只占自己需要的那一段，
+       再用上方的 auto 外边距把这一整块（唱片 / 歌词 / 控件）压到下方，
+       上方空出来的是面板白底。内容超长时 auto 边距归零、内容区收缩内滚
+       （min-height: 0 在基础规则里）。 */
+    .mp-panel-body {
+        flex: 1 1 auto;
+        margin-top: 0;
+    }
+
+    .mp-modal.is-closing .mp-panel {
+        animation-name: mpSheetOut;
+        animation-duration: 0.22s;
+        animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
+    }
+
+    .mp-panel-head {
+        padding: 13px 12px 13px 16px;
+    }
+
+    .mp-panel-body {
+        padding: 16px 16px 10px;
+    }
+
+    .mp-barwrap {
+        padding: 10px 16px calc(12px + env(safe-area-inset-bottom));
+    }
+}
+
+/* 横屏 / 矮屏：唱片缩一档，歌词区跟着收，保证控件始终在屏幕里 */
+@media (max-height: 560px) {
+    .mp-panel {
+        --mp-disc: 104px;
+    }
+
+    .mp-lyric {
+        min-height: 96px;
+        max-height: 132px;
+    }
+
+    .mp-lyric-empty {
+        height: 96px;
+    }
+
+    .mp-panel-body {
+        padding-top: 14px;
+    }
+}
+
+@keyframes mp-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    /* 浮窗的进出场直接落终态：淡入淡出只是锦上添花，
+       减弱动效的人不需要它，也不能因为没演完就看不见 */
+    .mp-backdrop,
+    .mp-panel,
+    .mp-modal.is-closing .mp-backdrop,
+    .mp-modal.is-closing .mp-panel {
+        animation: none;
+    }
+
+    .mp-lyric-line,
+    .mp-play-icon,
+    .mp-btn,
+    .mp-bar::after,
+    .mp-vol::after,
+    .mp-barwrap::before {
+        transition: none;
+    }
+
+    .mp-art-img,
+    .mp-disc,
+    .mp-play[data-loading="true"]::after {
+        animation: none;
+    }
+}

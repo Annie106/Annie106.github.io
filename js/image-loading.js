@@ -23,8 +23,10 @@
     //   · 头像 .avatar（首页/文章作者头像，走的是媒体 CDN，跟高速直链无关；
     //     它有自己的内联 onerror 兜底，也不打日志）
     //   · 音乐播放器区域（音频是 <audio>，本来就不会进这里；封面图同样放过）
+    //     .mt-art 也要放过：曲目列表的封面有自己的一套「黑胶占位 → 解码完淡入」，
+    //     再叠一层模糊占位会互相打架，而且这些图是同源小图，用不上双直链。
     //   · 任何显式标了 data-image-loading="off" / data-fast-quota="off" 的区域
-    var EXCLUDED_SELECTOR = '.avatar, .music-entry, .music-dock, ' +
+    var EXCLUDED_SELECTOR = '.avatar, .music-entry, .music-dock, .mt-art, ' +
         '[data-image-loading="off"], [data-fast-quota="off"]';
     var FAST_DAILY_KEY = 'annie-image-fast-daily';
 

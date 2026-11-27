@@ -72,7 +72,7 @@ const PUBLISH_DIRS = [
     'js',
     'fonts',
     'images',
-    'music',        /* 音乐模块资源：tracks/ui/core/dock（音乐视图内嵌在首页 ?view=music） */
+    'music',        /* 音乐模块资源：tracks/ui/core/dock/player（音乐视图内嵌在首页 ?view=music） */
     'project_subpage',
 ];
 

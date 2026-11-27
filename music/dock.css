@@ -111,6 +111,8 @@
 }
 
 .music-dock-art {
+    /* 黑胶是 absolute 叠在封面上，容器必须是定位祖先，否则会跑到整条 dock 上去 */
+    position: relative;
     display: block;
     width: 36px;
     height: 36px;
@@ -132,8 +134,11 @@
     animation-play-state: running;
 }
 
+/* 封面解码完成才把黑胶淡出（和首页卡片同一套逻辑）。
+   display:none 没法过渡，所以用 opacity；黑胶是 absolute 叠在 <img> 上面。 */
 .music-dock-art[data-cover="true"] .music-dock-disc {
-    display: none;
+    opacity: 0;
+    pointer-events: none;
 }
 
 /* 没有封面的曲目要真的把 <img> 藏掉：img 的 display:block 会压过 [hidden]，
@@ -143,7 +148,8 @@
 }
 
 .music-dock-disc {
-    position: relative;
+    position: absolute;
+    inset: 0;
     display: block;
     width: 36px;
     height: 36px;
@@ -154,6 +160,7 @@
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
     animation: music-dock-spin 9s linear infinite;
     animation-play-state: paused;
+    transition: opacity 220ms ease;
 }
 
 .music-dock.is-playing .music-dock-disc {
@@ -383,6 +390,7 @@
     }
     .music-dock-disc {
         animation: none;
+        transition: none;
     }
     .music-dock-panel {
         transition: none;
