@@ -64,6 +64,9 @@
     var baseUrl = resolveBase();
     var engine = null;
     var engineLoading = null;
+    /* 还没开始放就点歌词：起播位置先记着，等音频真正开始（'play'）再补一次 seek。
+       元数据没到之前设的 currentTime 只能算「期望位置」，各家浏览器不一定认。 */
+    var pendingPlaySeek = null;
     var dockDismissed = false;
     var cardVisible = true;
     var seeking = false;
@@ -184,8 +187,7 @@
         list: document.getElementById('musicEntryList'),
         sheetClose: document.getElementById('musicSheetClose'),
         rows: document.getElementById('musicCardList'),
-        viewPlay: document.getElementById('musicViewPlay'),
-        viewPlayText: document.getElementById('musicViewPlayText'),
+        viewOpen: document.getElementById('musicViewOpen'),
         viewMode: document.getElementById('musicViewMode'),
         viewModeText: document.getElementById('musicViewModeText'),
         viewCount: document.getElementById('musicViewCount'),
@@ -250,7 +252,9 @@
         return engineLoading;
     }
 
-    function applyState(next) {
+    /* reason 是 core 的 emit 理由（'play' / 'track' / 'time' …），
+       只有「点歌词起播」那一条收尾要用到它 */
+    function applyState(next, reason) {
         state.playing = next.playing;
         state.buffering = next.buffering;
         state.error = next.error;
@@ -264,6 +268,22 @@
         state.volume = next.volume;
         state.muted = next.muted;
         renderAll();
+
+        /* 点歌词起播的收尾：真出声了（'play'）元数据一定到了，这时看真实位置
+           有没有落在那一句上，偏了才补一次 seek（位置已经对就别白等一次缓冲）；
+           换歌 / 出错就让这个期望位置作废 */
+        if (pendingPlaySeek != null) {
+            if (reason === 'play') {
+                var target = pendingPlaySeek;
+                pendingPlaySeek = null;
+                if (engine && Math.abs((next.currentTime || 0) - target) > 1) {
+                    markLyricSeek();
+                    engine.seek(target);
+                }
+            } else if (reason === 'track' || reason === 'error') {
+                pendingPlaySeek = null;
+            }
+        }
     }
 
     /* ---------------- 操作 ---------------- */
@@ -302,15 +322,6 @@
         }).catch(function () {});
     }
 
-    function playAll() {
-        ensureEngine().then(function (instance) {
-            var current = instance.getState();
-            if (current.playing) instance.pause();
-            else if (current.index === 0 && current.currentTime > 0) instance.play();
-            else instance.play(0);
-        }).catch(function () {});
-    }
-
     function cycleMode() {
         ensureEngine().then(function (instance) {
             instance.cycleMode();
@@ -319,6 +330,9 @@
 
     function seekRatio(ratio) {
         ensureEngine().then(function (instance) {
+            /* 标记要在 seek 之前打：engine 的 emit 是同步的，
+               标记放后面的话这一次渲染已经画完了 */
+            markLyricSeek();
             instance.seekRatio(ratio);
         }).catch(function () {});
     }
@@ -331,7 +345,7 @@
         if (current.index !== index || !current.playing) select(index);
         /* 卡片歌单的窄屏浮层这时候该退场了：播放浮层在它上面，
            留着它等于关掉播放浮层后还挡着一层歌单 */
-        if (cardSheet.open) closeCardSheet(true);
+        if (cardSheet.open) closeCardSheet('tap', true);
         openPlayer();
     }
 
@@ -339,6 +353,29 @@
        拉不起来（限流 / 直链坏了）就什么都不做 —— core.js 自己会报错。 */
     function seekSeconds(seconds) {
         ensureEngine().then(function (instance) {
+            markLyricSeek();
+            instance.seek(seconds);
+        }).catch(function () {});
+    }
+
+    /* 点歌词那一句。**还没开始放**的时候这一下就等于「从这一句开始听」：
+       先起播再跳（顺序不能反 —— core 的 load() 会把 currentTime 归零）。
+       已经放过（就算是暂停着）就只跳位置，不替用户按下播放。 */
+    function playFromLyric(seconds) {
+        ensureEngine().then(function (instance) {
+            var current = instance.getState();
+            var idle = !current.playing && !(current.currentTime > 0);
+
+            markLyricSeek();
+            if (idle) instance.play(current.index);
+
+            /* ⚠️ 这一行必须排在 play() 后面：起播会 emit('track')，
+               而 applyState 收到 'track' 就把待补的起播位置作废（见那里）。 */
+            pendingPlaySeek = idle ? seconds : null;
+
+            /* 起播可能把 currentTime 归零（load 里做的），这里再跳一次才落到点上。
+               两次都是瞬时居中，同一帧里完成，看不到中间位置。 */
+            markLyricSeek();
             instance.seek(seconds);
         }).catch(function () {});
     }
@@ -453,7 +490,7 @@
 
     /* 独立页 /music/ 没有首页卡片，renderCard 会在开头 return。
        音乐页自己的文案 / 状态必须单独渲染，别塞在 renderCard 里，
-       否则独立页的曲目数、错误横幅、播放/暂停按钮全是静态兜底值。 */
+       否则独立页的曲目数、错误横幅、播放模式全是静态兜底值。 */
     function renderView() {
         if (!view) return;
         var error = state.error ? errorText() : '';
@@ -466,16 +503,6 @@
                 : '还没有曲目。';
         }
         if (el.viewCount) el.viewCount.textContent = TRACKS.length + ' 首';
-        var nextPlayLabel = state.playing ? '暂停' : '播放全部';
-        /* 只有文案真的变了才重放淡入动画 —— timeupdate 每秒好几次，
-           每次都加 class 会让文字一直在抖。 */
-        if (el.viewPlayText && el.viewPlayText.textContent !== nextPlayLabel) {
-            el.viewPlayText.textContent = nextPlayLabel;
-            el.viewPlayText.classList.remove('is-switching');
-            void el.viewPlayText.offsetWidth; /* 强制重排，让同一动画能重新播放 */
-            el.viewPlayText.classList.add('is-switching');
-        }
-        if (el.viewPlay) el.viewPlay.dataset.playing = state.playing ? 'true' : 'false';
         if (el.viewMode) {
             el.viewMode.dataset.mode = state.mode;
             el.viewMode.setAttribute('aria-label', '播放模式：' + MODE_TEXT[state.mode]);
@@ -686,7 +713,7 @@
         node.hidden = true;
         /* 点背板就收。pointerdown 那条在 bindOutsideClose 里（真机点击先来 pointerdown），
            这里补一条 click，指针事件被拦掉的场景 тоже 能关 */
-        node.addEventListener('click', function () { closeCardSheet(); });
+        node.addEventListener('click', function () { closeCardSheet('blur'); });
         document.body.appendChild(node);
         cardSheet.backdrop = node;
         return node;
@@ -719,8 +746,13 @@
         cardSheet.anchor = list.nextSibling;
         document.body.appendChild(list);
 
+        /* 收起演到一半又被点开：别让它重新从屏幕底下爬一遍，
+           给个短一半的进场，看起来像「收回又放出来」而不是「重开」 */
+        var wasClosing = list.classList.contains('is-closing');
         list.classList.remove('is-closing');
         list.classList.add('is-sheet', 'is-open');
+        if (wasClosing) list.style.setProperty('--me-enter-dur', '0.24s');
+        else list.style.removeProperty('--me-enter-dur');
         list.setAttribute('tabindex', '-1');
         el.list.inert = false;
         cardSheet.open = true;
@@ -739,7 +771,7 @@
         try { list.focus({ preventScroll: true }); } catch (error) {}
     }
 
-    function closeCardSheet(immediate) {
+    function closeCardSheet(reason, immediate) {
         if (!cardSheet.open || !el.list) return;
         cardSheet.open = false;
         var list = el.list;
@@ -777,14 +809,58 @@
             return;
         }
 
-        /* 收起：keyframes 演 0.22s，220ms 后把整块归位 */
+        /* 收起：抽屉整块滑出屏幕，时长跟其它面板共用 --me-exit-dur；
+           搬回卡片的时间必须跟动画对齐，否则会在半路上被「抽」回去。 */
+        var preset = applyExitMotion(list, reason, 'sheet');
+        applyExitMotion(cardSheet.backdrop, reason, 'sheet');
+
         list.classList.remove('is-open');
         list.classList.add('is-closing');
         if (cardSheet.backdrop) {
             cardSheet.backdrop.classList.remove('is-open');
             cardSheet.backdrop.classList.add('is-closing');
         }
-        cardSheet.timer = window.setTimeout(finish, 220);
+        cardSheet.timer = window.setTimeout(finish, Math.round(preset.dur * 1000) + 24);
+    }
+
+    /* ---------------- 收起动效的三档参数 ----------------
+     * 同样是「收起」，用户是怎么走的，它就该怎么消失：
+     *   tap    再点一下按钮：意图明确，稍微快一点，带一点朝卡片的回缩；
+     *   blur   点空白处：视线已经移开，慢半拍、飘一点，不抢注意力；
+     *   scroll 滚轮滚走了：页面正在动，越快越好、纯淡出不带位移
+     *          （有位移的话面板会像在「追」页面，看着更乱）。
+     * 时长 / 缓动 / 位移都写进元素自己的 --me-exit-*，CSS 统一读，
+     * 三档只是参数不同，收起的形状始终一致，不会各演各的。
+     * dur 是整体（位移 + 高度），fade 略短 —— 让「消失」稍微先于「缩回」。
+     * scale 目前只给迷你条面板用，卡片歌单不动缩放（小字经不起缩）。 */
+    var EXIT_MOTION = {
+        tap: { dur: 0.28, fade: 0.22, ease: 'cubic-bezier(0.4, 0, 0.2, 1)', shift: 6, scale: 0.992 },
+        blur: { dur: 0.36, fade: 0.3, ease: 'cubic-bezier(0.4, 0, 0.2, 1)', shift: 3, scale: 0.996 },
+        scroll: { dur: 0.2, fade: 0.16, ease: 'cubic-bezier(0.32, 0.72, 0, 1)', shift: 0, scale: 1 }
+    };
+
+    /* mode：'down' 卡片下方 / 'up' 卡片上方 / 'side' 右侧停靠 / 'sheet' 贴底抽屉。
+       位移方向永远是「朝它弹出来的地方回去」。 */
+    function applyExitMotion(root, reason, mode) {
+        var preset = EXIT_MOTION[reason] || EXIT_MOTION.tap;
+        if (!root) return preset;
+
+        var shift = preset.shift;
+        var x = 0;
+        var y = 0;
+        if (shift) {
+            if (mode === 'side') x = -shift;
+            else if (mode === 'up' || mode === 'sheet') y = shift;
+            else y = -shift;
+        }
+
+        root.style.setProperty('--me-exit-dur', preset.dur + 's');
+        root.style.setProperty('--me-exit-fade', preset.fade + 's');
+        root.style.setProperty('--me-exit-ease', preset.ease);
+        root.style.setProperty('--me-exit-x', x + 'px');
+        root.style.setProperty('--me-exit-y', y + 'px');
+        root.style.setProperty('--me-exit-scale', String(preset.scale));
+        return preset;
     }
 
     /* ---------------- 卡片歌单 · 宽屏右侧停靠 ----------------
@@ -834,28 +910,87 @@
         if (!card || !el.listToggle || !el.list) return;
 
         if (isCompactSheet()) {
-            if (cardSheet.open) closeCardSheet();
+            if (cardSheet.open) closeCardSheet('tap');
             else openCardSheet();
             return;
         }
 
-        var open = !card.classList.contains('is-list-open');
-        card.classList.toggle('is-list-open', open);
-        el.listToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-        el.list.inert = !open;
-
-        if (open) placeCardList();
-    }
-
-    function closeCardList() {
-        if (!card || !el.listToggle || !el.list) return;
-        if (cardSheet.open) {
-            closeCardSheet();
+        /* 已展开 → 收起。走 closeCardList 是为了统一入口，
+           场景参数也只有这一个地方需要维护 */
+        if (card.classList.contains('is-list-open')) {
+            closeCardList('tap');
             return;
         }
+
+        card.classList.add('is-list-open');
+        el.listToggle.setAttribute('aria-expanded', 'true');
+        el.list.inert = false;
+        placeCardList();
+    }
+
+    function closeCardList(reason) {
+        if (!card || !el.listToggle || !el.list) return;
+        if (cardSheet.open) {
+            closeCardSheet(reason);
+            return;
+        }
+        /* 已经收起来了就别再动：点空白和滚轮可能在同一帧连着来，
+           第二次进来重设动画参数会让正在淡出的面板突然「跳」一下 */
+        if (!card.classList.contains('is-list-open')) return;
+
+        applyExitMotion(el.list, reason, card.classList.contains('is-list-side') ? 'side'
+            : (card.classList.contains('is-list-upward') ? 'up' : 'down'));
+
         card.classList.remove('is-list-open');
         el.listToggle.setAttribute('aria-expanded', 'false');
         el.list.inert = true;
+    }
+
+    /* 点 / 滚到面板外面 → 收起面板。抽成一份，pointerdown（点）和 wheel（滚）
+       共用，免得两边各写一套排除条件、越改越不一致。
+       reason 决定收起动画：'blur' 点空白、'scroll' 滚走（见 EXIT_MOTION）。 */
+    function dismissOpenPanels(target, reason) {
+        /* 窄屏浮层：点背板 / 浮层外面就收（浮层自己已经搬到 body 上了）。
+           收起后要挡住紧随其后的那一次 click，否则它会落到背后页面上（见 sheetClickGuard） */
+        if (cardSheet.open) {
+            if (el.list && el.list.contains(target)) return;
+            closeCardSheet(reason);
+            armSheetClickGuard();
+            return;
+        }
+
+        if (card && card.classList.contains('is-list-open')) {
+            if (el.listToggle && el.listToggle.contains(target)) return;
+            if (el.list && el.list.contains(target)) return;
+            closeCardList(reason);
+        }
+
+        if (dock && dock.classList.contains('is-list-open')) {
+            if (dockEl && dockEl.listBtn && dockEl.listBtn.contains(target)) return;
+            if (dockEl && dockEl.panel && dockEl.panel.contains(target)) return;
+            closeDockPanel(reason);
+        }
+    }
+
+    /* 点背板收起浮层的同一次手势，不能再被背景页面收一次。
+       pointerdown 一响面板就开始收，背板也可能很快收完（long press 时手指
+       抬起来已经晚了几百毫秒）—— 那一次 click 于是落在背板后面的元素上。
+       这里记一个短守卫，把它吞掉；新的 pointerdown 会立刻作废守卫，
+       所以「收起来之后再点别的」照常生效。 */
+    var sheetClickGuard = 0;
+
+    function armSheetClickGuard() {
+        sheetClickGuard = Date.now();
+    }
+
+    function consumeGuardedClick(event) {
+        if (!sheetClickGuard) return;
+        var armedAt = sheetClickGuard;
+        sheetClickGuard = 0;
+        /* 间隔太久说明是另一次点击，放过去 */
+        if (Date.now() - armedAt > 1200) return;
+        event.preventDefault();
+        event.stopPropagation();
     }
 
     /* 点卡片歌单 / 迷你条歌单之外的地方 → 收起面板。
@@ -863,27 +998,82 @@
        否则点面板里的歌曲时刚触发播放就被这里关掉了。 */
     function bindOutsideClose() {
         document.addEventListener('pointerdown', function (event) {
-            var target = event.target;
+            /* 新的一次按下就是新的一次点击，上一发守卫作废 */
+            sheetClickGuard = 0;
+            dismissOpenPanels(event.target, 'blur');
+        }, true);
 
-            /* 窄屏浮层：点背板 / 浮层外面就收（浮层自己已经搬到 body 上了） */
-            if (cardSheet.open) {
-                if (el.list && el.list.contains(target)) return;
-                closeCardSheet();
+        /* 捕获阶段就要拦住：背板自己的 click 是冒泡阶段的监听，
+           拦晚了背景页面（以及背板上那个关浮层的监听）都已经收到了 */
+        document.addEventListener('click', consumeGuardedClick, true);
+
+        /* 滚轮落在面板外面 → 顺手收起来：鼠标已经滚去别处看了，
+           还挂着那块面板只会碍事。这里单独给一档更快的收起（'scroll'），
+           页面在动的时候任何拖泥带水的动画都会显得卡。
+           passive:true —— 只观察不拦截，绝不能拖慢正文滚动。 */
+        document.addEventListener('wheel', function (event) {
+            /* 横向滑动（shift + 滚轮、触控板横扫）不算「滚走了」 */
+            if (!event.deltaY) return;
+            dismissOpenPanels(event.target, 'scroll');
+        }, { passive: true });
+    }
+
+    /* ---------------- 滚轮 · 只滚面板里的列表 ----------------
+     * 面板是悬空的一张卡（右下角的迷你条歌单、宽屏停在右侧的歌单都是），
+     * 浏览器默认会把「列表滚到头之后多出来的那点滚动」继续传给 body ——
+     * 表现就是列表拉到底、整页跟着往下跑。
+     *
+     * 只在两种情况下 preventDefault：
+     *   · 列表滚不动（歌太少，压根没有 overflow）；
+     *   · 已经到顶 / 到底，还要往那个方向滚。
+     * 中间状态完全交给浏览器，内部滚动保持原生手感（含触控板惯性）。
+     * 落在面板的内边距 / 头部 / 「打开完整曲库」上时，手动把 delta 转给列表，
+     * 否则那些地方会直接去滚页面。
+     *
+     * 必须 passive:false —— 否则 preventDefault 只是个摆设。
+     */
+    function wheelDelta(event) {
+        /* deltaMode: 0 像素 / 1 行 / 2 页。行模式下 deltaY 只有 3，
+           当像素加会几乎不动，按 16px 一行折一下 */
+        return event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY;
+    }
+
+    function bindListWheel(root) {
+        if (!root) return;
+        root.addEventListener('wheel', function (event) {
+            var delta = wheelDelta(event);
+            if (!delta) return;
+
+            /* 谁在滚：卡片歌单 / 窄屏浮层是里面的 ul（面板自己 overflow:hidden），
+               迷你条歌单是面板自己（max-height + overflow:auto）。
+               先看 ul 滚不滚得动；滚不动再看面板的 overflowY ——
+               面板也是 hidden 的话就是真的没得滚，别把它的 scrollHeight
+               （被 hidden 裁掉的那部分）当成可滚区域。 */
+            var list = root.querySelector('.music-tracklist');
+            if (!list || list.scrollHeight - list.clientHeight <= 1) {
+                var overflowY = window.getComputedStyle(root).overflowY;
+                list = /(auto|scroll)/.test(overflowY) ? root : null;
+            }
+
+            /* 没得滚：整块吃掉，别漏给正文 */
+            if (!list || list.scrollHeight - list.clientHeight <= 1) {
+                event.preventDefault();
                 return;
             }
 
-            if (card && card.classList.contains('is-list-open')) {
-                if (el.listToggle && el.listToggle.contains(target)) return;
-                if (el.list && el.list.contains(target)) return;
-                closeCardList();
+            var max = list.scrollHeight - list.clientHeight;
+
+            if (list.contains(event.target)) {
+                var atTop = list.scrollTop <= 0;
+                var atBottom = list.scrollTop >= max - 1;
+                if ((delta < 0 && atTop) || (delta > 0 && atBottom)) event.preventDefault();
+                return;
             }
 
-            if (dock && dock.classList.contains('is-list-open')) {
-                if (dockEl && dockEl.listBtn && dockEl.listBtn.contains(target)) return;
-                if (dockEl && dockEl.panel && dockEl.panel.contains(target)) return;
-                closeDockPanel();
-            }
-        }, true);
+            /* 面板里但不在列表上（内边距、头部、底部链接）：手动转给列表 */
+            event.preventDefault();
+            list.scrollTop = Math.min(max, Math.max(0, list.scrollTop + delta));
+        }, { passive: false });
     }
 
     function bindCard() {
@@ -925,6 +1115,7 @@
         if (el.listToggle && el.list) {
             el.listToggle.addEventListener('click', toggleCardList);
             el.list.inert = true;
+            bindListWheel(el.list);
         }
 
         /* 开着歌单的时候改窗口大小：重新决定「停靠右侧 / 卡片下方 / 上方」，
@@ -946,13 +1137,13 @@
         });
 
         if (el.sheetClose) {
-            el.sheetClose.addEventListener('click', function () { closeCardSheet(); });
+            el.sheetClose.addEventListener('click', function () { closeCardSheet('tap'); });
         }
 
         document.addEventListener('keydown', function (event) {
             if (!cardSheet.open || event.key !== 'Escape') return;
             event.preventDefault();
-            closeCardSheet();
+            closeCardSheet('tap');
         });
 
         /* 开着的时候把窗口拉宽了：立刻收回卡片里，
@@ -960,7 +1151,7 @@
         if (window.matchMedia) {
             var compactQuery = window.matchMedia('(max-width: 640px)');
             var handleCompactChange = function () {
-                if (!compactQuery.matches && cardSheet.open) closeCardSheet(true);
+                if (!compactQuery.matches && cardSheet.open) closeCardSheet('tap', true);
             };
             if (compactQuery.addEventListener) compactQuery.addEventListener('change', handleCompactChange);
             else if (compactQuery.addListener) compactQuery.addListener(handleCompactChange);
@@ -994,6 +1185,11 @@
         if (more) {
             more.addEventListener('click', function (event) {
                 event.preventDefault();
+                /* 先收起歌单再切视图（收起动画和切页同时跑）。
+                   窄屏这块已经搬到 body 上了，不主动收的话它会悬在音乐页上面 ——
+                   「打开完整曲库」之后还压着一层播放列表就是这个。
+                   桌面那份在卡片里，跟着首页一起隐藏，顺手关掉是为了回到首页时不留尾巴 */
+                closeCardList('tap');
                 openMusicView();
             });
         }
@@ -1044,8 +1240,9 @@
             if (!step) return;
             event.preventDefault();
             ensureEngine().then(function (instance) {
-                var current = instance.getState();
-                instance.seek(current.currentTime + step);
+                /* 走 seekSeconds：它会把「刚跳过进度」标记打上，
+                   播放页里的歌词才会立刻跟着重新居中 */
+                seekSeconds(instance.getState().currentTime + step);
             }).catch(function () {});
         });
     }
@@ -1096,6 +1293,8 @@
 
         dockRows = dock.querySelector('#musicDockRows');
         buildRows(dockRows);
+        /* 迷你条歌单同样：滚到头别把正文带着一起滚 */
+        bindListWheel(dockEl.panel);
         /* 迷你条的封面同样是「黑胶顶着，加载完再淡入」 */
         watchCoverArt(dockEl.art, dockEl.cover);
 
@@ -1126,14 +1325,20 @@
 
     function toggleDockPanel() {
         if (!dock || !dockEl) return;
-        var open = !dock.classList.contains('is-list-open');
-        dock.classList.toggle('is-list-open', open);
-        dockEl.listBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-        dockEl.panel.inert = !open;
+        if (dock.classList.contains('is-list-open')) {
+            closeDockPanel('tap');
+            return;
+        }
+        dock.classList.add('is-list-open');
+        dockEl.listBtn.setAttribute('aria-expanded', 'true');
+        dockEl.panel.inert = false;
     }
 
-    function closeDockPanel() {
+    /* 迷你条歌单排在播放条**上方**，收起时朝下缩回去（mode 'up'）。 */
+    function closeDockPanel(reason) {
         if (!dock || !dockEl) return;
+        if (!dock.classList.contains('is-list-open')) return;
+        applyExitMotion(dockEl.panel, reason, 'up');
         dock.classList.remove('is-list-open');
         dockEl.listBtn.setAttribute('aria-expanded', 'false');
         dockEl.panel.inert = true;
@@ -1236,7 +1441,13 @@
     var modal = null;               // 浮层本体（挂在 body 上）
     var playerOpen = false;
     var playerReturnFocus = null;   // 关掉后把焦点还回打开它的那个元素
+    /* 播放页自己压的那层历史是不是还在栈顶：手机返回键 / 系统手势
+       应该先收起浮层，而不是把人直接带出站点（和搜索面板同一套约定）。 */
+    var playerHistoryActive = false;
     var playerQueueOpen = false;
+    var queueScrollRaf = 0;         // 歌单展开/收起时跟着高度走的滚动，见 followQueueScroll
+    var queueAnim = null;           // 正在跑的高度动画（连点时要掐掉）
+    var queueToken = 0;             // 每次开关自增，作废上一轮动画的收尾回调
     var playerStyleReady = false;
     var playerStylePending = null;
     var playerCoverUrl = '';
@@ -1251,8 +1462,13 @@
         nodes: [],
         active: -1,
         detached: false,
-        touchedAt: 0
+        idleTimer: null,    /* 滚开之后的回中倒计时（见 scheduleLyricReturn） */
+        pendingSeek: false  /* 刚跳过进度：下一次同步不用等换行，立刻定位 */
     };
+
+    /* 用户滚开歌词后，停手满这么久才把正在唱的那句滚回中间。
+       期间播放器里任何一次操作都会把这个计时按回 0。 */
+    var LYRIC_RETURN_DELAY = 5000;
 
     /* 读过的 .lrc 文本（url → 文本，读失败记 false），同一次会话不再读第二遍；
        lyricRequest 是「当前这次」的序号，切歌后回来的旧请求直接丢掉 */
@@ -1283,9 +1499,11 @@
        动画被取消 / 标签页在后台 / 减弱动效，任何一种情况下版面都要落到终态。 */
     function tweenHeight(node, from, to, duration, done, easing) {
         var settled = false;
+        var timer = 0;
         function finish() {
             if (settled) return;
             settled = true;
+            if (timer) window.clearTimeout(timer);
             node.classList.remove('is-animating');
             if (done) done();
         }
@@ -1302,7 +1520,7 @@
             { duration: duration, easing: easing || 'cubic-bezier(0.22, 0.61, 0.36, 1)' }
         );
         anim.onfinish = finish;
-        window.setTimeout(finish, duration + 150);
+        timer = window.setTimeout(finish, duration + 150);
         return anim;
     }
 
@@ -1411,13 +1629,13 @@
         modal.addEventListener('click', function (event) {
             /* 背板（data-mp-close）点一下就关 */
             if (event.target.hasAttribute('data-mp-close')) {
-                closePlayer();
+                requestClosePlayer();
                 return;
             }
             var button = event.target.closest('[data-mp]');
             if (!button) return;
             var action = button.getAttribute('data-mp');
-            if (action === 'close') closePlayer();
+            if (action === 'close') requestClosePlayer();
             else if (action === 'toggle') toggle();
             else if (action === 'prev') step('prev');
             else if (action === 'next') step('next');
@@ -1438,13 +1656,24 @@
         });
 
         /* 用户一动滚轮 / 手指就标记「别自动滚了」。
-           用 scroll 事件不行：程序自己居中也会触发 scroll。 */
+           用 scroll 事件不行：程序自己居中也会触发 scroll。
+           标完开始数 5 秒，停手就自己回到正在唱的那句。 */
         ['wheel', 'touchstart', 'pointerdown'].forEach(function (name) {
             player.lyric.addEventListener(name, function () {
-                lyric.touchedAt = Date.now();
+                /* 用户自己接管了：正在跑的居中动画立刻停，别跟他抢滚轮 */
+                stopLyricScroll();
                 lyric.detached = true;
+                scheduleLyricReturn();
             }, { passive: true });
         });
+
+        /* 「任何操作都重置 5 秒」：监听整个面板，不只监听歌词区 ——
+           点播放键、拖进度条、翻歌单、按方向键都算一次操作，
+           只要还在动，就不把歌词抢回来。 */
+        ['pointerdown', 'wheel', 'touchstart'].forEach(function (name) {
+            modal.addEventListener(name, noteLyricActivity, { passive: true });
+        });
+        modal.addEventListener('keydown', noteLyricActivity);
 
         modal.addEventListener('keydown', onPlayerKeydown);
 
@@ -1471,7 +1700,7 @@
         if (event.key === 'Escape') {
             event.preventDefault();
             if (playerQueueOpen) toggleQueue(false);
-            else closePlayer();
+            else requestClosePlayer();
             return;
         }
         if (event.key !== 'Tab') return;
@@ -1506,6 +1735,74 @@
         }
     }
 
+    /* ---------------- 播放页的返回历史 ----------------
+     * 浮层本身不是一条页面记录，手机的系统返回 / 浏览器后退会直接离站。
+     * 打开时压一条带标记的记录，返回时 popstate 认出标记没了就收起浮层。
+     * history.state 整份复制过去：script.js 靠 annieView / annieScrollTop
+     * 记住当前视图和滚动位置，丢掉它们返回后会跳回首页。 */
+    function pushPlayerHistory() {
+        if (playerHistoryActive) return;
+        try {
+            var next = Object.assign({}, stampCurrentView(), {
+                annieMusicPlayer: true,
+                annieScrollTop: Math.round(window.scrollY)
+            });
+            history.pushState(next, '', window.location.href);
+            playerHistoryActive = true;
+        } catch (error) {
+            playerHistoryActive = false;
+        }
+    }
+
+    /* 直接打开某个站内视图（书签 / 分享链接，比如 ?view=music）时，
+       那一条历史记录里是没有 annieView 的。收起播放页靠 back() 退回它，
+       script.js 的 popstate 认不出视图就兜底成首页 —— 于是「关播放页」
+       变成「回首页」。所以压播放页记录之前，先给当前这条补上视图名
+       （字段和 script.js 压视图记录时一致）。
+       ⚠️ article 视图跳过：它的历史靠 annieArticleId + articleHistoryEntryActive
+       那一套认，凭空补一个 annieView 会让「前进回文章」落到没渲染内容的文章页。 */
+    function stampCurrentView() {
+        var current = history.state || null;
+        if (current && typeof current.annieView === 'string') return current;
+        var active = document.querySelector('.view.active-view');
+        var name = active && active.id ? active.id.replace(/^view-/, '') : '';
+        if (!name || name === 'article') return current;
+        var stamped = Object.assign({}, current || {}, {
+            annieView: name,
+            annieScrollTop: Math.round(window.scrollY)
+        });
+        history.replaceState(stamped, '', window.location.href);
+        return stamped;
+    }
+
+    /* × / 背板 / Esc 也走 history.back()，让历史栈和画面同步：
+       否则浮层关了、那条记录还留着，下次按返回会「关一个已经关掉的浮层」。
+       popstate 里统一收起；pushState 被浏览器拒绝时直接关。 */
+    function requestClosePlayer() {
+        if (!playerOpen) return;
+        if (!playerHistoryActive) {
+            closePlayer();
+            return;
+        }
+        try {
+            history.back();
+        } catch (error) {
+            playerHistoryActive = false;
+            closePlayer();
+        }
+    }
+
+    function bindPlayerHistory() {
+        window.addEventListener('popstate', function (event) {
+            var state = event.state;
+            var isPlayer = !!(state && state.annieMusicPlayer);
+            if (!isPlayer) playerHistoryActive = false;
+            /* 前进回到播放页那条记录时不自动弹回浮层：
+               用户上一次是主动关掉的，不该被「前进」强迫重开。 */
+            if (playerOpen && !isPlayer) closePlayer();
+        });
+    }
+
     function openPlayer() {
         if (!TRACKS.length) return;
         if (playerOpen) {
@@ -1533,6 +1830,8 @@
             modal.classList.remove('is-closing');
             modal.hidden = false;
             modal.inert = false;
+            /* 浮层真要显示了才压历史，别让「样式加载失败」留一条空记录 */
+            pushPlayerHistory();
             lockPageScroll();
 
             /* 焦点给面板本身，不给关闭按钮：程序化聚焦同样会命中 :focus-visible，
@@ -1542,12 +1841,19 @@
             }
             syncBodyFade();
             syncDock();
+            /* 上次离开时歌词停在用户翻到的位置：回来重新开始数 5 秒，
+               不马上抢回去（「离开播放器不触发回中」的另一半） */
+            scheduleLyricReturn();
         });
     }
 
     function closePlayer() {
         if (!playerOpen) return;
         playerOpen = false;
+        /* 收起就作废回中计时：离开播放器不该把歌词滚回中间，
+           下次打开再重新数 */
+        cancelLyricReturn();
+        stopLyricScroll();
         toggleQueue(false, true);
 
         if (!modal) {
@@ -1588,6 +1894,15 @@
         var open = typeof force === 'boolean' ? force : !playerQueueOpen;
         if (open === playerQueueOpen) return;
         playerQueueOpen = open;
+        stopQueueScroll();
+        /* 连点两下时上一轮的高度动画还在跑：先掐掉，再作废它的收尾回调。
+           不作废的话，上一轮的 done 会把刚展开的 hidden 又设回去 ——
+           按钮显示「已展开」而列表是空的，之后连 aria-expanded 都纠正不回来。 */
+        if (queueAnim) {
+            queueAnim.cancel();
+            queueAnim = null;
+        }
+        var token = ++queueToken;
 
         player.queueBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
         player.queue.inert = !open;
@@ -1598,14 +1913,19 @@
             player.queue.hidden = false;
             player.queue.style.height = 'auto';
             var full = player.queue.offsetHeight;
+            var body = player.body;
+            var zero = body ? body.scrollTop : 0;
+            var fit = body ? Math.max(0, body.scrollHeight - body.clientHeight) : 0;
             centerQueueRow();
-            tweenHeight(player.queue, 0, full, 300, function () {
+            queueAnim = tweenHeight(player.queue, 0, full, 300, function () {
+                if (token !== queueToken) return;
                 player.queue.style.height = '';
                 /* ⚠️ 滚动必须等展开动画走完再算：动画途中量到的高度只有一半，
                    滚不到底，300ms 一过歌单就停在视野外，看着像点了没反应。 */
                 revealQueue();
                 syncBodyFade();
             });
+            followQueueScroll(fit, zero, full, 300);
             return;
         }
 
@@ -1618,12 +1938,55 @@
         }
 
         var height = player.queue.offsetHeight;
-        tweenHeight(player.queue, height, 0, 220, function () {
+        var body = player.body;
+        var fit = body ? body.scrollTop : 0;
+        /* 终点 = 歌单拿掉之后的滚动上限。临时 hidden 一下再放回来量，
+           同一个任务里完成，不会闪；按 scrollTop 硬减高度算会漏掉上边距。
+           ⚠️ 这一隐会让内容瞬间变短、scrollTop 被浏览器夹到 0，
+           量完必须还回去，否则收起的第一帧画面就跳了。 */
+        var zero = 0;
+        if (body) {
+            player.queue.hidden = true;
+            zero = Math.max(0, body.scrollHeight - body.clientHeight);
+            player.queue.hidden = false;
+            body.scrollTop = fit;
+        }
+        queueAnim = tweenHeight(player.queue, height, 0, 220, function () {
+            if (token !== queueToken) return;
             player.queue.hidden = true;
             player.queue.style.height = '';
             pinBodyHeight(false);
             syncBodyFade();
         }, 'cubic-bezier(0.4, 0, 0.9, 1)');
+        followQueueScroll(fit, zero, height, 220);
+    }
+
+    function stopQueueScroll() {
+        if (!queueScrollRaf) return;
+        window.cancelAnimationFrame(queueScrollRaf);
+        queueScrollRaf = 0;
+    }
+
+    /* 让内容区的滚动跟着歌单的高度一起走。
+       ⚠️ 只做高度动画是不够的：歌单接在钉死了高度的 .mp-body 下面，
+       展开的那 300ms 它整块都在可视区之外（屏幕上什么都没动），动画一结束
+       revealQueue 才一次跳到位 —— 看着就是「没有过渡动画」。
+       进度取真实渲染高度而不是时间：WAAPI 的缓动和时间进度不是一回事，
+       按时间插值会让歌单下沿在动画中途漏到可视区外。
+       atFull / atZero 是歌单撑满 / 收到底时 scrollTop 该在的位置，
+       展开和收起只是这两个值换个方向，共用一套插值。 */
+    function followQueueScroll(atFull, atZero, total, duration) {
+        var body = player.body;
+        if (!body || !total || Math.abs(atFull - atZero) < 1) return;
+        var start = window.performance.now();
+        function step() {
+            var ratio = Math.max(0, Math.min(1, player.queue.getBoundingClientRect().height / total));
+            body.scrollTop = atZero + (atFull - atZero) * ratio;
+            queueScrollRaf = window.performance.now() - start < duration + 20
+                ? window.requestAnimationFrame(step)
+                : 0;
+        }
+        queueScrollRaf = window.requestAnimationFrame(step);
     }
 
     /* 歌单展开时把「唱片 + 歌词」这一块钉在「歌单没开时」的高度：
@@ -1840,6 +2203,8 @@
         lyric.index = index;
         lyric.active = -1;
         lyric.detached = false;
+        lyric.pendingSeek = false;
+        cancelLyricReturn();
 
         var raw = track && track.lyric;
         if (!raw && track && track.lyricFile) {
@@ -1930,9 +2295,11 @@
         if (!box) return;
 
         box.innerHTML = '';
+        stopLyricScroll();
         box.scrollTop = 0;
         box.dataset.empty = lyric.lines.length ? 'false' : 'true';
         lyric.nodes = [];
+        lyric.active = -1;
 
         if (!lyric.lines.length) {
             showLyricNotice('该歌曲未配置歌词');
@@ -1942,17 +2309,39 @@
         lyric.lines.forEach(function (line) {
             var item = document.createElement('p');
             item.className = 'mp-lyric-line';
-            item.textContent = line.text || '';
             if (line.time != null) {
-                /* 点一句跳过去：鼠标用户的便利，不做 Tab 焦点
-                   （几十个 Tab 停靠点会把键盘用户困在歌词里） */
-                item.classList.add('is-seekable');
+                item.classList.add('is-timed', 'is-seekable');
                 item.title = '跳到这一句';
-                item.addEventListener('click', function () { seekSeconds(line.time); });
+
+                /* 时间和正文是一个整体（CSS 里整行居中），时间块常驻占位：
+                   露出 / 收起都不会推动正文，折行也不变。 */
+                var stamp = document.createElement('span');
+                stamp.className = 'mp-lyric-time';
+                stamp.textContent = formatTime(line.time);
+                /* 只做视觉提示，读屏念歌词本身就好，不用每句前都念一遍时间 */
+                stamp.setAttribute('aria-hidden', 'true');
+                item.appendChild(stamp);
+
+                var text = document.createElement('span');
+                text.className = 'mp-lyric-text';
+                text.textContent = line.text || '';
+                item.appendChild(text);
+
+                /* 点一句跳过去（还没开始放的话就顺带放起来）。不做 Tab 焦点
+                   （几十个 Tab 停靠点会把键盘用户困在歌词里） */
+                item.addEventListener('click', function () { playFromLyric(line.time); });
+            } else {
+                item.textContent = line.text || '';
             }
             box.appendChild(item);
             lyric.nodes.push(item);
         });
+
+        /* 歌词是 fetch 回来的，或者是打开播放页那一刻本来就暂停着：
+           画完立刻按当前进度认一次「现在唱到哪句」，不然要等下一次
+           timeupdate 才有高亮和居中（暂停时永远等不到）。 */
+        lyric.active = -1;
+        syncLyric(true);
     }
 
     /* 每帧都可能被叫（timeupdate），所以只在「当前行真的变了」时动 DOM */
@@ -1962,6 +2351,12 @@
             loadLyric(currentTrack(), state.index);
             force = true;
         }
+
+        /* 跳进度是用户明确要看这一句：不管之前是不是被滚走了都重新居中。
+           只在播放页里算数（面板隐藏时量不到尺寸，滚了也没意义）。 */
+        var jumped = lyric.pendingSeek && playerOpen;
+        lyric.pendingSeek = false;
+
         if (!lyric.timed || !lyric.lines.length) return;
 
         var time = state.currentTime + 0.15;
@@ -1971,18 +2366,88 @@
             else break;
         }
 
-        if (active !== lyric.active) {
+        var moved = active !== lyric.active;
+        if (moved) {
             lyric.active = active;
             for (var j = 0; j < lyric.nodes.length; j += 1) {
                 lyric.nodes[j].classList.toggle('is-active', j === active);
                 lyric.nodes[j].classList.toggle('is-past', j < active);
             }
-            if (lyric.detached && Date.now() - lyric.touchedAt > 4000) lyric.detached = false;
-            if (active >= 0 && !lyric.detached) centerLyric(active);
+        }
+
+        if (jumped) {
+            /* 拖进度条 / 点歌词之后按新进度重新定位（平滑滚动，见 centerLyric） */
+            if (active >= 0) centerLyric(active);
+            else scrollLyricTo(0);
             return;
         }
 
-        if (force && active >= 0 && !lyric.detached) centerLyric(active);
+        if (active < 0) return;
+        /* 正常播放：换行时把新的那句挪到中间；用户刚滚开过就先别抢，
+           停手 5 秒后由 scheduleLyricReturn 把他带回来 */
+        if (!lyric.detached && (moved || force)) centerLyric(active);
+    }
+
+    /* 歌词区的滚动动画状态（同一时刻只有一个）。
+       不用原生 scrollTo({behavior:'smooth'})：它的时长由浏览器定（跨几十行要滑一两秒），
+       而且连续点击时没法精确接管。这里自己按帧推进，随时可以从「当前位置」改目标。 */
+    var lyricScroll = null;   // { frame, from, distance, duration, startAt }
+
+    function stopLyricScroll() {
+        if (!lyricScroll) return;
+        window.cancelAnimationFrame(lyricScroll.frame);
+        lyricScroll = null;
+    }
+
+    /* 把所有歌词行挪到指定 scrollTop。
+       · 默认 easeOutCubic，时长按距离给（一句 320ms、跨半首歌也不超过 700ms）
+       · 动画中途再次调用：从当前滚动位置接着走，不回到起点重新来
+       · 减弱动效 / 不支持 rAF：直接落位 */
+    function scrollLyricTo(top) {
+        var box = player && player.lyric;
+        if (!box) return;
+
+        stopLyricScroll();
+
+        var from = box.scrollTop;
+        var distance = top - from;
+        if (!window.requestAnimationFrame || prefersReducedMotion() || Math.abs(distance) < 1) {
+            box.scrollTop = top;
+            return;
+        }
+
+        var run = {
+            frame: 0,
+            from: from,
+            distance: distance,
+            duration: Math.min(700, Math.max(320, Math.abs(distance) * 1.4)),
+            startAt: null
+        };
+
+        function step(now) {
+            /* 已经被新的目标接管 / 被用户停掉了 */
+            if (lyricScroll !== run) return;
+            if (run.startAt == null) run.startAt = now;
+            var progress = Math.min(1, (now - run.startAt) / run.duration);
+            var eased = 1 - Math.pow(1 - progress, 3);
+            box.scrollTop = run.from + run.distance * eased;
+            if (progress < 1) run.frame = window.requestAnimationFrame(step);
+            else lyricScroll = null;
+        }
+
+        lyricScroll = run;
+        run.frame = window.requestAnimationFrame(step);
+    }
+
+    /* 歌词区里「正在唱的那句」该落在多高的位置（0~1，0.5 = 正中）。
+       数值写在 player.css 的 --mp-lyric-focus：桌面 0.5，窄屏 0.38 ——
+       窄屏歌词区一直铺到走带栏，按正中摆会显得偏下。 */
+    function lyricFocusRatio(box) {
+        var raw = window.getComputedStyle(box).getPropertyValue('--mp-lyric-focus');
+        var value = parseFloat(raw);
+        if (!isFinite(value) || value <= 0) return 0.5;
+        /* 写 38 和写 38% 都认 */
+        return value > 1 ? value / 100 : value;
     }
 
     function centerLyric(index) {
@@ -1992,16 +2457,44 @@
 
         var boxRect = box.getBoundingClientRect();
         var nodeRect = node.getBoundingClientRect();
-        var top = box.scrollTop + (nodeRect.top - boxRect.top) - (box.clientHeight - nodeRect.height) / 2;
-        top = Math.max(0, top);
+        /* 当前这句的中心离歌词区顶部多远 → 差多少就滚多少 */
+        var currentCenter = (nodeRect.top - boxRect.top) + nodeRect.height / 2;
+        var targetCenter = box.clientHeight * lyricFocusRatio(box);
+        scrollLyricTo(Math.max(0, box.scrollTop + currentCenter - targetCenter));
+    }
 
-        if (box.scrollTo && !prefersReducedMotion()) {
-            try {
-                box.scrollTo({ top: top, behavior: 'smooth' });
-                return;
-            } catch (error) { /* 老浏览器不认对象参数 */ }
-        }
-        box.scrollTop = top;
+    /* 用户滚开歌词之后：停手满 LYRIC_RETURN_DELAY 就把正在唱的那句滚回中间。
+       「停手」按播放器里最后一次操作算，所以每次都先撤掉旧计时再重挂。 */
+    function scheduleLyricReturn() {
+        cancelLyricReturn();
+        if (!playerOpen || !lyric.detached) return;
+        lyric.idleTimer = window.setTimeout(function () {
+            lyric.idleTimer = null;
+            /* 关掉播放器之后才到点的计时什么也不做 */
+            if (!playerOpen || !lyric.detached) return;
+            lyric.detached = false;
+            if (lyric.active >= 0) centerLyric(lyric.active);
+        }, LYRIC_RETURN_DELAY);
+    }
+
+    function cancelLyricReturn() {
+        if (!lyric.idleTimer) return;
+        window.clearTimeout(lyric.idleTimer);
+        lyric.idleTimer = null;
+    }
+
+    /* 播放器里任意一次操作都从这一刻重新数 5 秒（没滚开就不用管） */
+    function noteLyricActivity() {
+        if (!lyric.detached) return;
+        scheduleLyricReturn();
+    }
+
+    /* 拖进度条 / 点歌词 / ←→ 键：先记下「这次跳是用户点的」，
+       再让引擎去 seek（engine 的 emit 是同步的，标记必须打在它前面） */
+    function markLyricSeek() {
+        lyric.pendingSeek = true;
+        lyric.detached = false;
+        cancelLyricReturn();
     }
 
     /* ---------------- 站内音乐页 ---------------- */
@@ -2010,7 +2503,10 @@
         if (!view) return;
         buildRows(el.viewRows, 'lg');
 
-        if (el.viewPlay) el.viewPlay.addEventListener('click', playAll);
+        /* 音乐页顶部只留「打开播放页面」这一个入口：它把播放浮层拉起来，
+           不负责起播（起播是曲目行 / 播放页里那颗播放键的事）。
+           翻页、歌词、音量全在播放页里，这里再放一颗「播放全部」等于两处抢同一件事。 */
+        if (el.viewOpen) el.viewOpen.addEventListener('click', openPlayer);
 
         if (el.back) {
             el.back.addEventListener('click', function () {
@@ -2048,10 +2544,11 @@
             bindCard();
         }
         /* 播放引擎保持懒加载：第一次点播放才拉 core.js + dock.css。
-           站内音乐视图里的「播放全部」同样走 playAll() → ensureEngine()，
-           仍要用户手势，浏览器不允许自动播。 */
+           音乐页的「打开播放页面」只建浮层，不碰引擎；真正起播的是曲目行
+           和播放页里那颗播放键，都是用户手势，浏览器不允许自动播。 */
         bindView();
         bindOutsideClose();
+        bindPlayerHistory();
         renderAll();
     }
 

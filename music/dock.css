@@ -281,6 +281,8 @@
     bottom: calc(100% + 8px);
     max-height: 264px;
     overflow: auto;
+    /* 面板自己是滚动容器：滚到底不要顺手把博客正文一起滚了 */
+    overscroll-behavior: contain;
     padding: 10px 10px 8px;
     border: 1px solid var(--md-border);
     border-radius: 14px;
@@ -294,9 +296,16 @@
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    transform: translateY(8px) scale(0.98);
+    /* 收起落点：往迷你条里缩回去（方向朝下）。大小、时长、缓动由 ui.js
+       按触发场景写进 --me-exit-*，和卡片歌单共用同一套参数表。 */
+    transform: translateY(var(--me-exit-y, 8px)) scale(var(--me-exit-scale, 0.98));
     transform-origin: bottom center;
-    transition: opacity 0.2s ease, transform 0.24s cubic-bezier(0.22, 0.61, 0.36, 1), visibility 0.2s;
+    /* max-height / padding 这类会「压扁内容」的属性不参与动画，
+       等完全看不见了再由 .is-list-open 的收起结束自然复位 */
+    transition:
+        opacity var(--me-exit-fade, 0.2s) ease-out,
+        transform var(--me-exit-dur, 0.26s) var(--me-exit-ease, cubic-bezier(0.22, 0.61, 0.36, 1)),
+        visibility var(--me-exit-dur, 0.26s);
 }
 
 .music-dock.is-list-open .music-dock-panel {
@@ -304,6 +313,11 @@
     visibility: visible;
     pointer-events: auto;
     transform: none;
+    /* 展开比收起快半拍，和卡片歌单保持一致 */
+    transition:
+        opacity 0.18s ease-out,
+        transform 0.26s cubic-bezier(0.22, 0.61, 0.36, 1),
+        visibility 0.26s;
 }
 
 .music-dock-panel-title {

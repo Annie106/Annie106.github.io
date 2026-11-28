@@ -356,6 +356,9 @@
             state.playing = true;
             state.buffering = false;
             state.error = '';
+            /* 起播这一刻的真实位置（状态以 audio 为准）。UI 拿它判断
+               「点了某一句再起播」有没有真的落在那一句上，落偏了才补一次 seek。 */
+            state.currentTime = audio.currentTime || 0;
             /* 真的放出声了：失败链结束，下一次失败重新从「立即重试」开始数 */
             resetFailureChain();
             syncMediaSessionState();

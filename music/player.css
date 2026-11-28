@@ -44,6 +44,12 @@
     --mp-hover-bg: var(--card-control-bg);
     --mp-accent: var(--card-accent);
     --mp-disc: 200px;
+    /* 歌词时间块的宽度：常驻占位（不显示时也占着），悬停露出时正文不动 */
+    --mp-lyric-time: 46px;
+    /* 「正在唱的那句」落在歌词区高度的哪个位置：0.5 是正中。
+       窄屏把它压到 0.38 —— 歌词区一路铺到走带栏，正中看着偏低，
+       稍微提一点才像主角（见 ui.js 的 centerLyric）。 */
+    --mp-lyric-focus: 0.5;
 
     position: relative;
     display: flex;
@@ -165,7 +171,9 @@
     display: grid;
     grid-template-columns: var(--mp-disc) minmax(0, 1fr);
     gap: clamp(20px, 3vw, 34px);
-    align-items: start;
+    /* 唱片在自己的那一格里垂直居中：右边歌词比它高，
+       align-items: start 会让唱片吊在顶上、下面空一大块 */
+    align-items: center;
 }
 
 .mp-stage {
@@ -306,7 +314,50 @@
     line-height: 1.65;
     color: var(--mp-faint);
     opacity: 0.78;
+    /* 歌词整行居中排（长句折行也居中）：唱片一侧的空间是留给歌词的，
+       靠左排的话右边会空一大块，看着像没对齐 */
+    text-align: center;
     transition: color 0.28s ease, opacity 0.28s ease;
+}
+
+/* 带时间的行：时间 + 正文当**一个整体**居中。
+   时间那一栏的宽度常驻（没显示也占着），所以露出 / 收起时
+   正文不会被推着动；右边再补一条等宽的留白，让正文本身居中，
+   不会因为左边多了个时间栏而偏右半格。 */
+.mp-lyric-line.is-timed {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 8px;
+    padding-right: calc(var(--mp-lyric-time) + 8px);
+}
+
+.mp-lyric-text {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+/* 参照稿里那一小块：浅底、圆角、等宽数字。
+   平时完全藏起来（只占位），鼠标移到这一句上才露出来 —— 播放中的那句
+   也不例外，歌词区里始终只有「手正指着的那一行」带时间。 */
+.mp-lyric-time {
+    flex: none;
+    width: var(--mp-lyric-time);
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: var(--mp-hover-bg);
+    color: var(--mp-faint);
+    font-size: 0.68rem;
+    font-weight: 400;
+    line-height: inherit;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+    text-align: right;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    user-select: none;
+    transition: opacity 0.28s ease, color 0.28s ease;
 }
 
 .mp-lyric-line.is-past {
@@ -326,6 +377,11 @@
 html:not(.is-touch-input) .mp-lyric-line.is-seekable:hover {
     color: var(--mp-fg);
     opacity: 1;
+}
+
+html:not(.is-touch-input) .mp-lyric-line.is-seekable:hover .mp-lyric-time {
+    opacity: 1;
+    color: var(--mp-muted);
 }
 
 .mp-lyric-empty {
@@ -735,14 +791,19 @@ html:not(.is-touch-input)[data-theme="dark"] .mp-queue-list .mt-row-hit:hover {
     background: rgba(255, 255, 255, 0.04);
 }
 
-/* 浮窗打开时锁住背后滚动（ui.js 会写 --mp-modal-gap 补滚动条宽度） */
-html.mp-modal-open,
-html.mp-modal-open body {
+/* 浮窗打开时锁住背后滚动（ui.js 会写 --mp-modal-gap 补滚动条宽度）。
+   ⚠️ body 上必须是 overflow: clip，不能写 hidden：hidden 会让 body 变成
+   滚动容器，里面的 .site-header（position: sticky）就改成相对 body 定位，
+   页面已经滚过一段时顶栏会跟着内容被推出屏幕 —— 窄屏打开播放页时
+   顶上那条导航错乱就是这个。clip 只裁不滚，不建立滚动容器，sticky 仍对着视口。 */
+html.mp-modal-open {
     overflow: hidden;
     overscroll-behavior: none;
 }
 
 html.mp-modal-open body {
+    overflow: clip;
+    overscroll-behavior: none;
     padding-right: calc(var(--body-pad-x, 24px) + var(--mp-modal-gap, 0px));
 }
 
@@ -794,6 +855,8 @@ html.mp-modal-open body {
 @media (max-width: 720px) {
     .mp-panel {
         --mp-disc: 132px;
+        /* 上下堆叠以后歌词区一直延伸到走带栏，正中太低：往上收一档 */
+        --mp-lyric-focus: 0.38;
     }
 
     .mp-panel-body {
@@ -829,6 +892,16 @@ html.mp-modal-open body {
         flex: 1 1 auto;
         min-height: 120px;
         max-height: none;
+    }
+
+    /* 窄屏没有鼠标悬停，时间根本不会出现：整栏去掉（连带右边那条
+       补白也去掉），歌词才是真正对称居中的 */
+    .mp-lyric-line.is-timed {
+        padding-right: 0;
+    }
+
+    .mp-lyric-time {
+        display: none;
     }
 
     .mp-lyric-empty {
@@ -914,6 +987,14 @@ html.mp-modal-open body {
 
     .mp-panel-body {
         padding: 16px 16px 10px;
+    }
+
+    /* 歌词滚动条贴着面板右边缘：内容区有 16px 内边距，滚动条就缩在里面。
+       用负外边距把滚动容器顶到面板边，再补回等宽内边距 —— 歌词的可读宽度
+       和居中基准都不变，只有滚动条的位置挪到边上。 */
+    .mp-lyric {
+        margin-right: -16px;
+        padding-right: 16px;
     }
 
     .mp-barwrap {

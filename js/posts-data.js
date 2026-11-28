@@ -17,7 +17,7 @@
 
 window.BLOG_POSTS = [{
     id: 19,
-    title: '【教程】Win10解决PS授权限制“This unlicensed Adobe app has been disabled”',
+    title: 'Win10解决PS授权限制“This unlicensed Adobe app has been disabled”',
     date: '2026-11-28',
     excerpt: '解决PS授权限制的操作方式和技巧',
     tags: ['教程', '随笔'],

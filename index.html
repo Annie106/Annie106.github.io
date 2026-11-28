@@ -1029,12 +1029,11 @@
             </header>
 
             <div class="music-view-bar">
-                <button class="music-view-play" id="musicViewPlay" type="button" data-playing="false">
-                    <span class="music-view-play-icon" aria-hidden="true">
-                        <i class="icon-play"></i>
-                        <i class="icon-pause"></i>
-                    </span>
-                    <span class="music-view-play-label" id="musicViewPlayText">播放全部</span>
+                <!-- 只负责把播放页拉起来，不在这里起播：播放本身从下面的曲目行点进去，
+                     真正的播放 / 暂停 / 歌词都在播放页里（见 ui.js 的 openPlayer） -->
+                <button class="music-view-open" id="musicViewOpen" type="button">
+                    <i class="ri-play-line" aria-hidden="true"></i>
+                    打开播放页面
                 </button>
                 <!-- 点一下换一种模式：顺序 → 随机 → 单曲循环，文案跟着变 -->
                 <button class="music-view-mode" id="musicViewMode" type="button"
@@ -1148,7 +1147,7 @@
             </section>
 
             <!-- 版本号：从页脚挪到这里，收在关于页右下角 -->
-            <p class="about-version">版本 0.4.27.057</p>
+            <p class="about-version">版本 0.4.27.082</p>
         </div>
 
         <!-- ==================== 文章详情视图 ==================== -->
