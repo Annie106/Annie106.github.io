@@ -7,9 +7,19 @@
     <link>https://annie106.github.io/</link>
     <description>思考 · 记录 · 创造 —— 记录阅读、成长和日常灵感。</description>
     <language>zh-cn</language>
-    <lastBuildDate>Thu, 19 Nov 2026 00:00:00 +0800</lastBuildDate>
+    <lastBuildDate>Sat, 28 Nov 2026 00:00:00 +0800</lastBuildDate>
     <generator>tools/build-feed.js</generator>
     <atom:link href="https://annie106.github.io/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>【教程】Win10解决PS授权限制“This unlicensed Adobe app has been disabled”</title>
+      <link>https://annie106.github.io/posts/19/</link>
+      <guid isPermaLink="true">https://annie106.github.io/?article=19</guid>
+      <pubDate>Sat, 28 Nov 2026 00:00:00 +0800</pubDate>
+      <description>解决PS授权限制的操作方式和技巧</description>
+      <category>教程</category>
+      <category>随笔</category>
+      <media:thumbnail url="https://picgocloud.com/m/knb7yrbq/d75ad0e1-f8ac-4425-9c93-71369ef9e822.png"/>
+    </item>
     <item>
       <title>没进校门，就先迟到了</title>
       <link>https://annie106.github.io/posts/18/</link>
