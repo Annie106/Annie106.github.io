@@ -787,6 +787,49 @@
         cardSheet.timer = window.setTimeout(finish, 220);
     }
 
+    /* ---------------- 卡片歌单 · 宽屏右侧停靠 ----------------
+     * 容器是 1080 居中，视口一宽，卡片右边就空出一大片（1440 下约 490px）。
+     * 与其把列表叠在卡片下面盖住正文，不如让它从卡片右边弹出来，
+     * 正好落在「博客右边的空白」里：正文不被遮、下面内容也不用往下顶。
+     *
+     * 只在右侧真的放得下时才走这条路（见 canDockSide）；
+     * 空间不够（1200 左右的窗口）仍然回落到卡片下方/上方那个小浮层。
+     * 位置写死在 CSS（left: 100% + 14px），高度按「卡片顶部到视口底」算，
+     * 由这里写进 --me-side-max，免得窗口矮的时候面板伸出屏幕。 */
+    var SIDE_WIDTH = 320;
+    var SIDE_GAP = 14;
+
+    function canDockSide() {
+        if (!card) return false;
+        var rect = card.getBoundingClientRect();
+        /* 留 16px 给页面右边距，别贴着视口边缘 */
+        return window.innerWidth - rect.right - SIDE_GAP - 16 >= SIDE_WIDTH;
+    }
+
+    function syncSideMax() {
+        if (!card) return;
+        var rect = card.getBoundingClientRect();
+        var avail = window.innerHeight - Math.max(rect.top, 16) - 24;
+        card.style.setProperty('--me-side-max', Math.max(240, Math.round(avail)) + 'px');
+    }
+
+    /* 停靠与否只在「打开」时决定；收起时不要摘 is-list-side，
+       否则面板会在淡出的这 0.18s 里先跳回卡片下面。 */
+    function placeCardList() {
+        if (!card) return;
+        var rect = card.getBoundingClientRect();
+        var side = canDockSide();
+        card.classList.toggle('is-list-side', side);
+        if (side) {
+            card.classList.remove('is-list-upward');
+            syncSideMax();
+            return;
+        }
+        /* 歌单浮层默认往卡片下面弹；下方空间不够（靠近视口底部 / 页脚）
+           就改成往上弹，避免展开后盖住页脚或伸出屏幕外。 */
+        card.classList.toggle('is-list-upward', window.innerHeight - rect.bottom < 300);
+    }
+
     function toggleCardList() {
         if (!card || !el.listToggle || !el.list) return;
 
@@ -801,14 +844,7 @@
         el.listToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
         el.list.inert = !open;
 
-        /* 歌单浮层默认往卡片下面弹；如果下方空间不够（靠近视口底部 / 页脚），
-           就改成往上弹，避免展开后盖住页脚或伸出屏幕外。 */
-        if (open) {
-            var rect = card.getBoundingClientRect();
-            var spaceBelow = window.innerHeight - rect.bottom;
-            var upward = spaceBelow < 300;
-            card.classList.toggle('is-list-upward', upward);
-        }
+        if (open) placeCardList();
     }
 
     function closeCardList() {
@@ -890,6 +926,24 @@
             el.listToggle.addEventListener('click', toggleCardList);
             el.list.inert = true;
         }
+
+        /* 开着歌单的时候改窗口大小：重新决定「停靠右侧 / 卡片下方 / 上方」，
+           并刷新停靠面板的高度上限。rAF 节流，拖一次窗口只算一遍。 */
+        var sideRaf = 0;
+        window.addEventListener('resize', function () {
+            if (!card || !el.list || cardSheet.open) return;
+            if (!card.classList.contains('is-list-open')) return;
+            if (isCompactSheet()) {
+                /* 拉到手机宽度：右侧停靠/下拉都装不下，直接收回卡片 */
+                closeCardList();
+                return;
+            }
+            if (sideRaf) return;
+            sideRaf = window.requestAnimationFrame(function () {
+                sideRaf = 0;
+                placeCardList();
+            });
+        });
 
         if (el.sheetClose) {
             el.sheetClose.addEventListener('click', function () { closeCardSheet(); });

@@ -4881,6 +4881,47 @@
             transform: none;
         }
 
+        /* ---------------- 歌单停靠到卡片右侧（宽屏） ----------------
+           容器 1080 居中，视口一宽卡片右边就空出一大片。这时列表不放
+           卡片下面（会压下正文），而是从卡片右边缘外面弹出来，落在页面
+           右侧的空白里 —— 和卡片同一水平线，像挂在旁边的一栏。
+
+           宽度 320 在 CSS 里写死，和 ui.js 的 SIDE_WIDTH 对应；够不够放
+           由 canDockSide() 判断（1440 下卡片右边有 ~490，够；1200 不够，
+           会退回卡片下方的浮层）。高度上限由 JS 写进 --me-side-max：
+           「卡片顶部 → 视口底部」，窗口矮的时候面板不会伸出屏幕。 */
+        .music-entry.is-list-side .music-entry-list {
+            top: 0;
+            bottom: auto;
+            left: calc(100% + 12px);
+            right: auto;
+            width: 320px;
+            /* 圆角跟着卡片走，两张卡才像一套 */
+            border-radius: 18px;
+            /* 从卡片里"拉开"：位移改成水平，竖着的旧位移要清掉 */
+            transform: translateX(-8px);
+            /* 旁边没有卡片托着，投影得比下拉浮层再厚一点才站得住 */
+            box-shadow:
+                0 1px 2px rgba(15, 23, 42, 0.06),
+                0 26px 54px -26px rgba(15, 23, 42, 0.4);
+        }
+
+        .music-entry.is-list-side.is-list-open .music-entry-list {
+            max-height: min(470px, var(--me-side-max, 470px));
+            transform: none;
+        }
+
+        /* 停靠时列表可以多露几首（卡片下方只有 192px 是因为浮层总高 300） */
+        .music-entry.is-list-side .music-entry-list .music-tracklist {
+            max-height: min(300px, calc(var(--me-side-max, 470px) - 96px));
+        }
+
+        [data-theme="dark"] .music-entry.is-list-side .music-entry-list {
+            box-shadow:
+                0 1px 2px rgba(0, 0, 0, 0.4),
+                0 28px 58px -26px rgba(0, 0, 0, 0.86);
+        }
+
         /* 歌曲多的时候列表区自己滚，最多露出 4 首的高度；
            超过就上下滑动，浮层总高度不跟着涨 */
         .music-entry-list .music-tracklist {
