@@ -24,6 +24,9 @@
     --md-disc-1: #2b2b30;
     --md-disc-2: #191a1d;
     --md-label: #b45f74;
+    /* 折叠小胶囊的底色 / 图标色：浅色用博客那种浅灰（同标签胶囊 #f2f2f2），深色在下面覆盖 */
+    --dock-fab-bg: #f2f2f2;
+    --dock-fab-ink: #666666;
 
     position: fixed;
     right: 20px;
@@ -108,6 +111,62 @@
     border: 0;
     background: none;
     cursor: pointer;
+}
+
+/* ---------------- 折叠圆钮（仅移动端） ----------------
+   移动端迷你条默认收成一枚圆形悬浮按钮：点它才展开成胶囊。
+   桌面端不出现（display:none），仍保持右下角横条。
+   底色 / 图标走「主按钮」那对变量，外圈进度环用 accent —— 全用主题变量，
+   不写死色值，深色模式自动跟着 [data-theme="dark"] 走。 */
+.music-dock-fab {
+    display: none;
+    position: relative;
+    flex: 0 0 auto;
+    width: 52px;
+    height: 52px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--md-primary-bg);
+    color: var(--md-primary-ink);
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow:
+        0 2px 6px rgba(15, 23, 42, 0.18),
+        0 12px 26px -10px rgba(15, 23, 42, 0.5);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.music-dock-fab i {
+    position: relative;
+    font-size: 22px;
+    line-height: 1;
+}
+
+/* 进度环：圆钮外沿那圈细线，conic-gradient + 环形遮罩挖空中间 */
+.music-dock-fab::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    background: conic-gradient(var(--md-label) calc(var(--dock-progress, 0) * 1%), var(--md-track) 0);
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px));
+    mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px));
+    pointer-events: none;
+}
+
+html:not(.is-touch-input) .music-dock-fab:hover {
+    filter: brightness(1.1);
+}
+
+.music-dock-fab:active {
+    transform: scale(0.93);
+}
+
+.music-dock-fab:focus-visible {
+    outline: 2px solid var(--md-fill);
+    outline-offset: 3px;
 }
 
 .music-dock-art {
@@ -363,6 +422,8 @@
     --md-disc-1: #3a3b41;
     --md-disc-2: #24252a;
     --md-label: #c5748a;
+    --dock-fab-bg: #2b2c31;
+    --dock-fab-ink: #c2c6cd;
     box-shadow:
         0 1px 2px rgba(0, 0, 0, 0.4),
         0 20px 44px -20px rgba(0, 0, 0, 0.8);
@@ -372,29 +433,145 @@
     color: #ff8f88;
 }
 
-/* ---------------- 移动端 ---------------- */
+/* ---------------- 移动端 ----------------
+   ≤600px 改成两态：
+   · 折叠：贴屏幕左边缘、一半藏在屏外的小胶囊（只露右半、一枚音符），
+     不挡正文；按住可上下拖动换位置，位置记在 localStorage。
+   · 展开：点一下从左侧滑出成完整胶囊（全部控制），再点 × 收回。
+   桌面端完全不受影响。 */
 @media (max-width: 600px) {
     .music-dock {
-        left: 12px;
-        right: 12px;
-        bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-        width: auto;
-        padding: 9px 8px 9px 10px;
-        gap: 7px;
-        border-radius: 14px;
+        left: -30px;
+        right: auto;
+        top: var(--dock-top, 55%);
+        bottom: auto;
+        width: 60px;
+        height: 42px;
+        padding: 0;
+        gap: 0;
+        justify-content: flex-end;
+        border-radius: 0 999px 999px 0;
+        background: var(--dock-fab-bg);
+        border-color: var(--md-border);
+        box-shadow: 0 4px 14px -6px rgba(15, 23, 42, 0.22);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+        touch-action: none; /* 拖动小胶囊时不连带滚页面 */
+        transition:
+            left 0.34s cubic-bezier(0.22, 0.61, 0.36, 1),
+            width 0.34s cubic-bezier(0.22, 0.61, 0.36, 1),
+            height 0.34s cubic-bezier(0.22, 0.61, 0.36, 1),
+            border-radius 0.34s ease,
+            background-color 0.34s ease,
+            box-shadow 0.34s ease,
+            opacity 0.24s ease,
+            transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1),
+            visibility 0.24s;
     }
+
+    /* 折叠态只露 fab（铺满整枚半胶囊、图标靠露出的右半），其余内容收起 */
+    .music-dock:not(.is-expanded) .music-dock-progress,
+    .music-dock:not(.is-expanded) .music-dock-open,
+    .music-dock:not(.is-expanded) .music-dock-info,
+    .music-dock:not(.is-expanded) .music-dock-actions {
+        display: none;
+    }
+
+    .music-dock:not(.is-expanded) .music-dock-fab {
+        display: inline-flex;
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border-radius: inherit;
+        background: transparent;
+        color: var(--dock-fab-ink);
+        justify-content: flex-end;
+        padding-right: 7px;
+        box-shadow: none;
+    }
+
+    .music-dock:not(.is-expanded) .music-dock-fab i {
+        font-size: 20px;
+    }
+
+    /* 折叠态不出进度环：半胶囊只当一个「拉手」 */
+    .music-dock:not(.is-expanded) .music-dock-fab::before {
+        display: none;
+    }
+
+    /* 展开态：从左侧滑出成完整胶囊（比之前窄一截，别铺太长） */
+    .music-dock.is-expanded {
+        left: 12px;
+        width: min(300px, calc(100vw - 24px));
+        height: 54px;
+        padding: 8px 6px 8px 8px;
+        gap: 4px;
+        justify-content: flex-start;
+        border-radius: 16px;
+        background: var(--md-bg);
+        border-color: var(--md-border);
+        box-shadow:
+            0 1px 2px rgba(15, 23, 42, 0.05),
+            0 18px 40px -18px rgba(15, 23, 42, 0.35);
+        -webkit-backdrop-filter: blur(18px) saturate(1.5);
+        backdrop-filter: blur(18px) saturate(1.5);
+        touch-action: auto;
+    }
+
+    .music-dock.is-expanded .music-dock-fab {
+        display: none;
+    }
+
+    /* 内容随滑出淡入，别「啪」地一下全冒出来 */
+    .music-dock.is-expanded .music-dock-info,
+    .music-dock.is-expanded .music-dock-actions,
+    .music-dock.is-expanded .music-dock-progress,
+    .music-dock.is-expanded .music-dock-open {
+        animation: dockContentIn 0.3s ease both;
+    }
+
     .music-dock-artist {
         font-size: 0.68rem;
     }
     .music-dock-btn {
-        width: 30px;
-        height: 30px;
+        width: 28px;
+        height: 28px;
     }
     .music-dock-panel {
         left: 4px;
         right: 4px;
+        /* 和播放条拉开一点，别贴着压住列表最后一行 */
+        bottom: calc(100% + 12px);
         max-height: 46vh;
+        /* 顶部 / 底部各留一点，滚动时首尾行不被圆角切到 */
+        padding-top: 6px;
+        padding-bottom: 10px;
     }
+}
+
+@keyframes dockContentIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* ---------------- 展开时的压暗遮罩 ----------------
+   展开播放条时铺一层半透明黑，突出播放条；点它 / 页面滚动都会收回。
+   桌面不展开，所以默认永远不显示。 */
+.music-dock-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 870; /* 低于 .music-dock(880)，高于普通内容 */
+    background: rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.28s ease, visibility 0.28s;
+}
+.music-dock-backdrop.is-open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
 }
 
 @media (prefers-reduced-motion: reduce) {

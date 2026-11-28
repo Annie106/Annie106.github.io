@@ -1,5 +1,7 @@
 # AGENTS.md
 
+## 未得到批准禁止提交和推送
+
 给在这个仓库里写代码的 AI 工具看的约定。人看的速查是 `README.md`，完整手册是站内 `project_subpage/blog/guide.html`。
 `CLAUDE.md` / `.cursorrules` 只是指向本文件的指针，规则一律写在这里，别在那边另开一套。
 

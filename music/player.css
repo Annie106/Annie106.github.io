@@ -26,6 +26,57 @@
     display: none;
 }
 
+/* ---------------- 网页全屏 ----------------
+   让播放页铺满**浏览器视口**（不是 requestFullscreen 那种把浏览器 UI 也赶走的
+   整屏全屏）。版面只认 .is-fullscreen 这一条 class，由 ui.js 的 toggleFullscreen
+   加上 / 去掉：面板去掉圆角、宽度上限和高度上限，内容区把多出来的高度给歌词。 */
+.mp-modal.is-fullscreen {
+    padding: 0;
+    align-items: stretch;
+    justify-content: stretch;
+}
+
+.mp-modal.is-fullscreen .mp-backdrop {
+    display: none;
+}
+
+.mp-modal.is-fullscreen .mp-panel {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    animation: none;
+}
+
+/* 高度从「跟着内容走」变成「铺满」之后，把富余的高度给歌词：
+   唱片保持原尺寸并居中，歌词区一直长到走带栏上方 */
+.mp-modal.is-fullscreen .mp-panel-body {
+    display: flex;
+    flex-direction: column;
+}
+
+.mp-modal.is-fullscreen .mp-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    align-items: stretch;
+}
+
+.mp-modal.is-fullscreen .mp-stage {
+    align-self: center;
+}
+
+.mp-modal.is-fullscreen .mp-info {
+    min-height: 0;
+}
+
+.mp-modal.is-fullscreen .mp-lyric {
+    flex: 1 1 auto;
+    max-height: none;
+}
+
 .mp-backdrop {
     position: absolute;
     inset: 0;
@@ -44,8 +95,6 @@
     --mp-hover-bg: var(--card-control-bg);
     --mp-accent: var(--card-accent);
     --mp-disc: 200px;
-    /* 歌词时间块的宽度：常驻占位（不显示时也占着），悬停露出时正文不动 */
-    --mp-lyric-time: 46px;
     /* 「正在唱的那句」落在歌词区高度的哪个位置：0.5 是正中。
        窄屏把它压到 0.38 —— 歌词区一路铺到走带栏，正中看着偏低，
        稍微提一点才像主角（见 ui.js 的 centerLyric）。 */
@@ -320,16 +369,12 @@
     transition: color 0.28s ease, opacity 0.28s ease;
 }
 
-/* 带时间的行：时间 + 正文当**一个整体**居中。
-   时间那一栏的宽度常驻（没显示也占着），所以露出 / 收起时
-   正文不会被推着动；右边再补一条等宽的留白，让正文本身居中，
-   不会因为左边多了个时间栏而偏右半格。 */
+/* 带时间的行：正文照旧在歌词区里居中，时间**不进正文的排版**，
+   绝对定位贴在歌词区最右边（right: 0）—— 所有句子的时间右边缘
+   落在同一条线上，正文也不用为它让出半格，长句折行宽度和
+   不带时间的行完全一致。 */
 .mp-lyric-line.is-timed {
-    display: flex;
-    align-items: baseline;
-    justify-content: center;
-    gap: 8px;
-    padding-right: calc(var(--mp-lyric-time) + 8px);
+    position: relative;
 }
 
 .mp-lyric-text {
@@ -337,13 +382,21 @@
     overflow-wrap: anywhere;
 }
 
-/* 参照稿里那一小块：浅底、圆角、等宽数字。
+/* 参照稿里那一小块：浅底、圆角、等宽数字，前面带一枚小播放三角。
    平时完全藏起来（只占位），鼠标移到这一句上才露出来 —— 播放中的那句
-   也不例外，歌词区里始终只有「手正指着的那一行」带时间。 */
+   也不例外，歌词区里始终只有「手正指着的那一行」带时间。
+   宽度跟着内容走（不写死）：只靠 right:0 让所有句子的右边缘对齐，
+   写死宽度会在三角前面留出一截空白。 */
 .mp-lyric-time {
-    flex: none;
-    width: var(--mp-lyric-time);
-    padding: 1px 5px;
+    position: absolute;
+    /* 与 .mp-lyric-line 的 padding-top 对齐，再把自身高度压回行内中线：
+       行盒 1.65 × 0.9rem ≈ 23.8px，时间块 ≈ 20px，差 4px 分上下各一半 */
+    top: 6px;
+    right: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 4px;
     border-radius: 5px;
     background: var(--mp-hover-bg);
     color: var(--mp-faint);
@@ -352,12 +405,24 @@
     line-height: inherit;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.01em;
-    text-align: right;
     white-space: nowrap;
     opacity: 0;
     pointer-events: none;
     user-select: none;
     transition: opacity 0.28s ease, color 0.28s ease;
+}
+
+/* 小三角（播放提示）：整行都可点，它只是视觉提示，不单独吃点击 */
+.mp-lyric-cue {
+    display: inline-flex;
+    flex: none;
+}
+
+.mp-lyric-cue svg {
+    display: block;
+    width: 10px;
+    height: 10px;
+    fill: currentColor;
 }
 
 .mp-lyric-line.is-past {
@@ -504,6 +569,13 @@ html:not(.is-touch-input) .mp-lyric-line.is-seekable:hover .mp-lyric-time {
     align-items: center;
     gap: 12px;
     margin-top: 2px;
+}
+
+/* 左下角那一格：全屏 + 播放模式并排 */
+.mp-modeslot {
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
 
 .mp-controls {
@@ -894,12 +966,8 @@ html.mp-modal-open body {
         max-height: none;
     }
 
-    /* 窄屏没有鼠标悬停，时间根本不会出现：整栏去掉（连带右边那条
-       补白也去掉），歌词才是真正对称居中的 */
-    .mp-lyric-line.is-timed {
-        padding-right: 0;
-    }
-
+    /* 窄屏没有鼠标悬停，时间根本不会出现：直接不渲染那一块，
+       歌词区右侧也不用给它留位置 */
     .mp-lyric-time {
         display: none;
     }

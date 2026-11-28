@@ -61,9 +61,10 @@ window.ANNIE_MUSIC_TRACKS = [
         title: '好想抱住你',
         artist: '程佳佳',
         album: '好想抱住你',
-        src: 'https://1837491863.cdn.123clouddisk.com/1837491863/51963332#',
+        src: 'https://1837491863.cdn.123clouddisk.com/1837491863/51963332',
         cover: 'images/music_img/IMG_hug_you_0.jpg',
         duration: 222,
+        lyricFile: 'music/lyrics/hug_you.lrc',
         accent: '#b45f74'
     },
     {
@@ -74,6 +75,128 @@ window.ANNIE_MUSIC_TRACKS = [
         src: 'https://1837491863.cdn.123clouddisk.com/1837491863/52025030',
         cover: 'images/music_img/IMG_wind blows_0.jpg',
         duration: 159,
+        lyricFile: 'music/lyrics/wind blows.lrc',
+        accent: '#b45f74'
+    },
+    {
+        id: 'Summer Flower',
+        title: '夏花 ',
+        artist: '一颗狼星',
+        album: '夏花 ',
+        src: 'https://1837491863.cdn.123clouddisk.com/1837491863/51888061',
+        cover: 'images/music_img/IMG_Summer Flower_0.jpg',
+        duration: 181,
+        lyricFile: 'music/lyrics/Summer Flower.lrc',
+        accent: '#b45f74'
+    },
+    {
+        id: 'The Seventh Wish',
+        title: '第七个愿',
+        artist: '梶',
+        album: '第七个愿 ',
+        src: 'https://1837491863.cdn.123clouddisk.com/1837491863/51972400',
+        cover: 'images/music_img/IMG_The Seventh Wish_0.jpg',
+        duration: 163,
+        lyricFile: 'music/lyrics/The Seventh Wish.lrc',
+        accent: '#b45f74'
+    },
+    {
+        id: 'Una Mattina',
+        title: 'Una Mattina',
+        artist: 'Papa Tin',
+        album: 'Una Mattina',
+        src: 'https://1837491863.cdn.123clouddisk.com/1837491863/52053384',
+        cover: 'images/music_img/IMG_Una Mattina_0.jpg',
+        duration: 177,
+        lyricFile: 'music/lyrics/Una Mattina.lrc',
+        accent: '#b45f74'
+    },
+    {
+        id: 'shallow-summer',
+        title: '浅夏淡过花开时',
+        artist: '莫小娘',
+        album: '只能选择长大',
+        src: 'https://1837491863.cdn.123clouddisk.com/1837491863/51888068',
+        cover: 'images/music_img/IMG_shallow-summer_0.jpg',
+        duration: 236,
+        lyricFile: 'music/lyrics/shallow-summer.lrc',
+        accent: '#b45f74'
+    },
+    {
+        id: 'libra-collapse',
+        title: '天秤座·崩塌时论',
+        artist: '沐可儿',
+        album: '天秤座·崩塌时论',
+        src: 'https://1837491863.cdn.123clouddisk.com/1837491863/52004231',
+        cover: 'images/music_img/IMG_libra-collapse_0.jpg',
+        duration: 155,
+        lyricFile: 'music/lyrics/libra-collapse.lrc',
+        accent: '#b45f74'
+    },
+    {
+        id: 'moon-not-shine',
+        title: '我恨明月不照我',
+        artist: '阿YueYue',
+        album: '我恨明月不照我',
+        src: 'https://1837491863.cdn.123clouddisk.com/1837491863/52004232',
+        cover: 'images/music_img/IMG_moon-not-shine_0.jpg',
+        duration: 252,
+        lyricFile: 'music/lyrics/moon-not-shine.lrc',
+        accent: '#b45f74'
+    },
+    {
+        id: 'ask-wind',
+        title: '问风',
+        artist: '金渔',
+        album: '问风',
+        src: 'https://1837491863.cdn.123clouddisk.com/1837491863/52053393',
+        cover: 'images/music_img/IMG_ask-wind_0.jpg',
+        duration: 214,
+        lyricFile: 'music/lyrics/ask-wind.lrc',
+        accent: '#b45f74'
+    },
+    {
+        id: 'fireworks-star',
+        title: '烟花碰不到星星',
+        artist: '6SP',
+        album: '烟花碰不到星星',
+        src: 'https://1837491863.cdn.123clouddisk.com/1837491863/52082021',
+        cover: 'images/music_img/IMG_fireworks-star_0.jpg',
+        duration: 180,
+        lyricFile: 'music/lyrics/fireworks-star.lrc',
+        accent: '#b45f74'
+    },
+    {
+        id: 'timid',
+        title: '露怯',
+        artist: '苏效音',
+        album: '露怯',
+        src: 'https://1837491863.cdn.123clouddisk.com/1837491863/52112978',
+        cover: 'images/music_img/IMG_timid_0.jpg',
+        duration: 155,
+        lyricFile: 'music/lyrics/timid.lrc',
+        accent: '#b45f74'
+    },
+    {
+        id: 'childhood-run',
+        title: '童年的罚跑',
+        artist: '李小眼 / LKF34',
+        album: '惊蛰',
+        src: 'https://1837491863.cdn.123clouddisk.com/1837491863/52143543',
+        cover: 'images/music_img/IMG_childhood-run_0.jpg',
+        duration: 187,
+        lyricFile: 'music/lyrics/childhood-run.lrc',
+        accent: '#b45f74'
+    },
+    {
+        id: 'pulse',
+        title: '脉搏',
+        artist: '傅梦彤 / 高明飞',
+        album: '脉搏',
+        src: 'https://1837491863.cdn.123clouddisk.com/1837491863/52168273',
+        cover: 'images/music_img/IMG_pulse.jpg',
+        duration: 158,
+        lyricFile: 'music/lyrics/pulse.lrc',
         accent: '#b45f74'
     },
     {

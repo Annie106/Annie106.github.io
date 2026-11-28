@@ -56,6 +56,9 @@
         chevronDown: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9.4l6 6 6-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
         chevronUp: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 14.6l6-6 6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
         volume: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 9.5h3l3.6-3.1v11.2L8 14.5H5z" fill="currentColor"/><path d="M15 9.2a3.7 3.7 0 010 5.6M17.4 6.9a7 7 0 010 10.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+        /* 全屏 / 退出全屏：四个角括号朝外（展开）和朝内（收起） */
+        fullscreen: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 4H4v5.5M14.5 4H20v5.5M9.5 20H4v-5.5M14.5 20H20v-5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        fullscreenExit: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9.5h5.5V4M20 9.5h-5.5V4M4 14.5h5.5V20M20 14.5h-5.5V20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
         volumeOff: '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 9.5h3l3.6-3.1v11.2L8 14.5H5z" fill="currentColor"/><path d="M15.4 9.6l4.2 4.8M19.6 9.6l-4.2 4.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>'
     };
 
@@ -199,6 +202,7 @@
     var dock = null;
     var dockEl = null;
     var dockRows = null;
+    var dockBackdrop = null;
 
     /* ---------------- 引擎（懒加载） ---------------- */
 
@@ -255,6 +259,7 @@
     /* reason 是 core 的 emit 理由（'play' / 'track' / 'time' …），
        只有「点歌词起播」那一条收尾要用到它 */
     function applyState(next, reason) {
+        var wasPlaying = state.playing;
         state.playing = next.playing;
         state.buffering = next.buffering;
         state.error = next.error;
@@ -268,6 +273,10 @@
         state.volume = next.volume;
         state.muted = next.muted;
         renderAll();
+
+        /* 暂停时用户滚开了歌词 → 那时候不回中（见 scheduleLyricReturn）；
+           重新起播就把「跟着唱到哪」这条规则接回来，照样停手 5 秒才回 */
+        if (!wasPlaying && state.playing && lyric.detached) scheduleLyricReturn();
 
         /* 点歌词起播的收尾：真出声了（'play'）元数据一定到了，这时看真实位置
            有没有落在那一句上，偏了才补一次 seek（位置已经对就别白等一次缓冲）；
@@ -1257,6 +1266,8 @@
         dock.setAttribute('role', 'region');
         dock.setAttribute('aria-label', '音乐播放条');
         dock.innerHTML = [
+            /* 移动端折叠态的圆钮：点它展开成完整胶囊（桌面端 CSS 里 display:none） */
+            '<button class="music-dock-fab" type="button" data-music="expand" aria-label="展开播放条" aria-expanded="false"><i class="ri-music-2-line" aria-hidden="true"></i></button>',
             '<span class="music-dock-progress" role="slider" tabindex="0" aria-label="播放进度" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0"><span class="music-dock-progress-fill"></span></span>',
             '<button class="music-dock-open" type="button" data-music="open-view" aria-label="打开音乐页">',
             '    <span class="music-dock-art" data-cover="false"><img class="music-dock-cover" alt="" hidden><span class="music-dock-disc"></span></span>',
@@ -1279,7 +1290,18 @@
         ].join('');
         document.body.appendChild(dock);
 
+        /* 展开时的压暗遮罩：点一下遮罩（页面别处）就收回 */
+        if (!dockBackdrop) {
+            dockBackdrop = document.createElement('div');
+            dockBackdrop.className = 'music-dock-backdrop';
+            /* 点遮罩、或在遮罩上滑动都收回 */
+            dockBackdrop.addEventListener('click', collapseDock);
+            dockBackdrop.addEventListener('touchmove', collapseDock, { passive: true });
+            document.body.appendChild(dockBackdrop);
+        }
+
         dockEl = {
+            fab: dock.querySelector('.music-dock-fab'),
             fill: dock.querySelector('.music-dock-progress-fill'),
             progress: dock.querySelector('.music-dock-progress'),
             cover: dock.querySelector('.music-dock-cover'),
@@ -1299,6 +1321,8 @@
         watchCoverArt(dockEl.art, dockEl.cover);
 
         dock.addEventListener('click', function (event) {
+            /* 刚拖动过就别把这次手势当成点击（否则拖完会误触展开/播放） */
+            if (Date.now() - dockDragEndAt < 350) return;
             var button = event.target.closest('[data-music]');
             if (!button) return;
             var action = button.getAttribute('data-music');
@@ -1309,18 +1333,137 @@
                要先把人拽到页面顶上，等于把人从正在读的段落里拔出来 ——
                所以这里仍然回曲库页，播放模块只在首页和曲库内部展开。 */
             else if (action === 'open-view') openMusicView();
+            else if (action === 'expand') expandDock();
             else if (action === 'list') toggleDockPanel();
             else if (action === 'close') {
-                /* × 只是把播放条藏起来，音乐继续放 —— 用户随时能从卡片 / 音乐页再操作 */
-                dockDismissed = true;
-                closeDockPanel();
-                renderDock();
+                if (isMobileDock()) {
+                    /* 移动端：× 只是把胶囊收回到圆钮，音乐继续放；再点圆钮又能展开 */
+                    closeDockPanel();
+                    collapseDock();
+                } else {
+                    /* 桌面端：彻底收起播放条，音乐继续放 —— 随时能从卡片 / 音乐页再操作 */
+                    dockDismissed = true;
+                    closeDockPanel();
+                    renderDock();
+                }
             }
         });
 
         bindSeek(dockEl.progress, function (ratio) { seekRatio(ratio); });
         observeCard();
+        initDockDrag();
+        restoreDockTop();
         renderDock();
+    }
+
+    /* 移动端（≤600px）才启用「圆钮 ↔ 胶囊」两态；桌面端恒为横条。 */
+    function isMobileDock() {
+        return !!(window.matchMedia && window.matchMedia('(max-width: 600px)').matches);
+    }
+
+    /* ---------------- 位置记忆 & 上下拖动（仅移动端折叠态） ----------------
+       折叠的小胶囊贴在左边缘，按住可上下拖；松手把 top 存进 localStorage，
+       下次进来还在原处。展开态不参与拖动（避免误触里面的按钮）。 */
+    var DOCK_TOP_KEY = 'annie:musicDockTop';
+    var dockDrag = { active: false, moved: false, startY: 0, startTop: 0, id: null };
+    var dockDragEndAt = 0;
+
+    function dockHeightNow() {
+        var rect = dock && dock.getBoundingClientRect();
+        return rect && rect.height ? rect.height : 42;
+    }
+
+    function clampDockTop(top) {
+        var h = dockHeightNow();
+        var min = 8;
+        var max = window.innerHeight - h - 8;
+        if (max < min) max = min;
+        return Math.max(min, Math.min(max, top));
+    }
+
+    function applyDockTop(top) {
+        if (dock) dock.style.setProperty('--dock-top', Math.round(top) + 'px');
+    }
+
+    function restoreDockTop() {
+        if (!dock) return;
+        var saved = NaN;
+        try { saved = parseFloat(localStorage.getItem(DOCK_TOP_KEY)); } catch (e) {}
+        var top = isFinite(saved) ? saved : window.innerHeight * 0.55;
+        applyDockTop(clampDockTop(top));
+    }
+
+    function initDockDrag() {
+        if (!dock) return;
+
+        dock.addEventListener('pointerdown', function (event) {
+            if (!isMobileDock()) return;
+            if (dock.classList.contains('is-expanded')) return; /* 只有折叠小胶囊可拖 */
+            if (event.pointerType === 'mouse' && event.button !== 0) return;
+            var rect = dock.getBoundingClientRect();
+            dockDrag.active = true;
+            dockDrag.moved = false;
+            dockDrag.startY = event.clientY;
+            dockDrag.startTop = rect.top;
+            dockDrag.id = event.pointerId;
+        });
+
+        window.addEventListener('pointermove', function (event) {
+            if (!dockDrag.active || event.pointerId !== dockDrag.id) return;
+            var dy = event.clientY - dockDrag.startY;
+            if (Math.abs(dy) > 5) dockDrag.moved = true;
+            if (!dockDrag.moved) return;
+            applyDockTop(clampDockTop(dockDrag.startTop + dy));
+            if (event.cancelable) event.preventDefault();
+        }, { passive: false });
+
+        function endDrag(event) {
+            if (!dockDrag.active) return;
+            if (event && event.pointerId != null && event.pointerId !== dockDrag.id) return;
+            dockDrag.active = false;
+            if (dockDrag.moved) {
+                dockDragEndAt = Date.now();
+                try {
+                    var top = parseFloat(window.getComputedStyle(dock).top);
+                    if (isFinite(top)) localStorage.setItem(DOCK_TOP_KEY, String(Math.round(top)));
+                } catch (e) {}
+            }
+            dockDrag.id = null;
+        }
+
+        window.addEventListener('pointerup', endDrag);
+        window.addEventListener('pointercancel', endDrag);
+
+        /* 旋屏 / 改窗口大小后，原来的 px 可能已经越界：重新夹回可视范围 */
+        window.addEventListener('resize', function () {
+            if (!dock) return;
+            /* 拉宽到桌面宽度就不再是迷你两态，顺手把展开态和遮罩收掉 */
+            if (!isMobileDock() && dock.classList.contains('is-expanded')) collapseDock();
+            var top = parseFloat(window.getComputedStyle(dock).top);
+            if (isFinite(top)) applyDockTop(clampDockTop(top));
+        });
+    }
+
+    function expandDock() {
+        if (!dock || !dockEl) return;
+        dock.classList.add('is-expanded');
+        if (dockBackdrop) dockBackdrop.classList.add('is-open');
+        if (dockEl.fab) dockEl.fab.setAttribute('aria-expanded', 'true');
+        /* 展开后变高（42 → 54），贴着屏幕底部时可能冒出去，重新夹一下 */
+        var top = parseFloat(window.getComputedStyle(dock).top);
+        if (isFinite(top)) applyDockTop(Math.max(8, Math.min(window.innerHeight - 54 - 8, top)));
+        /* 展开后圆钮被隐藏，把焦点交给播放键，键盘用户不至于丢焦点 */
+        if (dockEl.toggle && document.activeElement === dockEl.fab) dockEl.toggle.focus();
+    }
+
+    function collapseDock() {
+        if (!dock || !dockEl) return;
+        dock.classList.remove('is-expanded');
+        if (dockBackdrop) dockBackdrop.classList.remove('is-open');
+        if (dockEl.fab) {
+            dockEl.fab.setAttribute('aria-expanded', 'false');
+            if (document.activeElement && dock.contains(document.activeElement)) dockEl.fab.focus();
+        }
     }
 
     function toggleDockPanel() {
@@ -1329,6 +1472,11 @@
             closeDockPanel('tap');
             return;
         }
+        /* 面板从播放条上方弹出：按上方剩余空间限制高度，别顶出屏幕被裁 */
+        var rect = dock.getBoundingClientRect();
+        var avail = rect.top - 20;
+        var cap = Math.max(140, Math.min(window.innerHeight * 0.6, avail));
+        dockEl.panel.style.maxHeight = cap + 'px';
         dock.classList.add('is-list-open');
         dockEl.listBtn.setAttribute('aria-expanded', 'true');
         dockEl.panel.inert = false;
@@ -1341,6 +1489,8 @@
         applyExitMotion(dockEl.panel, reason, 'up');
         dock.classList.remove('is-list-open');
         dockEl.listBtn.setAttribute('aria-expanded', 'false');
+        /* 不清空 maxHeight：收起时保持当前高度淡出下移。
+           一旦清空会瞬间回退到 CSS 的 46vh，高度变大就会闪出一帧顶出屏幕的溢出。 */
         dockEl.panel.inert = true;
     }
 
@@ -1362,6 +1512,8 @@
             ? '暂停'
             : (state.locked ? '今日不可再试' : '播放'));
         dockEl.fill.style.width = percent.toFixed(2) + '%';
+        /* 折叠圆钮那圈进度环读这个变量（见 dock.css 的 .music-dock-fab::before） */
+        dock.style.setProperty('--dock-progress', percent.toFixed(2));
         dockEl.progress.setAttribute('aria-valuemax', String(Math.round(duration) || 0));
         dockEl.progress.setAttribute('aria-valuenow', String(Math.round(state.currentTime) || 0));
 
@@ -1391,6 +1543,8 @@
             scheduled = true;
             window.requestAnimationFrame(function () {
                 scheduled = false;
+                /* 展开状态下只要页面一滚就自动收回 */
+                if (dock && dock.classList.contains('is-expanded')) collapseDock();
                 syncDock();
             });
         }, { passive: true });
@@ -1420,6 +1574,7 @@
             }
         }
 
+        if (!visible && dock.classList.contains('is-expanded')) collapseDock();
         dock.classList.toggle('is-visible', visible);
         dock.setAttribute('aria-hidden', visible ? 'false' : 'true');
     }
@@ -1568,6 +1723,7 @@
             '    </div>',
             '    <div class="mp-transport">',
             '    <div class="mp-modeslot">',
+            '      <button class="mp-btn mp-fs-btn" type="button" data-mp="fullscreen" aria-label="网页全屏" title="网页全屏">' + ICONS.fullscreen + '</button>',
             '      <button class="mp-btn mp-mode" type="button" data-mp="mode" data-mode="list" aria-label="播放模式：顺序播放" title="播放模式">' + ICONS.modeList + ICONS.modeShuffle + ICONS.modeOne + '</button>',
             '    </div>',
             '    <div class="mp-controls">',
@@ -1612,6 +1768,7 @@
             durTime: layer.querySelector('.mp-time--dur'),
             toggle: layer.querySelector('.mp-play'),
             mode: layer.querySelector('.mp-mode'),
+            fullscreenBtn: layer.querySelector('[data-mp="fullscreen"]'),
             queueBtn: layer.querySelector('[data-mp="queue"]'),
             queue: layer.querySelector('.mp-queue'),
             rows: layer.querySelector('.mp-queue-list'),
@@ -1640,6 +1797,7 @@
             else if (action === 'prev') step('prev');
             else if (action === 'next') step('next');
             else if (action === 'mode') cycleMode();
+            else if (action === 'fullscreen') toggleFullscreen();
             else if (action === 'queue') toggleQueue();
             else if (action === 'mute') {
                 ensureEngine().then(function (instance) { instance.toggleMute(); }).catch(function () {});
@@ -1684,6 +1842,47 @@
         window.addEventListener('resize', function () {
             if (playerOpen && playerQueueOpen) pinBodyHeight(true);
         });
+    }
+
+    /* ---------------- 播放页 · 网页全屏 ----------------
+       注意「网页全屏」不是 requestFullscreen：不要真去请求浏览器整屏全屏
+       （那会把地址栏 / 标签栏一起赶走），只是让播放页铺满**当前网页视口**。
+       所以这里只做一件事 —— 在 .mp-modal 上挂 / 摘 .is-fullscreen，
+       版面全在 player.css 里按这条 class 写。 */
+    function syncFullscreenButton() {
+        if (!player || !player.fullscreenBtn) return;
+        var on = !!(modal && modal.classList.contains('is-fullscreen'));
+        player.fullscreenBtn.innerHTML = on ? ICONS.fullscreenExit : ICONS.fullscreen;
+        player.fullscreenBtn.setAttribute('aria-label', on ? '退出网页全屏' : '网页全屏');
+        player.fullscreenBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        player.fullscreenBtn.setAttribute('title', on ? '退出网页全屏' : '网页全屏');
+    }
+
+    /* 面板尺寸变了：重算「内容区能不能继续滚」和歌单的钉高 */
+    function relayoutAfterFullscreen() {
+        if (!playerOpen) return;
+        syncBodyFade();
+        if (playerQueueOpen) pinBodyHeight(true);
+    }
+
+    function enterFullscreen() {
+        if (!modal || modal.classList.contains('is-fullscreen')) return;
+        modal.classList.add('is-fullscreen');
+        syncFullscreenButton();
+        relayoutAfterFullscreen();
+    }
+
+    function exitFullscreen() {
+        if (!modal || !modal.classList.contains('is-fullscreen')) return;
+        modal.classList.remove('is-fullscreen');
+        syncFullscreenButton();
+        relayoutAfterFullscreen();
+    }
+
+    function toggleFullscreen() {
+        if (!modal) return;
+        if (modal.classList.contains('is-fullscreen')) exitFullscreen();
+        else enterFullscreen();
     }
 
     /* 面板内容溢出了才在控件条上沿飘一层淡出 —— 直接量 scrollHeight，
@@ -1850,6 +2049,9 @@
     function closePlayer() {
         if (!playerOpen) return;
         playerOpen = false;
+        /* 网页全屏跟着播放页一起收：留着的话下次打开直接铺满，
+           跟第一次打开的样子不一致 */
+        exitFullscreen();
         /* 收起就作废回中计时：离开播放器不该把歌词滚回中间，
            下次打开再重新数 */
         cancelLyricReturn();
@@ -2313,19 +2515,32 @@
                 item.classList.add('is-timed', 'is-seekable');
                 item.title = '跳到这一句';
 
-                /* 时间和正文是一个整体（CSS 里整行居中），时间块常驻占位：
-                   露出 / 收起都不会推动正文，折行也不变。 */
-                var stamp = document.createElement('span');
-                stamp.className = 'mp-lyric-time';
-                stamp.textContent = formatTime(line.time);
-                /* 只做视觉提示，读屏念歌词本身就好，不用每句前都念一遍时间 */
-                stamp.setAttribute('aria-hidden', 'true');
-                item.appendChild(stamp);
-
                 var text = document.createElement('span');
                 text.className = 'mp-lyric-text';
                 text.textContent = line.text || '';
                 item.appendChild(text);
+
+                /* 时间块放在正文后面，靠 CSS 绝对定位贴到歌词区最右边：
+                   不占正文的排版位置，正文照旧整行居中，悬停露出 / 收起
+                   都不会把字推来推去。 */
+                var stamp = document.createElement('span');
+                stamp.className = 'mp-lyric-time';
+                /* 只做视觉提示，读屏念歌词本身就好，不用每句前都念一遍时间 */
+                stamp.setAttribute('aria-hidden', 'true');
+
+                /* 时间前面那枚小三角：「点这一句就从这里放」的提示。
+                   点击由整行接管（见下面 item 的 click），它自己不接事件 */
+                var cue = document.createElement('span');
+                cue.className = 'mp-lyric-cue';
+                cue.innerHTML = ICONS.play;
+                stamp.appendChild(cue);
+
+                var clock = document.createElement('span');
+                clock.className = 'mp-lyric-clock';
+                clock.textContent = formatTime(line.time);
+                stamp.appendChild(clock);
+
+                item.appendChild(stamp);
 
                 /* 点一句跳过去（还没开始放的话就顺带放起来）。不做 Tab 焦点
                    （几十个 Tab 停靠点会把键盘用户困在歌词里） */
@@ -2464,7 +2679,10 @@
     }
 
     /* 用户滚开歌词之后：停手满 LYRIC_RETURN_DELAY 就把正在唱的那句滚回中间。
-       「停手」按播放器里最后一次操作算，所以每次都先撤掉旧计时再重挂。 */
+       「停手」按播放器里最后一次操作算，所以每次都先撤掉旧计时再重挂。
+       ⚠️ 没在放的时候不抢：暂停着往后翻两句歌词是很正常的读法，
+       这时候把视图拽回去等于不让人看。放下 detached 不管，等真的起播
+       再由 applyState 里那次「暂停 → 播放」重新排一次计时。 */
     function scheduleLyricReturn() {
         cancelLyricReturn();
         if (!playerOpen || !lyric.detached) return;
@@ -2472,6 +2690,7 @@
             lyric.idleTimer = null;
             /* 关掉播放器之后才到点的计时什么也不做 */
             if (!playerOpen || !lyric.detached) return;
+            if (!state.playing) return;
             lyric.detached = false;
             if (lyric.active >= 0) centerLyric(lyric.active);
         }, LYRIC_RETURN_DELAY);
